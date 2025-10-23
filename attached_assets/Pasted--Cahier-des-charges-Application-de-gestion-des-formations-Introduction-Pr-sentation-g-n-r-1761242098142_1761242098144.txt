@@ -1,0 +1,421 @@
+# Cahier des charges – Application de gestion des formations
+
+## Introduction – Présentation générale de l’outil
+
+L’application de gestion des formations développée pour **Colombus Consulting** a pour objectif de centraliser et simplifier tout le processus de formation interne, depuis la consultation du catalogue jusqu’à la validation des présences. Elle vise à fluidifier les échanges entre **consultants**, **RH**, **formateurs** et **managers**, tout en garantissant un suivi précis des priorités, des inscriptions et de la complétion des sessions.
+
+L’outil fonctionne comme un **portail unique** accessible en ligne. Chaque collaborateur s’y connecte selon son rôle et dispose d’un espace personnalisé :
+
+* Les **consultants** peuvent parcourir le catalogue des formations disponibles, rechercher par mots-clés, thème ou niveau, consulter les fiches détaillées et s’inscrire à une session. S’ils ne trouvent pas la formation souhaitée, ils peuvent soumettre une **demande hors catalogue** directement aux RH. Lors de l’inscription, ils choisissent un **niveau de priorité** (P1, P2 ou P3) dans le respect des quotas annuels, et sont informés si leur niveau de séniorité ne correspond pas aux critères de la formation. En cas de session complète ou non planifiée, ils rejoignent une **liste d’attente** et sont automatiquement notifiés dès qu’une place se libère ou qu’une session est créée. Les consultants reçoivent également leurs **invitations Outlook**, leurs rappels, et accèdent à leurs **attestations de présence** après la formation.
+
+* Les **RH** disposent d’un back-office complet pour construire et administrer le **catalogue de formations** : création et mise à jour des fiches, planification de sessions, gestion des salles, suivi des inscriptions et des présences, export de données et reporting. Ils sont les seuls habilités à **valider les inscriptions** (en masse ou individuellement) et à transformer les demandes hors catalogue en nouvelles formations. L’application automatise la **promotion des consultants** en liste d’attente selon leurs priorités et gère l’envoi des e-mails et invitations Outlook. Les RH peuvent également suivre les indicateurs clés : taux de remplissage, complétion, no-show, répartition des priorités, etc.
+
+* Les **formateurs** peuvent déclarer leurs **disponibilités** pour animer des sessions, être notifiés des nouvelles demandes d’inscription sur leurs formations, et gérer la **feuille d’émargement numérique** via un **QR code rotatif** projeté en salle. Les participants scannent le QR code pour s’enregistrer automatiquement, et le formateur valide sa propre présence. Le système empêche les doublons ou fraudes et permet une vérification rapide des présences.
+
+* Les **managers et coachs** disposent d’un tableau de bord pour suivre les formations suivies, à venir ou planifiées par les membres de leur équipe. Cela leur permet d’accompagner la montée en compétence des collaborateurs sans interférer dans le processus d’inscription.
+
+En résumé, cette application fait le lien entre les besoins individuels des collaborateurs et la gestion globale du plan de formation de l’entreprise. Elle combine un **catalogue dynamique**, un **moteur d’inscription intelligent** (priorités, listes d’attente, séniorité), une **gestion RH centralisée**, et un **dispositif d’émargement numérique** moderne. L’ensemble vise à **automatiser** les tâches répétitives, **fiabiliser** les données de formation et **offrir une expérience fluide** à tous les acteurs du processus.
+
+---
+
+## 0) Contexte & objectifs
+
+* **Organisation** : Colombus Consulting.
+* **Objectif principal** : permettre aux **consultants** de s’inscrire à des formations du **catalogue**, et aux **RH**/**formateurs** de piloter l’offre, les sessions, les présences et le reporting. Les **managers/coach** consultent le suivi de leur équipe (sans étape de validation managériale en V1).
+* **Livrable** : Web app (desktop-first, responsive), V1 déployable sur Replit.
+
+---
+
+## 1) Périmètre fonctionnel (V1)
+
+## Parcours détaillé du consultant
+
+Le parcours du **consultant** dans l’application est conçu pour être fluide, intuitif et cohérent avec les processus internes de gestion des formations. Il couvre toutes les étapes depuis la découverte du catalogue jusqu’à la participation à une formation et la récupération de son attestation.
+
+### Étape 1 – Connexion et accès au portail
+
+Le consultant accède à l’application via un navigateur Web sécurisé. Il se connecte avec son adresse e-mail professionnelle (authentification par lien magique ou SSO). Une fois connecté, il arrive sur son **tableau de bord personnel**, qui présente :
+
+* Ses **formations à venir**, **en attente** ou **passées** ;
+* Son compteur de **priorités P1/P2** pour l’année civile ;
+* Des suggestions de formations en lien avec son profil (niveau de séniorité, BU, historique de participation).
+
+### Étape 2 – Recherche d’une formation
+
+Le consultant peut explorer le **catalogue de formations** de deux manières :
+
+1. **Par navigation** : une liste filtrable par thèmes, tags, modalités (présentiel/distanciel), durée, niveau requis, etc.
+2. **Par recherche directe** : une barre de recherche à tolérance de fautes lui permet de taper un ou plusieurs mots-clés pour retrouver des formations pertinentes.
+
+Chaque formation s’affiche sous forme de carte ou de ligne contenant : le titre, le niveau requis, la durée, la modalité, les prochaines sessions, et les tags principaux. En cliquant sur une carte, il accède à la **fiche détaillée**.
+
+### Étape 3 – Consultation d’une fiche formation
+
+La fiche présente :
+
+* Le descriptif complet (objectifs, contenu, prérequis) ;
+* Le niveau de séniorité requis ;
+* Les sessions disponibles avec dates, horaires, capacité restante et lieu/modalité ;
+* Les formateurs pressentis ou confirmés ;
+* Les retours d’expérience ou statistiques de satisfaction (dans les versions ultérieures).
+
+Si la séniorité du consultant est inférieure au niveau requis, une **boîte de dialogue d’alerte** s’affiche :
+
+> “Cette formation est réservée aux profils plus expérimentés. Souhaitez-vous tout de même demander votre inscription ?”
+> Le consultant peut choisir de continuer ou d’annuler.
+
+### Étape 4 – Choix d’une session et d’une priorité
+
+* Le consultant choisit une session disponible. Les sessions **complètes** apparaissent **grisées** et sont non sélectionnables.
+* Si aucune session n’est planifiée, un message indique :
+
+> “Aucune session n’est encore planifiée. Vous serez notifié dès qu’une date sera disponible.”
+> Il peut alors se **mettre en liste d’attente** pour la formation.
+
+* Lors de l’inscription, il sélectionne une **priorité** : **P1, P2 ou P3**.
+
+  * Le système vérifie automatiquement les quotas : **1 P1** et **1 P2 par an maximum**.
+  * Si le quota est dépassé, l’option correspondante est désactivée.
+* Une confirmation d’inscription s’affiche et un mail de **demande en attente de validation RH** est envoyé.
+
+### Étape 5 – Validation RH et notifications
+
+Les RH examinent la demande. Lorsqu’ils valident l’inscription :
+
+* Le consultant reçoit un **mail de confirmation** accompagné d’une **invitation Outlook (.ics)**.
+* S’il était en liste d’attente et qu’une place se libère, il est automatiquement **promu** selon les règles de priorité (P1>P2>P3, FIFO) et notifié par e-mail.
+
+### Étape 6 – Annulation ou modification
+
+Le consultant peut annuler son inscription depuis la page **Mes formations**.
+
+* Si l’annulation intervient **plus de 10 jours avant** la session, aucune pénalité : le quota P1/P2 est restitué.
+* Si elle intervient **dans les 10 jours précédant** la session, une **alerte d’avertissement** s’affiche avant confirmation.
+* Après annulation, le premier utilisateur de la **liste d’attente formation** est promu automatiquement.
+
+### Étape 7 – Participation à la formation
+
+Le jour de la formation, le consultant se rend en salle ou rejoint le lien visio. Le formateur projette la **feuille d’émargement QR code** :
+
+* Le consultant scanne le QR code via son smartphone, ce qui enregistre sa présence.
+* Un code alternatif (6 caractères) est disponible en cas de problème technique.
+
+### Étape 8 – Attestation et historique
+
+À la fin de la formation :
+
+* Le statut du consultant passe à **“complété”** s’il a émargé.
+* Il peut télécharger une **attestation de présence PDF** contenant le titre, les dates, la durée, le formateur et la signature électronique.
+* L’attestation reste accessible depuis son espace personnel, rubrique **Mes formations**.
+
+### Étape 9 – Demande hors catalogue (optionnel)
+
+Si le consultant ne trouve pas de formation correspondant à son besoin :
+
+* Il clique sur **“Je ne trouve pas ma formation”**.
+* Il remplit un **formulaire de demande** (titre souhaité, objectifs, justification, priorité, période cible, etc.).
+* La demande est transmise aux **RH**, qui peuvent l’examiner, fusionner avec une formation existante ou la transformer en nouvelle offre.
+* Le consultant reçoit un **accusé de réception** et un suivi de statut.
+
+Ce parcours garantit une expérience utilisateur simple, transparente et automatisée, tout en respectant les contraintes de priorité, de séniorité et de validation RH.
+
+---
+
+## Parcours détaillé des RH
+
+Le parcours **RH** est centré sur la création du catalogue, la planification des sessions, la validation des inscriptions et le suivi administratif des formations. L’interface RH se présente comme un tableau de bord de gestion complet.
+
+### Étape 1 – Création et mise à jour du catalogue
+
+* Les RH disposent d’un module **Catalogue** où ils peuvent créer, modifier ou archiver des formations.
+* Chaque fiche formation comporte : un titre, une description, les objectifs pédagogiques, la durée, les prérequis, la modalité (présentiel/distanciel/hybride), le niveau de séniorité requis, et des tags pour la recherche.
+* Les RH peuvent activer ou désactiver une formation du catalogue, et associer un ou plusieurs formateurs.
+
+### Étape 2 – Gestion des disponibilités formateurs et planification
+
+* Les formateurs saisissent leurs **disponibilités** ; les RH consultent ces créneaux dans une vue calendrier consolidée.
+* Le module **Planning** affiche les disponibilités formateurs, la disponibilité des salles et les inscriptions en attente.
+* Les RH créent une **session** en sélectionnant : la formation, le formateur, la salle ou le lien visio, la capacité et les dates/heures.
+* Le système vérifie la cohérence des ressources (salle libre, capacité, chevauchements). Si tout est correct, la session peut être publiée.
+
+### Étape 3 – Publication et ouverture des inscriptions
+
+* En publiant une session, les RH déclenchent automatiquement l’ouverture des inscriptions.
+* Les consultants déjà en **liste d’attente formation** sont promus selon la règle de priorité (P1>P2>P3, FIFO).
+* Un mail automatique est envoyé aux personnes concernées.
+
+### Étape 4 – Validation des inscriptions
+
+* Les RH visualisent toutes les **demandes d’inscription** dans une interface dédiée.
+* Ils peuvent **valider en masse** plusieurs demandes à la fois, le système contrôlant les quotas P1/P2.
+* Lors de la validation, une **invitation Outlook (.ics)** est générée et envoyée automatiquement.
+* En cas de refus, le consultant reçoit une notification avec le motif.
+
+### Étape 5 – Suivi de remplissage et gestion des sessions
+
+* Tableau de bord des sessions : nombre d’inscrits, taux de remplissage, présence du formateur, statut de session (ouverte, complète, clôturée, annulée).
+* Les RH peuvent ajuster les capacités, changer de formateur, déplacer une session ou l’annuler (avec envoi automatique d’un mail d’annulation aux inscrits).
+
+### Étape 6 – Suivi des présences et attestations
+
+* Après chaque session, le formateur valide les présences via QR code ; les RH peuvent **corriger ou compléter** la feuille d’émargement.
+* Ils génèrent et valident les **attestations PDF**.
+
+### Étape 7 – Reporting et exports
+
+* Module **Reporting** : indicateurs clés (taux de remplissage, complétion, no-show, utilisation des priorités, répartition par BU ou séniorité).
+* Export **CSV/Excel** des inscriptions, présences, no-shows et listes d’attente.
+* Données exploitables pour le suivi budgétaire ou la planification annuelle.
+
+### Étape 8 – Gestion des demandes hors catalogue
+
+* Les RH reçoivent les **demandes hors catalogue** des consultants.
+* Ils peuvent :
+
+  * Les qualifier et les commenter ;
+  * Les fusionner avec une formation existante ;
+  * Ou les transformer en **nouvelle formation** dans le catalogue.
+* Suivi du statut de la demande (en revue, acceptée, refusée, dupliquée, planifiée) avec notification au consultant.
+
+---
+
+## Parcours détaillé du formateur
+
+Le parcours du **formateur** est axé sur la planification de ses disponibilités, la gestion de ses sessions et la tenue des présences le jour de la formation.
+
+### Étape 1 – Déclaration des disponibilités
+
+* Le formateur accède à un module **Mes disponibilités** où il renseigne ses créneaux libres pour animer des sessions : date, heure, modalité (présentiel/distanciel), capacité suggérée, commentaire éventuel.
+* Les RH visualisent ces créneaux pour planifier de futures sessions.
+
+### Étape 2 – Notification des demandes en attente
+
+* Lorsque des consultants s’inscrivent à une formation dont il est formateur potentiel, il reçoit un **mail automatique** :
+
+  > « Vous avez de nouvelles demandes d’inscription sur la formation X. »
+* Cela lui permet d’ajuster ses disponibilités ou de se préparer à une future session.
+
+### Étape 3 – Sessions confirmées
+
+* Lorsqu’une session est créée et publiée, le formateur reçoit une **notification par e-mail** et une **invitation Outlook (.ics)**.
+* Il peut consulter la liste des inscrits, leur statut (validé, en attente, annulé) et le taux de remplissage.
+
+### Étape 4 – Animation et émargement
+
+* Le jour de la session, le formateur ouvre la page **Feuille d’émargement** dans l’application.
+* Un **QR code rotatif** (actualisé toutes les 60 à 120 secondes) est projeté à l’écran.
+* Les participants scannent le QR code pour émarger automatiquement.
+* Le formateur valide également sa propre présence via un bouton « Je suis présent ».
+* En cas de problème technique, un code court (6 caractères) peut être saisi manuellement par les participants.
+
+### Étape 5 – Clôture et validation de la présence
+
+* À la fin de la session, le formateur clôture la feuille d’émargement.
+* Il peut indiquer des remarques ou signaler des absences justifiées.
+* Les RH disposent ensuite d’un relevé complet des présences et peuvent générer les attestations.
+
+### Étape 6 – Historique et suivi
+
+* Le formateur peut consulter son **historique de sessions** animées, avec le nombre de participants, les taux de présence et les évaluations (dans les versions futures).
+
+---
+
+## Parcours détaillé du manager / coach
+
+Le **manager ou coach** n’intervient pas dans le processus de validation mais dispose d’un rôle de suivi et de pilotage.
+
+### Étape 1 – Consultation du tableau de bord
+
+* Accès à un espace **Tableau de bord équipe** listant les consultants rattachés.
+* Pour chaque collaborateur :
+
+  * Formations suivies (titre, date, durée, modalité) ;
+  * Formations à venir et en attente ;
+  * Priorités utilisées (P1, P2) ;
+  * Heures totales de formation cumulées.
+
+### Étape 2 – Analyse et accompagnement
+
+* Visualisation d’indicateurs par consultant ou par équipe :
+
+  * Taux de complétion des formations ;
+  * Répartition des thématiques (ex : soft skills, management, outils digitaux) ;
+  * Historique sur plusieurs années.
+* Ces informations permettent au manager de planifier les entretiens annuels et de définir des besoins de montée en compétence.
+
+---
+
+### 1.1 Rôles & permissions
+
+...
+
+---
+
+# Prompt complet à coller dans Replit (construction automatique du projet)
+
+Tu es **Replit AI**. Crée une application **monorepo** complète (backend + frontend) conforme aux spécifications suivantes, avec un **design moderne** et **accessible**, basée sur les couleurs : `#FFFFFF` (blanc), `#00313F` (vert-bleu profond), `#FF8200` (orange), `#009ECB` (cyan). Harmonise la palette via des **rôles sémantiques** de couleur (primary, accent, surface, text, subtle) pour un rendu élégant et cohérent.
+
+## 1) But & rôles
+
+* Organisation : **Colombus Consulting**.
+* But : Gestion complète des **formations**. Rôles : **consultant**, **RH**, **formateur**, **manager/coach**.
+* Parcours clés : catalogue, inscription (priorités **P1/P2/P3** avec quotas annuels **1 P1 + 1 P2**), waitlist **au niveau formation**, validation **RH uniquement** (bulk), sessions, émargement **QR rotatif**, attestations PDF, recherche FTS, demandes hors catalogue.
+
+## 2) Stack & structure
+
+* **Backend** : Node.js 20, **Express**, **Prisma** ORM, **SQLite** (FTS5), **Zod** validation, **Nodemailer** (mode dev SMTP `ethereal`), **ics** pour invitations, **pdfkit** pour attestations, **jsonwebtoken** pour auth JWT.
+* **Frontend** : **React + Vite**, **TypeScript**, **React Router**, **React Query**, **Tailwind CSS** + **Headless UI** (ou Radix) + **Heroicons**.
+* **Tests** : **Jest** (API) & **Vitest** (UI) minimal.
+* **Monorepo** :
+
+```
+/ (root)
+  package.json (workspaces)
+  /apps
+    /api (Express)
+    /web (React Vite)
+  /packages
+    /ui (Design tokens + composants partagés)
+    /config (tsconfig, eslint, tailwind preset)
+```
+
+## 3) Scripts NPM (root)
+
+```json
+{
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "postinstall": "prisma generate --schema=apps/api/prisma/schema.prisma",
+    "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "build": "npm --prefix apps/api run build && npm --prefix apps/web run build",
+    "start": "npm --prefix apps/api start"
+  },
+  "devDependencies": {"concurrently":"^9"}
+}
+```
+
+## 4) Backend (apps/api)
+
+* **Dépendances** : express, cors, zod, jsonwebtoken, bcryptjs, prisma, @prisma/client, better-sqlite3, nodemailer, ics, pdfkit, qrcode, nanoid.
+* **Prisma schema** (SQLite, FTS5) : crée les tables décrites au §3 du cahier des charges, dont : `users`, `trainings`, `sessions`, `enrollments`, `waitlists_training`, `priority_counters`, `trainer_availabilities`, `rooms`, `attendance_tokens`, `attendances`, `training_requests`, `notifications`, `files`, `audit_logs`.
+
+  * Ajoute un **virtual table FTS5** `trainings_fts(title, description, objectives, tags)` avec triggers d’indexation (insert/update/delete).
+* **Auth** : simple **magic-link** dev (token e-mail) + fallback **login demo**. Stocke rôle & seniority dans le JWT.
+* **Middleware RBAC** par rôle.
+* **ICS** : endpoint utilitaire pour générer et envoyer invitations.
+* **QR rotatif** : endpoint `POST /api/sessions/:id/attendance-token/rotate` générant un token HMAC (secret `.env`) avec TTL 90s ; `GET /api/sessions/:id/attendance-qr` renvoie un PNG QR.
+* **Endpoints principaux** (implémente ceux listés au cahier des charges) :
+
+  * Auth: `POST /api/auth/login`, `GET /api/auth/me`
+  * Catalogue & recherche: `GET /api/trainings`, `GET /api/trainings/:id`, `GET /api/search/suggest`
+  * Sessions (RH): `POST /api/sessions`, `PATCH /api/sessions/:id`, `POST /api/sessions/:id/publish`, `POST /api/sessions/:id/cancel`
+  * Inscriptions: `POST /api/trainings/:id/waitlist`, `POST /api/sessions/:id/enroll`, `POST /api/enrollments/bulk-validate`, `POST /api/enrollments/:id/cancel`
+  * Présences & attestations: `POST /api/sessions/:id/attendance/scan`, `POST /api/sessions/:id/attendance/manual`, `POST /api/sessions/:id/attendance/trainer-self`, `GET /api/enrollments/:id/attestation`
+  * Demandes hors catalogue: `POST /api/training-requests`, `GET /api/me/training-requests`, `GET/PATCH /api/training-requests/:id`
+  * Reporting/exports: `GET /api/reports/*`, `GET /api/exports/*.csv`
+* **Règles métier** à implémenter :
+
+  * Quotas P1/P2 vérifiés **à la validation RH** ; restitution si annulation avant début ; pas de restitution en `no_show`.
+  * Waitlist **au niveau formation** ; promotion P1 > P2 > P3 puis FIFO ; invitation **après validation RH**.
+  * Alerte J-10 lors d’une annulation tardive.
+  * Fenêtre d’émargement : `start_at - 15min` → `end_at`.
+* **Seed** : crée 2 RH, 3 formateurs, 1 manager, ~40 consultants, 20 formations (tags variés), 10 sessions (dont 3 complètes), 12 dispos formateurs, quelques demandes hors catalogue, 15 entrées en waitlist formation.
+
+### `.env` (apps/api)
+
+```
+JWT_SECRET=devsecret
+MAIL_FROM="Formations <noreply@colombus.example>"
+SMTP_HOST=smtp.ethereal.email
+SMTP_PORT=587
+SMTP_USER=demo
+SMTP_PASS=demo
+ATTENDANCE_TOKEN_SECRET=qr_secret
+BASE_URL=http://localhost:5173
+API_URL=http://localhost:3000
+```
+
+## 5) Frontend (apps/web)
+
+* **Dépendances** : react, react-dom, react-router-dom, @tanstack/react-query, axios, tailwindcss, class-variance-authority, @headlessui/react, @heroicons/react, react-hook-form, @hookform/resolvers, zod.
+* **Pages** : `/login`, `/catalogue`, `/formation/:id`, `/mes-formations`, `/rh/formations`, `/rh/sessions/:id`, `/rh/planning`, `/formateur/sessions`, page **Émargement** plein écran, `/manager/dashboard`.
+* **États** : Query keys structurés (`trainings`, `sessions`, `enrollments`, etc.). Garde de route par rôle.
+* **Formulaires** : **react-hook-form** + **zod** resolver.
+
+## 6) Design system (packages/ui)
+
+Met en place un **design system minimal** avec **Tailwind** et tokens sémantiques pour harmoniser la palette :
+
+### Couleurs
+
+Définit des **variables CSS** et une config Tailwind personnalisée :
+
+```css
+:root{
+  --color-surface:#FFFFFF;          /* fonds principaux */
+  --color-surface-muted:#F6F9FB;    /* panneaux secondaires */
+  --color-primary:#00313F;          /* actions, app bar */
+  --color-primary-contrast:#FFFFFF; /* texte sur primary */
+  --color-accent:#009ECB;           /* liens, focus, états informatifs */
+  --color-warn:#FF8200;             /* CTAs secondaires, alertes soft */
+  --color-text:#0F1C22;             /* texte par défaut (très sombre bleuté) */
+  --color-text-muted:#4E646C;       /* labels, aides */
+  --radius:14px;                    /* arrondis doux */
+  --shadow:0 6px 24px rgba(0,0,0,.08);
+}
+```
+
+**Règles d’usage** :
+
+* **Primary (#00313F)** pour barres d’app, boutons primaires, puces de statut confirmé.
+* **Accent (#009ECB)** pour liens, focus visible, badges informatifs, sliders/progress.
+* **Warn (#FF8200)** en **petites touches** : CTA secondaire, pill de priorité **P1**, messages d’attention J-10.
+* Privilégier fonds **blanc/surface-muted** + éléments primary/accent pour éviter les conflits de saturation.
+
+### Typographie & densité
+
+* Police : **Inter**, 14px/16px base, échelles `text-sm|base|lg|xl|2xl`.
+* Hauteur de ligne 1.5 ; espaces `8/12/16/24` ; cartes avec **ombre douce** et **bordures 1px** subtiles.
+
+### Composants
+
+* **AppBar** (primary), **Card**, **Button** (primary/accent/ghost), **Badge** (P1 orange, P2 accent, P3 muted), **Tag**, **Table**, **Modal**, **EmptyState**, **Form**, **Stepper**, **Toast**.
+* États **accessibles** : focus rings accent, contrastes > 4.5:1, zones touch 44px.
+
+## 7) UX spécifiques à implémenter
+
+* **Catalogue** : sessions complètes **grisées** + badge “Complet”. CTA « **Je ne trouve pas ma formation** ».
+* **Fiche formation** : bandeau **séniorité insuffisante** avec modal confirmation.
+* **Compteurs P1/P2** visibles dans `/mes-formations`.
+* **Validation RH en masse** : table avec colonnes (utilisateur, formation, session, **priorité**, compteur annuel, statut) + filtrage.
+* **Émargement** : page plein écran, QR rotatif (compteur, timer), fallback code manuel.
+
+## 8) Accessibilité & i18n
+
+* Langue par défaut **fr-FR**. Libellés ARIA, focus visible, ordre tab logique. Couleurs testées contraste AA.
+
+## 9) Tests minimum
+
+* API : tests quotas P1/P2, promotion waitlist, annulation J-10, QR fenêtre horaire.
+* UI : rendu pages clés, formulaire inscription avec validation Zod, état sessions complètes.
+
+## 10) Commandes Replit
+
+1. **Installer** : `npm install`
+2. **Init DB** : `npx prisma migrate dev --schema=apps/api/prisma/schema.prisma`
+3. **Seed** : `node apps/api/scripts/seed.js`
+4. **Lancer** : `npm run dev` (API : 3000, Web : 5173)
+
+## 11) Critères d’acceptation (extraits)
+
+* Recherche par mots-clés opérationnelle (FTS5) avec suggestions.
+* Inscription avec **priorité** et contrôle quotas à la **validation RH**.
+* Waitlist **formation** avec **promotion** automatique P1>P2>P3 FIFO.
+* Invitations **Outlook (.ics)** envoyées à la validation.
+* Émargement par **QR rotatif** ; attestation PDF téléchargeable.
+* Design cohérent, lisible, contrasté, utilisant harmonieusement les 4 couleurs.
+
+> Construis tout le squelette du projet, ajoute des composants UI de base (AppBar, Card, Button, Table, Modal, Badge), les pages listées, et des **données de démo** pour naviguer immédiatement. Documente dans le README comment changer la palette si besoin.
