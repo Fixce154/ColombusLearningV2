@@ -114,7 +114,7 @@ export default function InterestManagement() {
 
   const confirmAction = () => {
     if (!selectedInterest || !actionType) return;
-    const newStatus = actionType === "approve" ? "approved" : "withdrawn";
+    const newStatus = actionType === "approve" ? "approved" : "rejected";
     updateStatusMutation.mutate({ id: selectedInterest.id, status: newStatus, action: actionType });
   };
 
