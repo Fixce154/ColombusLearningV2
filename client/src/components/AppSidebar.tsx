@@ -10,12 +10,23 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Home, BookOpen, Calendar, Users, BarChart, GraduationCap, Heart, Settings, Plus } from "lucide-react";
+import { Home, BookOpen, Calendar, Users, BarChart, GraduationCap, Heart, Settings, Plus, Minus } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { User } from "@shared/schema";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useState } from "react";
 
 interface AppSidebarProps {
   currentUser: User;
@@ -29,6 +40,7 @@ interface MenuSection {
 export default function AppSidebar({ currentUser }: AppSidebarProps) {
   const [location] = useLocation();
   const { toast } = useToast();
+  const [showResignDialog, setShowResignDialog] = useState(false);
 
   const becomeInstructorMutation = useMutation({
     mutationFn: async () => {
@@ -46,6 +58,28 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
         variant: "destructive",
         title: "Erreur",
         description: error.message || "Impossible de devenir formateur",
+      });
+    },
+  });
+
+  const resignInstructorMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/users/resign-instructor", "POST");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      setShowResignDialog(false);
+      toast({
+        title: "Rôle formateur retiré",
+        description: "Vous n'êtes plus formateur.",
+      });
+    },
+    onError: (error: any) => {
+      setShowResignDialog(false);
+      toast({
+        variant: "destructive",
+        title: "Impossible de retirer le rôle",
+        description: error.message || "Des sessions vous sont assignées.",
       });
     },
   });
@@ -188,6 +222,28 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+
+        {currentUser.roles.includes("formateur") && (
+          <SidebarGroup className="mt-6">
+            <SidebarGroupLabel className="text-sidebar-foreground/70 uppercase tracking-wider text-xs mb-2 px-3">
+              Gérer mon rôle
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => setShowResignDialog(true)}
+                    className="h-12 px-4"
+                    data-testid="button-resign-instructor"
+                  >
+                    <Minus className="w-5 h-5" />
+                    <span className="font-medium">Ne plus être formateur</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-6">
         <div className="flex items-center gap-3">
@@ -202,6 +258,30 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
           </div>
         </div>
       </SidebarFooter>
+
+      <AlertDialog open={showResignDialog} onOpenChange={setShowResignDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ne plus être formateur</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir retirer votre rôle de formateur ?
+              <br /><br />
+              Cette action n'est possible que si aucune session ne vous est assignée.
+              Si des sessions vous sont assignées, vous devrez d'abord les réassigner à un autre formateur.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-resign">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => resignInstructorMutation.mutate()}
+              disabled={resignInstructorMutation.isPending}
+              data-testid="button-confirm-resign"
+            >
+              {resignInstructorMutation.isPending ? "Retrait..." : "Confirmer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sidebar>
   );
 }
