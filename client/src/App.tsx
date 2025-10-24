@@ -31,7 +31,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState<User>(mockUsers[0]);
 
   const style = {
-    "--sidebar-width": "20rem",
+    "--sidebar-width": "18rem",
     "--sidebar-width-icon": "4rem",
   };
 
@@ -39,15 +39,17 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full">
+          <div className="flex h-screen w-full bg-background">
             <AppSidebar currentUser={currentUser} />
-            <div className="flex flex-col flex-1">
-              <header className="flex items-center justify-between gap-4 p-4 border-b">
+            <div className="flex flex-col flex-1 min-w-0">
+              <header className="flex items-center justify-between gap-6 px-6 py-5 border-b bg-card shadow-sm">
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
                 <RoleSwitcher currentUser={currentUser} onUserChange={setCurrentUser} />
               </header>
-              <main className="flex-1 overflow-auto p-6 md:p-8">
-                <Router currentUser={currentUser} />
+              <main className="flex-1 overflow-auto">
+                <div className="container max-w-7xl mx-auto px-6 py-8">
+                  <Router currentUser={currentUser} />
+                </div>
               </main>
             </div>
           </div>

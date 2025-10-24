@@ -11,20 +11,22 @@ interface SearchBarProps {
 export default function SearchBar({ value, onChange, placeholder = "Rechercher une formation par mots-clés..." }: SearchBarProps) {
   return (
     <div className="relative">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
+        <Search className="w-5 h-5" />
+      </div>
       <Input
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="pl-10 pr-10 h-12"
+        className="pl-12 pr-12 h-14 text-base shadow-md border-border focus:border-accent focus:ring-accent/20 rounded-xl"
         data-testid="input-search"
       />
       {value && (
         <Button
           variant="ghost"
           size="icon"
-          className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+          className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 hover:bg-accent/10"
           onClick={() => onChange("")}
           data-testid="button-clear-search"
         >

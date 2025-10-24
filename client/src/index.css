@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE */
+/* LIGHT MODE - PREMIUM LMS DESIGN */
 :root {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
@@ -14,80 +14,95 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 0 0% 100%;
+  /* Base colors from Colombus Consulting brand */
+  /* Surface: #FFFFFF, Primary: #00313F, Accent: #009ECB, Warn: #FF8200 */
+  /* Text: #0F1C22, Text Muted: #4E646C */
 
-  --foreground: 0 0% 9%;
+  --background: 210 20% 98%; /* Light gray-blue #F8FAFC for premium feel */
 
-  --border: 0 0% 89%;
+  --foreground: 199 39% 10%; /* #0F1C22 - Deep teal text */
 
-  --card: 0 0% 98%;
+  --border: 210 16% 90%; /* Subtle border */
 
-  --card-foreground: 0 0% 9%;
+  --card: 0 0% 100%; /* Pure white cards #FFFFFF */
 
-  --card-border: 0 0% 93%;
+  --card-foreground: 199 39% 10%; /* #0F1C22 */
 
-  --sidebar: 0 0% 96%;
+  --card-border: 210 16% 93%; /* Subtle card border */
 
-  --sidebar-foreground: 0 0% 9%;
+  /* Sidebar with premium deep teal */
+  --sidebar: 193 100% 12%; /* #00313F - Deep teal primary */
 
-  --sidebar-border: 0 0% 91%;
+  --sidebar-foreground: 0 0% 98%; /* Almost white text */
 
-  --sidebar-primary: 215 90% 45%;
+  --sidebar-border: 193 100% 10%; /* Slightly darker border */
 
-  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-primary: 193 100% 40%; /* #009ECB - Bright cyan accent */
 
-  --sidebar-accent: 215 15% 88%;
+  --sidebar-primary-foreground: 0 0% 100%;
 
-  --sidebar-accent-foreground: 215 90% 20%;
+  --sidebar-accent: 193 100% 18%; /* Lighter teal for hover */
 
-  --sidebar-ring: 215 90% 45%;
+  --sidebar-accent-foreground: 0 0% 98%;
 
-  --popover: 0 0% 94%;
+  --sidebar-ring: 193 100% 40%; /* Bright cyan ring */
 
-  --popover-foreground: 0 0% 9%;
+  --popover: 0 0% 100%; /* Pure white */
 
-  --popover-border: 0 0% 87%;
+  --popover-foreground: 199 39% 10%;
 
-  --primary: 215 90% 45%;
+  --popover-border: 210 16% 90%;
 
-  --primary-foreground: 0 0% 98%;
+  /* Primary = Deep Teal #00313F */
+  --primary: 193 100% 12%;
 
-  --secondary: 0 0% 90%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary-foreground: 0 0% 9%;
+  /* Secondary = Light gray for subtle elements */
+  --secondary: 210 16% 95%;
 
-  --muted: 215 8% 92%;
+  --secondary-foreground: 199 39% 10%;
 
-  --muted-foreground: 215 6% 35%;
+  /* Muted = Soft blue-gray */
+  --muted: 210 20% 96%;
 
-  --accent: 215 12% 90%;
+  --muted-foreground: 196 16% 36%; /* #4E646C - Muted text */
 
-  --accent-foreground: 215 90% 25%;
+  /* Accent = Bright Cyan #009ECB */
+  --accent: 193 100% 40%;
 
-  --destructive: 0 84% 42%;
+  --accent-foreground: 0 0% 100%;
 
-  --destructive-foreground: 0 0% 98%;
+  /* Warning/Alert = Orange #FF8200 */
+  --destructive: 31 100% 50%;
 
-  --input: 0 0% 75%;
-  --ring: 215 90% 45%;
-  --chart-1: 215 90% 35%;
-  --chart-2: 175 65% 38%;
-  --chart-3: 45 85% 45%;
-  --chart-4: 280 70% 42%;
-  --chart-5: 25 80% 48%;
+  --destructive-foreground: 0 0% 100%;
+
+  --input: 210 16% 90%;
+  --ring: 193 100% 40%; /* Bright cyan focus ring */
+  
+  /* Chart colors with premium palette */
+  --chart-1: 193 100% 12%; /* Deep teal */
+  --chart-2: 193 100% 40%; /* Bright cyan */
+  --chart-3: 31 100% 50%; /* Orange */
+  --chart-4: 160 85% 45%; /* Success green */
+  --chart-5: 280 70% 50%; /* Purple accent */
 
   --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: JetBrains Mono, Menlo, monospace;
   --radius: .5rem;
-  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.05);
-  --shadow-xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.10);
-  --shadow-sm: 0px 2px 4px -1px hsl(0 0% 0% / 0.06), 0px 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow: 0px 4px 6px -1px hsl(0 0% 0% / 0.10), 0px 2px 4px -2px hsl(0 0% 0% / 0.10);
-  --shadow-md: 0px 6px 12px -2px hsl(0 0% 0% / 0.12), 0px 3px 6px -3px hsl(0 0% 0% / 0.08);
-  --shadow-lg: 0px 10px 20px -4px hsl(0 0% 0% / 0.15), 0px 4px 8px -4px hsl(0 0% 0% / 0.10);
-  --shadow-xl: 0px 20px 30px -6px hsl(0 0% 0% / 0.18), 0px 8px 12px -6px hsl(0 0% 0% / 0.12);
-  --shadow-2xl: 0px 25px 50px -12px hsl(0 0% 0% / 0.25);
+  
+  /* Enhanced shadows for premium elevation */
+  --shadow-2xs: 0px 1px 2px 0px hsl(193 100% 12% / 0.05);
+  --shadow-xs: 0px 1px 3px 0px hsl(193 100% 12% / 0.08);
+  --shadow-sm: 0px 2px 4px -1px hsl(193 100% 12% / 0.06), 0px 1px 2px -1px hsl(193 100% 12% / 0.10);
+  --shadow: 0px 4px 6px -1px hsl(193 100% 12% / 0.10), 0px 2px 4px -2px hsl(193 100% 12% / 0.10);
+  --shadow-md: 0px 6px 12px -2px hsl(193 100% 12% / 0.12), 0px 3px 6px -3px hsl(193 100% 12% / 0.08);
+  --shadow-lg: 0px 10px 20px -4px hsl(193 100% 12% / 0.15), 0px 4px 8px -4px hsl(193 100% 12% / 0.10);
+  --shadow-xl: 0px 20px 30px -6px hsl(193 100% 12% / 0.18), 0px 8px 12px -6px hsl(193 100% 12% / 0.12);
+  --shadow-2xl: 0px 25px 50px -12px hsl(193 100% 12% / 0.25);
+  
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
@@ -132,67 +147,68 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 0 0% 7%;
+  --background: 193 30% 8%; /* Dark teal background */
 
   --foreground: 0 0% 95%;
 
-  --border: 0 0% 18%;
+  --border: 193 20% 20%;
 
-  --card: 0 0% 9%;
+  --card: 193 25% 10%; /* Dark teal cards */
 
   --card-foreground: 0 0% 95%;
 
-  --card-border: 0 0% 14%;
+  --card-border: 193 20% 15%;
 
-  --sidebar: 0 0% 11%;
+  --sidebar: 193 100% 6%; /* Very dark teal */
 
   --sidebar-foreground: 0 0% 95%;
 
-  --sidebar-border: 0 0% 16%;
+  --sidebar-border: 193 100% 10%;
 
-  --sidebar-primary: 215 85% 50%;
+  --sidebar-primary: 193 100% 45%; /* Brighter cyan in dark mode */
 
   --sidebar-primary-foreground: 0 0% 98%;
 
-  --sidebar-accent: 215 12% 16%;
+  --sidebar-accent: 193 80% 18%;
 
-  --sidebar-accent-foreground: 215 85% 75%;
+  --sidebar-accent-foreground: 193 100% 80%;
 
-  --sidebar-ring: 215 85% 50%;
+  --sidebar-ring: 193 100% 45%;
 
-  --popover: 0 0% 13%;
+  --popover: 193 25% 12%;
 
   --popover-foreground: 0 0% 95%;
 
-  --popover-border: 0 0% 18%;
+  --popover-border: 193 20% 18%;
 
-  --primary: 215 85% 50%;
+  --primary: 193 100% 15%; /* Lighter teal for dark mode */
 
   --primary-foreground: 0 0% 98%;
 
-  --secondary: 0 0% 16%;
+  --secondary: 193 15% 16%;
 
   --secondary-foreground: 0 0% 95%;
 
-  --muted: 215 6% 15%;
+  --muted: 193 20% 15%;
 
-  --muted-foreground: 215 4% 65%;
+  --muted-foreground: 196 10% 65%;
 
-  --accent: 215 10% 17%;
+  --accent: 193 100% 45%; /* Brighter accent in dark mode */
 
-  --accent-foreground: 215 85% 75%;
+  --accent-foreground: 0 0% 98%;
 
-  --destructive: 0 80% 45%;
+  --destructive: 31 95% 55%; /* Slightly lighter orange */
 
   --destructive-foreground: 0 0% 98%;
 
-  --input: 0 0% 28%;
-  --ring: 215 85% 50%;
-  --chart-1: 215 85% 65%;
-  --chart-2: 175 60% 60%;
-  --chart-3: 45 80% 65%;
-  --chart-4: 280 65% 65%;
-  --chart-5: 25 75% 65%;
+  --input: 193 20% 22%;
+  --ring: 193 100% 45%;
+  
+  --chart-1: 193 100% 60%;
+  --chart-2: 193 80% 70%;
+  --chart-3: 31 95% 60%;
+  --chart-4: 160 70% 55%;
+  --chart-5: 280 60% 65%;
 
   --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.30);
   --shadow-xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.40);

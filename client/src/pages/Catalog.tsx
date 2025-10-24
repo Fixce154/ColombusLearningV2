@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import SearchBar from "@/components/SearchBar";
 import FilterPanel from "@/components/FilterPanel";
 import TrainingCard from "@/components/TrainingCard";
+import { BookOpen } from "lucide-react";
 import { mockFormations, mockSessions } from "@/lib/mockData";
 import { useLocation } from "wouter";
 
@@ -56,36 +57,55 @@ export default function Catalog() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold">Catalogue des formations</h1>
-        <p className="text-muted-foreground mt-1">
-          Explorez notre catalogue et inscrivez-vous aux formations qui vous intéressent
-        </p>
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="bg-primary/10 p-3 rounded-xl">
+            <BookOpen className="w-7 h-7 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-4xl font-bold text-primary tracking-tight">Catalogue des formations</h1>
+            <p className="text-lg text-muted-foreground mt-1">
+              Explorez notre catalogue et développez vos compétences
+            </p>
+          </div>
+        </div>
       </div>
 
+      {/* Search Bar */}
       <SearchBar value={searchQuery} onChange={setSearchQuery} />
 
-      <div className="grid lg:grid-cols-4 gap-6">
+      {/* Main Content Grid */}
+      <div className="grid lg:grid-cols-4 gap-8">
+        {/* Filters Sidebar */}
         <div className="lg:col-span-1">
-          <FilterPanel
-            selectedThemes={selectedThemes}
-            selectedModalities={selectedModalities}
-            selectedSeniority={selectedSeniority}
-            onThemeChange={setSelectedThemes}
-            onModalityChange={setSelectedModalities}
-            onSeniorityChange={setSelectedSeniority}
-            onReset={handleReset}
-          />
+          <div className="sticky top-6">
+            <FilterPanel
+              selectedThemes={selectedThemes}
+              selectedModalities={selectedModalities}
+              selectedSeniority={selectedSeniority}
+              onThemeChange={setSelectedThemes}
+              onModalityChange={setSelectedModalities}
+              onSeniorityChange={setSelectedSeniority}
+              onReset={handleReset}
+            />
+          </div>
         </div>
 
-        <div className="lg:col-span-3">
+        {/* Training Grid */}
+        <div className="lg:col-span-3 space-y-6">
           {filteredFormations.length > 0 ? (
             <>
-              <p className="text-sm text-muted-foreground mb-4">
-                {filteredFormations.length} formation{filteredFormations.length > 1 ? "s" : ""} trouvée
-                {filteredFormations.length > 1 ? "s" : ""}
-              </p>
+              <div className="flex items-baseline gap-3">
+                <p className="text-sm font-semibold text-primary">
+                  {filteredFormations.length} formation{filteredFormations.length > 1 ? "s" : ""} trouvée
+                  {filteredFormations.length > 1 ? "s" : ""}
+                </p>
+                {(searchQuery || selectedThemes.length > 0 || selectedModalities.length > 0 || selectedSeniority.length > 0) && (
+                  <p className="text-sm text-muted-foreground">sur {mockFormations.filter(f => f.active).length} au total</p>
+                )}
+              </div>
               <div className="grid md:grid-cols-2 gap-6">
                 {filteredFormations.map((formation) => (
                   <TrainingCard
@@ -98,9 +118,14 @@ export default function Catalog() {
               </div>
             </>
           ) : (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">Aucune formation ne correspond à vos critères</p>
-              <p className="text-sm text-muted-foreground mt-2">Essayez de modifier vos filtres ou votre recherche</p>
+            <div className="text-center py-20">
+              <div className="bg-muted/50 p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+                <BookOpen className="w-12 h-12 text-muted-foreground" />
+              </div>
+              <h3 className="text-xl font-semibold text-primary mb-2">Aucune formation trouvée</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Essayez de modifier vos filtres ou votre recherche pour découvrir d'autres formations
+              </p>
             </div>
           )}
         </div>

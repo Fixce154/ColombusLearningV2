@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Users, User } from "lucide-react";
+import { Calendar, MapPin, Users, User, Check } from "lucide-react";
 import type { Session } from "@shared/schema";
 
 interface SessionCardProps {
@@ -24,18 +24,22 @@ export default function SessionCard({
 
   return (
     <Card
-      className={`p-4 cursor-pointer transition-all ${
-        isSelected ? "ring-2 ring-primary" : ""
-      } ${isFull ? "opacity-50 cursor-not-allowed" : "hover-elevate"}`}
+      className={`p-6 cursor-pointer transition-all duration-200 ${
+        isSelected 
+          ? "ring-2 ring-accent border-accent shadow-lg" 
+          : "shadow-md hover:shadow-lg border-border"
+      } ${isFull ? "opacity-50 cursor-not-allowed" : "hover:border-accent/50"}`}
       onClick={!isFull ? onClick : undefined}
       data-testid={`card-session-${session.id}`}
     >
-      <div className="space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 text-sm flex-1">
-            <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-            <div>
-              <div className="font-medium">
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 text-sm flex-1">
+            <div className="bg-accent/10 p-2.5 rounded-lg flex-shrink-0">
+              <Calendar className="w-5 h-5 text-accent" />
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold text-primary">
                 {session.startDate.toLocaleDateString("fr-FR", {
                   weekday: "long",
                   day: "numeric",
@@ -43,42 +47,47 @@ export default function SessionCard({
                   year: "numeric",
                 })}
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-xs text-muted-foreground mt-1">
                 {session.startDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} -{" "}
                 {session.endDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
               </div>
             </div>
           </div>
-          {isFull && <Badge variant="secondary">Complet</Badge>}
+          {isSelected && (
+            <div className="bg-accent text-accent-foreground p-1.5 rounded-full flex-shrink-0">
+              <Check className="w-4 h-4" />
+            </div>
+          )}
+          {isFull && <Badge className="bg-muted text-muted-foreground">Complet</Badge>}
         </div>
 
         {session.location && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <MapPin className="w-4 h-4 flex-shrink-0" />
-            <span>{session.location}</span>
+            <span className="font-medium">{session.location}</span>
           </div>
         )}
 
         {instructorName && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <User className="w-4 h-4 flex-shrink-0" />
-            <span>{instructorName}</span>
+            <span className="font-medium">{instructorName}</span>
           </div>
         )}
 
-        <div className="space-y-1">
+        <div className="space-y-2 pt-2 border-t">
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Users className="w-4 h-4" />
-              <span>
+              <span className="font-medium">
                 {enrolledCount} / {session.capacity} inscrits
               </span>
             </div>
-            <span className="text-xs text-muted-foreground">{Math.round(capacityPercentage)}%</span>
+            <span className="text-xs font-semibold text-accent">{Math.round(capacityPercentage)}%</span>
           </div>
-          <div className="h-2 bg-secondary rounded-full overflow-hidden">
+          <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
             <div
-              className="h-full bg-primary rounded-full transition-all"
+              className="h-full bg-accent rounded-full transition-all duration-500"
               style={{ width: `${Math.min(capacityPercentage, 100)}%` }}
             />
           </div>

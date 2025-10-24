@@ -22,17 +22,19 @@ export default function TrainingListItem({
   onViewDetails,
 }: TrainingListItemProps) {
   return (
-    <Card className="p-4 hover-elevate cursor-pointer" onClick={onViewDetails} data-testid="item-training-list">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <StatusBadge status={status} />
-          {priority && <PriorityBadge priority={priority} />}
+    <Card className="p-6 shadow-md hover:shadow-lg cursor-pointer transition-all border-border hover:border-accent/50" onClick={onViewDetails} data-testid="item-training-list">
+      <div className="flex items-center justify-between gap-6">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <StatusBadge status={status} />
+            {priority && <PriorityBadge priority={priority} />}
+          </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-medium truncate">{title}</h4>
-            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                <span className="text-xs">
+            <h4 className="font-semibold text-primary text-base truncate mb-2">{title}</h4>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-4 h-4" />
+                <span className="font-medium">
                   {date.toLocaleDateString("fr-FR", {
                     day: "numeric",
                     month: "short",
@@ -41,16 +43,22 @@ export default function TrainingListItem({
                 </span>
               </div>
               {location && (
-                <div className="flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  <span className="text-xs truncate">{location}</span>
+                <div className="flex items-center gap-1.5 truncate">
+                  <MapPin className="w-4 h-4 flex-shrink-0" />
+                  <span className="font-medium truncate">{location}</span>
                 </div>
               )}
             </div>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onViewDetails(); }} data-testid="button-view-training">
-          <ArrowRight className="w-4 h-4" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="flex-shrink-0 hover:bg-accent/10 hover:text-accent" 
+          onClick={(e) => { e.stopPropagation(); onViewDetails(); }} 
+          data-testid="button-view-training"
+        >
+          <ArrowRight className="w-5 h-5" />
         </Button>
       </div>
     </Card>

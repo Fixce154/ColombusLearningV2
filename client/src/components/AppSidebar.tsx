@@ -10,7 +10,7 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Home, BookOpen, Calendar, Users, BarChart, Settings, GraduationCap } from "lucide-react";
+import { Home, BookOpen, Calendar, Users, BarChart, GraduationCap } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { User } from "@shared/schema";
 
@@ -55,30 +55,49 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
 
   const menuItems = getMenuItems();
 
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case "consultant":
+        return "Consultant";
+      case "rh":
+        return "Ressources Humaines";
+      case "formateur":
+        return "Formateur";
+      case "manager":
+        return "Manager";
+      default:
+        return role;
+    }
+  };
+
   return (
-    <Sidebar>
-      <SidebarHeader className="border-b p-6">
-        <div className="flex items-center gap-2">
-          <GraduationCap className="w-6 h-6 text-primary" />
+    <Sidebar className="border-r-0">
+      <SidebarHeader className="border-b border-sidebar-border px-6 py-6">
+        <div className="flex items-center gap-3">
+          <div className="bg-accent p-2.5 rounded-xl">
+            <GraduationCap className="w-6 h-6 text-accent-foreground" />
+          </div>
           <div>
-            <div className="font-semibold text-lg">Colombus</div>
-            <div className="text-xs text-muted-foreground">Formation LMS</div>
+            <div className="font-bold text-lg text-sidebar-foreground">Colombus</div>
+            <div className="text-xs text-sidebar-foreground/70">Learning Platform</div>
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="px-4 py-6">
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sidebar-foreground/70 uppercase tracking-wider text-xs mb-2 px-3">
+            Navigation
+          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               {menuItems.map((item) => {
                 const isActive = location === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive}>
+                    <SidebarMenuButton asChild isActive={isActive} className="h-12 px-4">
                       <Link href={item.url} data-testid={`link-${item.url.slice(1) || "home"}`}>
-                        <item.icon />
-                        <span>{item.title}</span>
+                        <item.icon className="w-5 h-5" />
+                        <span className="font-medium">{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -88,10 +107,15 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t p-4">
-        <div className="text-xs text-muted-foreground">
-          Connecté en tant que<br />
-          <span className="font-medium text-foreground">{currentUser.name}</span>
+      <SidebarFooter className="border-t border-sidebar-border p-6">
+        <div className="flex items-center gap-3">
+          <div className="bg-accent text-accent-foreground w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
+            {currentUser.name.split(' ').map(n => n[0]).join('')}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-sm text-sidebar-foreground truncate">{currentUser.name}</div>
+            <div className="text-xs text-sidebar-foreground/70 truncate">{getRoleLabel(currentUser.role)}</div>
+          </div>
         </div>
       </SidebarFooter>
     </Sidebar>

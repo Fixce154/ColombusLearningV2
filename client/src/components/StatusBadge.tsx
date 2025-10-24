@@ -8,24 +8,26 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
   const getStatusConfig = (status: string) => {
     switch (status) {
       case "validated":
+        return { label: "Validé", className: "bg-primary text-primary-foreground" };
       case "completed":
+        return { label: "Complété", className: "bg-muted text-muted-foreground" };
       case "open":
-        return { label: status === "validated" ? "Validé" : status === "completed" ? "Complété" : "Ouvert", variant: "default" as const };
+        return { label: "Ouvert", className: "bg-accent text-accent-foreground" };
       case "pending":
-        return { label: "En attente", variant: "secondary" as const };
+        return { label: "En attente", className: "bg-destructive/10 text-destructive border-destructive/20" };
       case "cancelled":
-        return { label: "Annulé", variant: "outline" as const };
+        return { label: "Annulé", className: "bg-muted text-muted-foreground" };
       case "full":
-        return { label: "Complet", variant: "secondary" as const };
+        return { label: "Complet", className: "bg-muted text-muted-foreground" };
       default:
-        return { label: status, variant: "outline" as const };
+        return { label: status, className: "bg-secondary text-secondary-foreground" };
     }
   };
 
   const config = getStatusConfig(status);
 
   return (
-    <Badge variant={config.variant} data-testid={`badge-status-${status}`}>
+    <Badge className={`${config.className} font-semibold uppercase tracking-wider text-xs px-3 py-1`} data-testid={`badge-status-${status}`}>
       {config.label}
     </Badge>
   );
