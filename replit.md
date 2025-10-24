@@ -10,6 +10,17 @@ The application is a full-stack web application with a desktop-first, responsive
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes (October 24, 2025)
+
+### RH CRUD Administration System
+- **FormationManagement Page** (/formations): Complete CRUD interface for managing training catalog with form validation, real-time table updates, and confirmation dialogs
+- **SessionManagement Page** (/sessions): Complete CRUD interface for scheduling sessions with datetime pickers and instructor assignment
+- **Sidebar Reorganization**: RH users see two menu sections - "Mes formations" (consultant features) and "Administration RH" (admin tools)
+- **API Routes**: Full CRUD endpoints (POST/PATCH/DELETE) for formations and sessions with RH role authorization
+- **Schema Fix**: insertSessionSchema now accepts Date objects and ISO 8601 strings with automatic conversion
+- **Bug Fixes**: Query parameter alignment (active=false), SelectItem empty value handling (__NONE__ sentinel), date serialization
+- **Testing**: End-to-end Playwright verification of complete CRUD workflow
+
 ## System Architecture
 
 ### Frontend Architecture

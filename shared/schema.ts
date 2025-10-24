@@ -64,7 +64,10 @@ export const registrations = pgTable("registrations", {
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertFormationSchema = createInsertSchema(formations).omit({ id: true });
-export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true });
+export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true }).extend({
+  startDate: z.union([z.date(), z.string()]).transform((val) => typeof val === 'string' ? new Date(val) : val),
+  endDate: z.union([z.date(), z.string()]).transform((val) => typeof val === 'string' ? new Date(val) : val),
+});
 export const insertFormationInterestSchema = createInsertSchema(formationInterests).omit({ id: true, expressedAt: true, status: true });
 export const insertRegistrationSchema = createInsertSchema(registrations).omit({ id: true, registeredAt: true, status: true });
 
