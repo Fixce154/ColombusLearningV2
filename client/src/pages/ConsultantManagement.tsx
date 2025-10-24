@@ -139,14 +139,14 @@ export default function ConsultantManagement() {
   const currentYear = new Date().getFullYear();
 
   const getConsultantStats = (userId: string) => {
-    const userInterests = allInterests.filter(i => {
+    const userInterests = Array.isArray(allInterests) ? allInterests.filter(i => {
       const date = i.expressedAt ? new Date(i.expressedAt) : new Date();
       return i.userId === userId && date.getFullYear() === currentYear;
-    });
+    }) : [];
     
-    const userRegistrations = allRegistrations.filter(r => {
+    const userRegistrations = Array.isArray(allRegistrations) ? allRegistrations.filter(r => {
       return r.userId === userId;
-    });
+    }) : [];
 
     return {
       totalInterests: userInterests.length,
@@ -163,8 +163,8 @@ export default function ConsultantManagement() {
   };
 
   const getConsultantHistory = (userId: string) => {
-    const userInterests = allInterests.filter(i => i.userId === userId);
-    const userRegistrations = allRegistrations.filter(r => r.userId === userId);
+    const userInterests = Array.isArray(allInterests) ? allInterests.filter(i => i.userId === userId) : [];
+    const userRegistrations = Array.isArray(allRegistrations) ? allRegistrations.filter(r => r.userId === userId) : [];
 
     return {
       interests: userInterests,
@@ -231,10 +231,10 @@ export default function ConsultantManagement() {
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Intentions {currentYear}</p>
                 <p className="text-3xl font-bold text-yellow-600">
-                  {allInterests.filter(i => {
+                  {Array.isArray(allInterests) ? allInterests.filter(i => {
                     const date = i.expressedAt ? new Date(i.expressedAt) : new Date();
                     return date.getFullYear() === currentYear;
-                  }).length}
+                  }).length : 0}
                 </p>
               </div>
               <div className="bg-yellow-500/10 p-3 rounded-full">
@@ -248,7 +248,7 @@ export default function ConsultantManagement() {
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Inscriptions validées</p>
                 <p className="text-3xl font-bold text-accent">
-                  {allRegistrations.filter(r => r.status === "validated").length}
+                  {Array.isArray(allRegistrations) ? allRegistrations.filter(r => r.status === "validated").length : 0}
                 </p>
               </div>
               <div className="bg-accent/10 p-3 rounded-full">
