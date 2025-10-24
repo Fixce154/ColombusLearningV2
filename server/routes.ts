@@ -782,17 +782,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const formationId = registration.formationId;
 
-      // Refund P1/P2 quotas if registration was pending or validated
-      if (registration.status === "pending" || registration.status === "validated") {
-        const user = await storage.getUser(userId);
-        if (user) {
-          if (registration.priority === "P1" && (user.p1Used || 0) > 0) {
-            await storage.updateUser(userId, { p1Used: (user.p1Used || 0) - 1 });
-          } else if (registration.priority === "P2" && (user.p2Used || 0) > 0) {
-            await storage.updateUser(userId, { p2Used: (user.p2Used || 0) - 1 });
-          }
-        }
-      }
+      // Note: Quotas are consumed at intention expression time, not at registration time
+      // Therefore, we do NOT refund quotas when deleting a registration
+      // Quotas are only refunded when the intention itself is deleted or rejected
 
       await storage.deleteRegistration(req.params.id);
 
