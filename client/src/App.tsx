@@ -12,6 +12,9 @@ import RegistrationManagement from "@/pages/RegistrationManagement";
 import InterestManagement from "@/pages/InterestManagement";
 import FormationManagement from "@/pages/FormationManagement";
 import SessionManagement from "@/pages/SessionManagement";
+import InstructorFormations from "@/pages/InstructorFormations";
+import InstructorAvailability from "@/pages/InstructorAvailability";
+import InstructorSessions from "@/pages/InstructorSessions";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/not-found";
 import type { User } from "@shared/schema";
@@ -29,6 +32,9 @@ function Router({ currentUser }: { currentUser: User }) {
       <Route path="/registrations" component={RegistrationManagement} />
       <Route path="/formations" component={FormationManagement} />
       <Route path="/sessions" component={SessionManagement} />
+      <Route path="/instructor-formations" component={InstructorFormations} />
+      <Route path="/instructor-availability" component={InstructorAvailability} />
+      <Route path="/instructor-sessions" component={InstructorSessions} />
       <Route component={NotFound} />
     </Switch>
   );
