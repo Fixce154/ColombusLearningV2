@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -19,8 +19,23 @@ import Login from "@/pages/Login";
 import NotFound from "@/pages/not-found";
 import type { User } from "@shared/schema";
 import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
 
 function Router({ currentUser }: { currentUser: User }) {
+  const [location] = useLocation();
+
+  // Rafraîchir les données quand on change de page
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/interests"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/registrations"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/formations"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/interests"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/registrations"] });
+  }, [location]);
+
   return (
     <Switch>
       <Route path="/" component={() => <Dashboard currentUser={currentUser} />} />
