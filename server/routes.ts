@@ -780,6 +780,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
+      const formationId = registration.formationId;
+
       // Refund P1/P2 quotas if registration was pending or validated
       if (registration.status === "pending" || registration.status === "validated") {
         const user = await storage.getUser(userId);
@@ -793,6 +795,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.deleteRegistration(req.params.id);
+
+      // Check if user has any remaining registrations for this formation
+      const remainingRegistrations = await storage.listRegistrations(userId);
+      const hasOtherRegistrations = remainingRegistrations.some(
+        r => r.formationId === formationId && r.status !== "cancelled"
+      );
+
+      // If no remaining registrations, revert intention from "converted" to "approved"
+      if (!hasOtherRegistrations) {
+        const intentions = await storage.listFormationInterests({ userId, formationId });
+        const convertedIntention = intentions.find(i => i.status === "converted");
+        
+        if (convertedIntention) {
+          await storage.updateFormationInterest(convertedIntention.id, { status: "approved" });
+        }
+      }
+
       res.json({ message: "Registration deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
