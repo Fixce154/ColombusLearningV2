@@ -32,10 +32,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication Routes
   app.post("/api/auth/register", async (req, res) => {
     try {
+      // Accept either 'role' (string) or 'roles' (array) from the form
+      const inputData = req.body;
+      
+      // Convert single role to roles array with business rules
+      if (inputData.role && !inputData.roles) {
+        const role = inputData.role;
+        
+        // Apply business rules
+        if (role === "rh") {
+          inputData.roles = ["consultant", "rh"]; // Un RH est forcément consultant
+        } else if (role === "manager") {
+          inputData.roles = ["consultant", "manager"]; // Un manager est aussi consultant
+        } else {
+          inputData.roles = [role]; // consultant or formateur
+        }
+        
+        delete inputData.role; // Remove single role field
+      }
+
       const validationSchema = insertUserSchema.extend({
         password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
       });
-      const data = validationSchema.parse(req.body);
+      const data = validationSchema.parse(inputData);
 
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(data.email);
