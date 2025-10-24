@@ -691,6 +691,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/admin/interests/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const interest = await storage.getFormationInterest(req.params.id);
+      if (!interest) {
+        return res.status(404).json({ message: "Interest not found" });
+      }
+
+      await storage.deleteFormationInterest(req.params.id);
+      res.json({ message: "Interest deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/admin/registrations", requireAuth, async (req, res) => {
     try {
       const userId = (req as AuthRequest).userId!;

@@ -107,6 +107,49 @@ export default function InterestManagement() {
     },
   });
 
+  // Delete interest mutation
+  const deleteInterestMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/admin/interests/${id}`, "DELETE");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/interests"] });
+      toast({
+        title: "Intention supprimée",
+        description: "L'intention a été supprimée avec succès",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de supprimer l'intention",
+      });
+    },
+  });
+
+  // Delete all rejected interests mutation
+  const deleteAllRejectedMutation = useMutation({
+    mutationFn: async () => {
+      const rejectedIds = interests.filter(i => i.status === "rejected").map(i => i.id);
+      return Promise.all(rejectedIds.map(id => apiRequest(`/api/admin/interests/${id}`, "DELETE")));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/interests"] });
+      toast({
+        title: "Intentions supprimées",
+        description: "Toutes les intentions refusées ont été supprimées",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de supprimer les intentions",
+      });
+    },
+  });
+
   const handleAction = (interest: FormationInterest, action: "approve" | "reject") => {
     setSelectedInterest(interest);
     setActionType(action);
@@ -124,6 +167,7 @@ export default function InterestManagement() {
   const pendingInterests = interests.filter(i => i.status === "pending");
   const approvedInterests = interests.filter(i => i.status === "approved");
   const convertedInterests = interests.filter(i => i.status === "converted");
+  const rejectedInterests = interests.filter(i => i.status === "rejected");
 
   if (isLoadingInterests) {
     return (
@@ -136,7 +180,7 @@ export default function InterestManagement() {
     );
   }
 
-  const InterestTable = ({ data, showActions = false }: { data: FormationInterest[]; showActions?: boolean }) => (
+  const InterestTable = ({ data, showActions = false, showDeleteAction = false }: { data: FormationInterest[]; showActions?: boolean; showDeleteAction?: boolean }) => (
     <div className="border rounded-lg">
       <Table>
         <TableHeader>
@@ -146,13 +190,13 @@ export default function InterestManagement() {
             <TableHead>Priorité</TableHead>
             <TableHead>Date d'expression</TableHead>
             <TableHead>Statut</TableHead>
-            {showActions && <TableHead className="text-right">Actions</TableHead>}
+            {(showActions || showDeleteAction) && <TableHead className="text-right">Actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={showActions ? 6 : 5} className="text-center py-12 text-muted-foreground">
+              <TableCell colSpan={(showActions || showDeleteAction) ? 6 : 5} className="text-center py-12 text-muted-foreground">
                 Aucune intention à afficher
               </TableCell>
             </TableRow>
@@ -202,6 +246,12 @@ export default function InterestManagement() {
                         Inscrit
                       </Badge>
                     )}
+                    {interest.status === "rejected" && (
+                      <Badge variant="destructive">
+                        <XCircle className="w-3 h-3 mr-1" />
+                        Refusée
+                      </Badge>
+                    )}
                   </TableCell>
                   {showActions && (
                     <TableCell className="text-right">
@@ -225,6 +275,20 @@ export default function InterestManagement() {
                           Refuser
                         </Button>
                       </div>
+                    </TableCell>
+                  )}
+                  {showDeleteAction && (
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => deleteInterestMutation.mutate(interest.id)}
+                        disabled={deleteInterestMutation.isPending}
+                        data-testid={`button-delete-interest-${interest.id}`}
+                      >
+                        <XCircle className="w-4 h-4 mr-1" />
+                        Supprimer
+                      </Button>
                     </TableCell>
                   )}
                 </TableRow>
@@ -304,7 +368,7 @@ export default function InterestManagement() {
 
       {/* Tabs for different statuses */}
       <Tabs defaultValue="pending" className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="pending" data-testid="tab-pending-interests">
             En attente ({pendingInterests.length})
           </TabsTrigger>
@@ -313,6 +377,9 @@ export default function InterestManagement() {
           </TabsTrigger>
           <TabsTrigger value="converted" data-testid="tab-converted-interests">
             Converties ({convertedInterests.length})
+          </TabsTrigger>
+          <TabsTrigger value="rejected" data-testid="tab-rejected-interests">
+            Refusées ({rejectedInterests.length})
           </TabsTrigger>
         </TabsList>
 
@@ -354,6 +421,43 @@ export default function InterestManagement() {
                 Ces consultants se sont inscrits à une session suite à l'approbation de leur intention.
               </p>
               <InterestTable data={convertedInterests} showActions={false} />
+            </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="rejected" className="space-y-4">
+          <Card className="p-6 shadow-md">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <XCircle className="w-5 h-5 text-destructive" />
+                  <h2 className="text-xl font-semibold text-primary">Intentions refusées</h2>
+                </div>
+                {rejectedInterests.length > 0 && (
+                  <Button
+                    variant="destructive"
+                    onClick={() => deleteAllRejectedMutation.mutate()}
+                    disabled={deleteAllRejectedMutation.isPending}
+                    data-testid="button-delete-all-rejected"
+                  >
+                    {deleteAllRejectedMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Suppression...
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Supprimer toutes les demandes
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Ces intentions ont été refusées. Vous pouvez les supprimer individuellement ou toutes à la fois.
+              </p>
+              <InterestTable data={rejectedInterests} showActions={false} showDeleteAction={true} />
             </div>
           </Card>
         </TabsContent>
