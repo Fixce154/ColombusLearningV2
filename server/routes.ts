@@ -673,13 +673,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         else if (interest.status === "converted") stats.converted++;
         else if (interest.status === "withdrawn") stats.withdrawn++;
 
-        // Count by priority
-        if (interest.priority === "P1") stats.p1Count++;
-        else if (interest.priority === "P2") stats.p2Count++;
-        else if (interest.priority === "P3") stats.p3Count++;
+        // Count by priority - only for active interests (exclude rejected and withdrawn)
+        if (interest.status !== "rejected" && interest.status !== "withdrawn") {
+          if (interest.priority === "P1") stats.p1Count++;
+          else if (interest.priority === "P2") stats.p2Count++;
+          else if (interest.priority === "P3") stats.p3Count++;
+        }
       }
 
-      const aggregated = Array.from(formationMap.values());
+      // Filter out formations with no active interests (exclude those with only rejected/withdrawn)
+      const aggregated = Array.from(formationMap.values()).filter(
+        stats => stats.pending > 0 || stats.approved > 0 || stats.converted > 0
+      );
       res.json({ interests, aggregated });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
