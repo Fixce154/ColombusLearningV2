@@ -3,6 +3,7 @@ import {
   users,
   formations,
   sessions,
+  formationInterests,
   registrations,
   type User,
   type InsertUser,
@@ -10,6 +11,8 @@ import {
   type InsertFormation,
   type Session,
   type InsertSession,
+  type FormationInterest,
+  type InsertFormationInterest,
   type Registration,
   type InsertRegistration,
 } from "@shared/schema";
@@ -36,6 +39,12 @@ export interface IStorage {
   getUpcomingSessions(formationId?: string): Promise<Session[]>;
   createSession(session: InsertSession): Promise<Session>;
   updateSession(id: string, updates: Partial<InsertSession>): Promise<Session | undefined>;
+
+  // Formation Interest methods
+  getFormationInterest(id: string): Promise<FormationInterest | undefined>;
+  listFormationInterests(filters?: { userId?: string; formationId?: string }): Promise<FormationInterest[]>;
+  createFormationInterest(interest: InsertFormationInterest): Promise<FormationInterest>;
+  updateFormationInterest(id: string, updates: Partial<FormationInterest>): Promise<FormationInterest | undefined>;
 
   // Registration methods
   getRegistration(id: string): Promise<Registration | undefined>;
@@ -148,6 +157,51 @@ export class DatabaseStorage implements IStorage {
       .where(eq(sessions.id, id))
       .returning();
     return session || undefined;
+  }
+
+  // Formation Interest methods
+  async getFormationInterest(id: string): Promise<FormationInterest | undefined> {
+    const [interest] = await db.select().from(formationInterests).where(eq(formationInterests.id, id));
+    return interest || undefined;
+  }
+
+  async listFormationInterests(filters?: { userId?: string; formationId?: string }): Promise<FormationInterest[]> {
+    const conditions = [];
+    
+    if (filters?.userId) {
+      conditions.push(eq(formationInterests.userId, filters.userId));
+    }
+    
+    if (filters?.formationId) {
+      conditions.push(eq(formationInterests.formationId, filters.formationId));
+    }
+
+    if (conditions.length > 0) {
+      return await db
+        .select()
+        .from(formationInterests)
+        .where(and(...conditions))
+        .orderBy(desc(formationInterests.expressedAt));
+    }
+    
+    return await db.select().from(formationInterests).orderBy(desc(formationInterests.expressedAt));
+  }
+
+  async createFormationInterest(insertInterest: InsertFormationInterest): Promise<FormationInterest> {
+    const [interest] = await db.insert(formationInterests).values(insertInterest).returning();
+    return interest;
+  }
+
+  async updateFormationInterest(
+    id: string,
+    updates: Partial<FormationInterest>
+  ): Promise<FormationInterest | undefined> {
+    const [interest] = await db
+      .update(formationInterests)
+      .set(updates)
+      .where(eq(formationInterests.id, id))
+      .returning();
+    return interest || undefined;
   }
 
   // Registration methods

@@ -30,7 +30,7 @@ import SessionCard from "@/components/SessionCard";
 import PrioritySelector from "@/components/PrioritySelector";
 import { ArrowLeft, Clock, Target, BookOpen, Calendar, AlertCircle, CheckCircle, Loader2, XCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { User, Formation, Session, Registration } from "@shared/schema";
+import type { User, Formation, Session, Registration, FormationInterest } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 interface TrainingDetailProps {
@@ -40,10 +40,8 @@ interface TrainingDetailProps {
 export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
   const [, params] = useRoute("/training/:id");
   const [, setLocation] = useLocation();
-  const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<"P1" | "P2" | "P3">("P3");
-  const [showEnrollDialog, setShowEnrollDialog] = useState(false);
-  const [showSeniorityAlert, setShowSeniorityAlert] = useState(false);
+  const [showInterestDialog, setShowInterestDialog] = useState(false);
   const { toast } = useToast();
 
   // Fetch formation
@@ -70,32 +68,30 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
     enabled: !!params?.id,
   });
 
-  // Fetch user's registrations
-  const { data: registrations = [] } = useQuery<Registration[]>({
-    queryKey: ["/api/registrations"],
+  // Fetch formation interests for this formation
+  const { data: interests = [] } = useQuery<FormationInterest[]>({
+    queryKey: ["/api/interests"],
   });
 
-  // Enrollment mutation
-  const enrollMutation = useMutation({
-    mutationFn: async (data: { sessionId: string; formationId: string; priority: string }) => {
-      return apiRequest("/api/registrations", "POST", data);
+  // Express interest mutation
+  const expressInterestMutation = useMutation({
+    mutationFn: async (data: { formationId: string; priority: string }) => {
+      return apiRequest("/api/interests", "POST", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/registrations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/interests"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({
-        title: "Inscription enregistrée !",
-        description: "Votre demande d'inscription a été envoyée. Elle est en attente de validation par les RH.",
+        title: "Intérêt manifesté !",
+        description: "Votre intérêt pour cette formation a été enregistré avec priorité " + selectedPriority + ". Les RH vont organiser les sessions en conséquence.",
       });
-      setShowEnrollDialog(false);
-      setShowSeniorityAlert(false);
-      setSelectedSession(null);
+      setShowInterestDialog(false);
     },
     onError: (error: any) => {
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: error.message || "Impossible de s'inscrire à cette session",
+        description: error.message || "Impossible de manifester votre intérêt",
       });
     },
   });
@@ -133,21 +129,10 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
   const requiredSeniorityLevel = seniorityLevels.indexOf(formation.seniorityRequired || "junior");
   const isSeniorityMismatch = userSeniorityLevel < requiredSeniorityLevel;
 
-  const handleEnroll = () => {
-    if (!selectedSession) return;
-
-    if (isSeniorityMismatch) {
-      setShowSeniorityAlert(true);
-    } else {
-      setShowEnrollDialog(true);
-    }
-  };
-
-  const confirmEnroll = () => {
-    if (!selectedSession || !formation) return;
+  const confirmExpressInterest = () => {
+    if (!formation) return;
     
-    enrollMutation.mutate({
-      sessionId: selectedSession,
+    expressInterestMutation.mutate({
       formationId: formation.id,
       priority: selectedPriority,
     });
@@ -156,8 +141,8 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
   const p1Available = (currentUser.p1Used || 0) < 1;
   const p2Available = (currentUser.p2Used || 0) < 1;
 
-  // Check if user is already registered for any session of this formation
-  const existingRegistration = registrations.find(r => r.formationId === formation.id);
+  // Check if user has already expressed interest for this formation
+  const existingInterest = interests.find(i => i.formationId === formation.id && i.status !== "withdrawn");
 
   return (
     <div className="space-y-8">
@@ -167,36 +152,36 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
         Retour au catalogue
       </Button>
 
-      {/* Existing Registration Alert */}
-      {existingRegistration && (
+      {/* Existing Interest Alert */}
+      {existingInterest && (
         <>
-          {existingRegistration.status === "pending" && (
+          {existingInterest.status === "pending" && (
             <Alert className="border-yellow-500/50 bg-yellow-500/10">
               <AlertCircle className="w-5 h-5 text-yellow-600" />
               <AlertDescription className="text-foreground">
                 <div className="space-y-2">
-                  <p className="font-semibold">Inscription en attente de validation par les RH</p>
+                  <p className="font-semibold">Intérêt manifesté avec priorité {existingInterest.priority}</p>
                   <p>
-                    Une <strong>place vous est réservée</strong> pour cette formation pendant l'examen de votre demande. 
-                    Vous recevrez une notification dès que votre inscription sera validée ou refusée.
+                    Les RH ont été informés de votre intérêt pour cette formation. Ils vont organiser les sessions en fonction de la demande. 
+                    Vous serez notifié dès qu'une session sera disponible.
                   </p>
                 </div>
               </AlertDescription>
             </Alert>
           )}
-          {existingRegistration.status === "validated" && (
+          {existingInterest.status === "approved" && (
             <Alert className="border-accent/50 bg-accent/10">
               <CheckCircle className="w-5 h-5 text-accent" />
               <AlertDescription className="text-foreground">
-                Vous êtes déjà inscrit à cette formation avec le statut <strong>validé</strong>.
+                Votre intérêt a été <strong>validé par les RH</strong>. Des sessions vont être organisées prochainement.
               </AlertDescription>
             </Alert>
           )}
-          {existingRegistration.status === "cancelled" && (
-            <Alert className="border-destructive/50 bg-destructive/10">
-              <XCircle className="w-5 h-5 text-destructive" />
+          {existingInterest.status === "converted" && (
+            <Alert className="border-accent/50 bg-accent/10">
+              <CheckCircle className="w-5 h-5 text-accent" />
               <AlertDescription className="text-foreground">
-                Votre inscription précédente a été <strong>refusée</strong>. Vous pouvez vous inscrire à nouveau.
+                Vous êtes inscrit à une session de cette formation.
               </AlertDescription>
             </Alert>
           )}

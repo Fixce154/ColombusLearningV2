@@ -5,7 +5,7 @@ import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
 import { storage } from "./storage";
 import { requireAuth, optionalAuth, type AuthRequest } from "./auth";
-import { insertUserSchema, insertFormationSchema, insertSessionSchema, insertRegistrationSchema } from "@shared/schema";
+import { insertUserSchema, insertFormationSchema, insertSessionSchema, insertFormationInterestSchema, insertRegistrationSchema } from "@shared/schema";
 import { z } from "zod";
 
 const PgSession = connectPgSimple(session);
@@ -169,6 +169,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Formation Interest Routes
+  app.get("/api/interests", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const interests = await storage.listFormationInterests({ userId });
+      res.json(interests);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/interests", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Validate request body
+      const validationSchema = insertFormationInterestSchema.omit({ userId: true });
+      const data = validationSchema.parse(req.body);
+
+      // Check if formation exists
+      const formation = await storage.getFormation(data.formationId);
+      if (!formation) {
+        return res.status(404).json({ message: "Formation not found" });
+      }
+
+      // Check if already expressed interest for this formation
+      const existing = await storage.listFormationInterests({ userId, formationId: data.formationId });
+      const activeInterest = existing.find(i => i.status === "pending" || i.status === "approved");
+      if (activeInterest) {
+        return res.status(400).json({ message: "Vous avez déjà manifesté votre intérêt pour cette formation" });
+      }
+
+      // Check P1/P2 quotas - consumed immediately at expression of interest
+      if (data.priority === "P1") {
+        if ((user.p1Used || 0) >= 1) {
+          return res.status(400).json({ message: "Vous avez déjà utilisé votre priorité P1 cette année" });
+        }
+        await storage.updateUser(userId, { p1Used: (user.p1Used || 0) + 1 });
+      } else if (data.priority === "P2") {
+        if ((user.p2Used || 0) >= 1) {
+          return res.status(400).json({ message: "Vous avez déjà utilisé votre priorité P2 cette année" });
+        }
+        await storage.updateUser(userId, { p2Used: (user.p2Used || 0) + 1 });
+      }
+
+      // Create interest with status="pending"
+      const interest = await storage.createFormationInterest({
+        ...data,
+        userId,
+        status: "pending",
+      });
+
+      res.status(201).json(interest);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/interests/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const interest = await storage.getFormationInterest(req.params.id);
+      if (!interest) {
+        return res.status(404).json({ message: "Interest not found" });
+      }
+
+      // Only RH can approve/reject, users can only withdraw their own
+      if (req.body.status === "approved" || req.body.status === "converted") {
+        if (user.role !== "rh") {
+          return res.status(403).json({ message: "Unauthorized" });
+        }
+      } else if (interest.userId !== userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const updated = await storage.updateFormationInterest(req.params.id, req.body);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Registration Routes
   app.get("/api/registrations", requireAuth, async (req, res) => {
     try {
@@ -305,6 +401,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // RH-specific routes
+  app.get("/api/admin/interests", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== "rh") {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Get all formation interests
+      const interests = await storage.listFormationInterests();
+      
+      // Aggregate by formation
+      const formationMap = new Map<string, {
+        formationId: string;
+        pending: number;
+        approved: number;
+        converted: number;
+        withdrawn: number;
+        p1Count: number;
+        p2Count: number;
+        p3Count: number;
+      }>();
+
+      for (const interest of interests) {
+        if (!formationMap.has(interest.formationId)) {
+          formationMap.set(interest.formationId, {
+            formationId: interest.formationId,
+            pending: 0,
+            approved: 0,
+            converted: 0,
+            withdrawn: 0,
+            p1Count: 0,
+            p2Count: 0,
+            p3Count: 0,
+          });
+        }
+
+        const stats = formationMap.get(interest.formationId)!;
+        
+        // Count by status
+        if (interest.status === "pending") stats.pending++;
+        else if (interest.status === "approved") stats.approved++;
+        else if (interest.status === "converted") stats.converted++;
+        else if (interest.status === "withdrawn") stats.withdrawn++;
+
+        // Count by priority
+        if (interest.priority === "P1") stats.p1Count++;
+        else if (interest.priority === "P2") stats.p2Count++;
+        else if (interest.priority === "P3") stats.p3Count++;
+      }
+
+      const aggregated = Array.from(formationMap.values());
+      res.json({ interests, aggregated });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/admin/registrations", requireAuth, async (req, res) => {
     try {
       const userId = (req as AuthRequest).userId!;

@@ -40,6 +40,15 @@ export const sessions = pgTable("sessions", {
   status: text("status").notNull(), // open, full, completed, cancelled
 });
 
+export const formationInterests = pgTable("formation_interests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formationId: varchar("formation_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  priority: text("priority").notNull(), // P1, P2, P3
+  status: text("status").notNull(), // pending, approved, converted, withdrawn
+  expressedAt: timestamp("expressed_at").default(sql`now()`),
+});
+
 export const registrations = pgTable("registrations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
@@ -54,6 +63,7 @@ export const registrations = pgTable("registrations", {
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertFormationSchema = createInsertSchema(formations).omit({ id: true });
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true });
+export const insertFormationInterestSchema = createInsertSchema(formationInterests).omit({ id: true, expressedAt: true, status: true });
 export const insertRegistrationSchema = createInsertSchema(registrations).omit({ id: true, registeredAt: true, status: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -62,5 +72,7 @@ export type InsertFormation = z.infer<typeof insertFormationSchema>;
 export type Formation = typeof formations.$inferSelect;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Session = typeof sessions.$inferSelect;
+export type InsertFormationInterest = z.infer<typeof insertFormationInterestSchema>;
+export type FormationInterest = typeof formationInterests.$inferSelect;
 export type InsertRegistration = z.infer<typeof insertRegistrationSchema>;
 export type Registration = typeof registrations.$inferSelect;
