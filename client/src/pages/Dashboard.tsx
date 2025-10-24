@@ -89,10 +89,11 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/registrations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/interests"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({
         title: "Inscription annulée",
-        description: "Votre inscription a été annulée avec succès. Vos quotas ont été remboursés si applicable.",
+        description: "Votre inscription a été annulée avec succès.",
       });
       setDeleteRegistrationId(null);
     },
