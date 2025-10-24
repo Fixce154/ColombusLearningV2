@@ -15,6 +15,12 @@ Preferred communication style: Simple, everyday language.
 ### Multi-Role System & Instructor Features
 - **Schema Migration**: Migrated `role` (text) to `roles` (text[]) to support multiple simultaneous roles per user
 - **Role Pattern**: All role checks now use `user.roles.includes("roleName")` pattern throughout the codebase
+- **Business Rules Implementation**:
+  - RH users have `roles: ["consultant", "rh"]` - Un RH est forcément consultant
+  - Consultants have `roles: ["consultant"]` - Un consultant n'est pas forcément RH
+  - Formateurs can have `roles: ["formateur"]` or be combined with other roles
+  - Managers have `roles: ["consultant", "manager"]`
+- **Sidebar Logic**: Consultant section displays for users with "consultant" OR "rh" role (fixes RH users seeing consultant features)
 - **Become Instructor**: Added "Devenir formateur" button in sidebar for consultants to self-upgrade to instructor role
 - **API Route**: POST /api/users/become-instructor endpoint with authentication guard and duplicate prevention
 - **Instructor Pages**: Created three instructor pages:
@@ -22,8 +28,8 @@ Preferred communication style: Simple, everyday language.
   - InstructorAvailability (/instructor-availability): Manage teaching availability (placeholder)
   - InstructorSessions (/instructor-sessions): View scheduled sessions with filtering by instructor
 - **Sidebar UX**: AppSidebar dynamically shows all relevant sections based on user's combined roles
-- **RoleSwitcher**: Displays primary role (first in array) with support for multiple role display
-- **Testing**: End-to-end Playwright verification of instructor activation flow and page navigation
+- **Seed Data**: Updated seed.ts to use roles array and apply business rules correctly
+- **Testing**: End-to-end Playwright verification of instructor activation flow, page navigation, and multi-role sidebar display
 
 ### RH CRUD Administration System
 - **FormationManagement Page** (/formations): Complete CRUD interface for managing training catalog with form validation, real-time table updates, and confirmation dialogs

@@ -20,7 +20,7 @@ async function seed() {
         email: "marie.dupont@colombus.fr",
         password: "password", // In production, this would be hashed
         name: "Marie Dupont",
-        role: "consultant",
+        roles: ["consultant"],
         seniority: "confirme",
         businessUnit: "Digital",
         p1Used: 0,
@@ -30,7 +30,7 @@ async function seed() {
         email: "sophie.martin@colombus.fr",
         password: "password",
         name: "Sophie Martin",
-        role: "rh",
+        roles: ["consultant", "rh"], // Un RH est forcément consultant
         seniority: "senior",
         businessUnit: "RH",
         p1Used: 0,
@@ -40,7 +40,7 @@ async function seed() {
         email: "pierre.bernard@colombus.fr",
         password: "password",
         name: "Pierre Bernard",
-        role: "formateur",
+        roles: ["formateur"],
         seniority: "expert",
         businessUnit: "Formation",
         p1Used: 0,
@@ -50,7 +50,7 @@ async function seed() {
         email: "jean.dubois@colombus.fr",
         password: "password",
         name: "Jean Dubois",
-        role: "manager",
+        roles: ["consultant", "manager"], // Un manager est aussi consultant
         seniority: "senior",
         businessUnit: "Digital",
         p1Used: 0,
@@ -178,7 +178,7 @@ async function seed() {
             ? "Visio Teams"
             : `Salle ${String.fromCharCode(65 + i)}`,
         capacity: Math.floor(Math.random() * 5) + 10, // 10-15 participants
-        instructorId: createdUsers.find((u) => u.role === "formateur")?.id,
+        instructorId: createdUsers.find((u) => u.roles.includes("formateur"))?.id,
         status: "open",
       });
     }
@@ -188,7 +188,7 @@ async function seed() {
   console.log(`✓ Created ${createdSessions.length} sessions`);
 
   // Create some sample registrations
-  const consultant = createdUsers.find((u) => u.role === "consultant");
+  const consultant = createdUsers.find((u) => u.roles.includes("consultant"));
   if (consultant && createdSessions.length > 0) {
     await db.insert(registrations).values([
       {

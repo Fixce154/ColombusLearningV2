@@ -55,7 +55,8 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
     const roles = currentUser.roles;
 
     // Section "Mes formations" pour tous les consultants
-    if (roles.includes("consultant")) {
+    // Un RH est forcément consultant, donc on affiche aussi pour les RH
+    if (roles.includes("consultant") || roles.includes("rh")) {
       sections.push({
         label: roles.includes("rh") || roles.includes("formateur") ? "Mes formations" : undefined,
         items: [
