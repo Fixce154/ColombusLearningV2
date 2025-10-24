@@ -32,7 +32,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
       case "rh":
         return [
           { title: "Tableau de bord RH", url: "/", icon: Home },
-          { title: "Catalogue", url: "/catalog", icon: BookOpen },
+          { title: "Formations", url: "/formations", icon: BookOpen },
           { title: "Intentions", url: "/interests", icon: Heart },
           { title: "Inscriptions", url: "/registrations", icon: Users },
         ];
