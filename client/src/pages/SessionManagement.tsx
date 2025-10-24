@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -47,7 +47,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Loader2, CalendarDays, MapPin, Users as UsersIcon, ChevronDown, ChevronRight, Clock } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, CalendarDays, MapPin, Users as UsersIcon, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Session, Formation, User, Registration } from "@shared/schema";
@@ -69,6 +69,7 @@ export default function SessionManagement() {
   const [editingSession, setEditingSession] = useState<Session | null>(null);
   const [deleteSession, setDeleteSession] = useState<Session | null>(null);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<Array<{date: string, timeSlot: string, instructorId: string}>>([]);
   const { toast } = useToast();
 
   const { data: sessions = [], isLoading } = useQuery<Session[]>({
@@ -228,6 +229,7 @@ export default function SessionManagement() {
 
   const handleCreate = () => {
     setEditingSession(null);
+    setSelectedSlots([]);
     form.reset({
       formationId: "",
       startDate: "",
@@ -242,6 +244,7 @@ export default function SessionManagement() {
 
   const handleEdit = (session: Session) => {
     setEditingSession(session);
+    setSelectedSlots([]);
     form.reset({
       formationId: session.formationId,
       startDate: format(new Date(session.startDate), "yyyy-MM-dd'T'HH:mm"),
@@ -300,6 +303,65 @@ export default function SessionManagement() {
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+
+  // Reset selected slots and dates when formation changes
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === "formationId") {
+        setSelectedSlots([]);
+        form.setValue("startDate", "");
+        form.setValue("endDate", "");
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+
+  // Sync selectedSlots to form dates
+  useEffect(() => {
+    if (selectedSlots.length === 0) {
+      form.setValue("startDate", "");
+      form.setValue("endDate", "");
+      return;
+    }
+
+    // Sort slots by date
+    const sortedSlots = [...selectedSlots].sort((a, b) => a.date.localeCompare(b.date));
+    const firstSlot = sortedSlots[0];
+    const lastSlot = sortedSlots[sortedSlots.length - 1];
+
+    // Calculate start date/time based on first slot's timeSlot
+    const startDate = new Date(firstSlot.date);
+    if (firstSlot.timeSlot === 'morning') {
+      startDate.setHours(9, 0, 0, 0);
+    } else if (firstSlot.timeSlot === 'afternoon') {
+      startDate.setHours(14, 0, 0, 0);
+    } else {
+      startDate.setHours(9, 0, 0, 0);
+    }
+
+    // Calculate end date/time based on last slot's timeSlot
+    const endDate = new Date(lastSlot.date);
+    if (lastSlot.timeSlot === 'morning') {
+      endDate.setHours(12, 0, 0, 0);
+    } else if (lastSlot.timeSlot === 'afternoon') {
+      endDate.setHours(18, 0, 0, 0);
+    } else {
+      endDate.setHours(18, 0, 0, 0);
+    }
+
+    // Format for datetime-local input
+    const formatForInput = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+
+    form.setValue("startDate", formatForInput(startDate));
+    form.setValue("endDate", formatForInput(endDate));
+  }, [selectedSlots, form]);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -368,7 +430,7 @@ export default function SessionManagement() {
                     const isExpanded = expandedSession === session.id;
                     
                     return (
-                      <>
+                      <React.Fragment key={`session-fragment-${session.id}`}>
                         <TableRow 
                           key={session.id} 
                           data-testid={`row-session-${session.id}`}
@@ -475,7 +537,7 @@ export default function SessionManagement() {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </React.Fragment>
                     );
                   })}
                 </TableBody>
@@ -527,95 +589,203 @@ export default function SessionManagement() {
 
                 {/* Display instructors and their availabilities for the selected formation */}
                 {form.watch("formationId") && (
-                  <div className="p-4 bg-muted/30 rounded-md border space-y-3">
-                    <h4 className="font-semibold text-sm flex items-center gap-2">
-                      <UsersIcon className="w-4 h-4" />
-                      Formateurs et disponibilités pour cette formation
-                    </h4>
+                  <div className="space-y-3">
+                    {/* Warning/Success Badges */}
                     {(() => {
                       const instructorsWithAvail = getFormationInstructorsWithAvailabilities(form.watch("formationId"));
-                      
-                      if (instructorsWithAvail.length === 0) {
-                        return (
-                          <p className="text-sm text-muted-foreground">
-                            Aucun formateur assigné à cette formation
-                          </p>
-                        );
-                      }
+                      const hasInstructors = instructorsWithAvail.length > 0;
+                      const hasAvailabilities = instructorsWithAvail.some(({ availability }: any) => 
+                        availability && availability.slots && Array.isArray(availability.slots) && availability.slots.length > 0
+                      );
 
                       return (
-                        <div className="space-y-3">
-                          {instructorsWithAvail.map(({ instructor, availability }: any) => (
-                            <div key={instructor.id} className="bg-background p-3 rounded-md border space-y-2">
-                              <div className="font-medium text-sm">{instructor.name}</div>
-                              {availability && availability.slots && Array.isArray(availability.slots) && availability.slots.length > 0 ? (
-                                <div className="space-y-1">
-                                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <Clock className="w-3 h-3" />
-                                    Disponibilités :
-                                  </div>
-                                  <div className="grid grid-cols-1 gap-1">
-                                    {[...availability.slots]
-                                      .sort((a: any, b: any) => a.date.localeCompare(b.date))
-                                      .map((slot: any, idx: number) => {
-                                        const slotDate = new Date(slot.date);
-                                        const timeSlotLabel = slot.timeSlot === 'full_day' ? 'Journée complète' :
-                                                             slot.timeSlot === 'morning' ? 'Matin' : 'Après-midi';
-                                        return (
-                                          <div key={idx} className="text-xs flex items-center gap-2">
-                                            <span className="font-mono">
-                                              {format(slotDate, "EEE dd MMM yyyy", { locale: fr })}
-                                            </span>
-                                            <Badge variant="secondary" className="text-xs">
-                                              {timeSlotLabel}
-                                            </Badge>
-                                          </div>
-                                        );
-                                      })}
-                                  </div>
-                                </div>
-                              ) : (
-                                <p className="text-xs text-muted-foreground">
-                                  Aucune disponibilité saisie
-                                </p>
-                              )}
-                            </div>
-                          ))}
+                        <div className="flex flex-wrap gap-2">
+                          {!hasInstructors && (
+                            <Badge variant="destructive" className="flex items-center gap-1" data-testid="badge-no-instructor">
+                              <AlertCircle className="w-3 h-3" />
+                              Aucun formateur assigné
+                            </Badge>
+                          )}
+                          {hasInstructors && !hasAvailabilities && (
+                            <Badge variant="destructive" className="flex items-center gap-1" data-testid="badge-no-availability">
+                              <AlertCircle className="w-3 h-3" />
+                              Aucune disponibilité déclarée
+                            </Badge>
+                          )}
+                          {hasInstructors && hasAvailabilities && (
+                            <Badge variant="default" className="flex items-center gap-1 bg-green-600 hover:bg-green-700" data-testid="badge-ready">
+                              <CheckCircle className="w-3 h-3" />
+                              Formateurs et disponibilités OK
+                            </Badge>
+                          )}
                         </div>
                       );
                     })()}
+
+                    {/* Instructor details */}
+                    <div className="p-4 bg-muted/30 rounded-md border space-y-3">
+                      <h4 className="font-semibold text-sm flex items-center gap-2">
+                        <UsersIcon className="w-4 h-4" />
+                        Formateurs et disponibilités pour cette formation
+                      </h4>
+                      {(() => {
+                        const instructorsWithAvail = getFormationInstructorsWithAvailabilities(form.watch("formationId"));
+                        
+                        if (instructorsWithAvail.length === 0) {
+                          return (
+                            <p className="text-sm text-muted-foreground">
+                              Aucun formateur assigné à cette formation
+                            </p>
+                          );
+                        }
+
+                        return (
+                          <div className="space-y-3">
+                            {instructorsWithAvail.map(({ instructor, availability }: any) => (
+                              <div key={instructor.id} className="bg-background p-3 rounded-md border space-y-2">
+                                <div className="font-medium text-sm">{instructor.name}</div>
+                                {availability && availability.slots && Array.isArray(availability.slots) && availability.slots.length > 0 ? (
+                                  <div className="space-y-1">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      Disponibilités :
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-1">
+                                      {[...availability.slots]
+                                        .sort((a: any, b: any) => a.date.localeCompare(b.date))
+                                        .map((slot: any, idx: number) => {
+                                          const slotDate = new Date(slot.date);
+                                          const timeSlotLabel = slot.timeSlot === 'full_day' ? 'Journée complète' :
+                                                               slot.timeSlot === 'morning' ? 'Matin' : 'Après-midi';
+                                          return (
+                                            <div key={idx} className="text-xs flex items-center gap-2">
+                                              <span className="font-mono">
+                                                {format(slotDate, "EEE dd MMM yyyy", { locale: fr })}
+                                              </span>
+                                              <Badge variant="secondary" className="text-xs">
+                                                {timeSlotLabel}
+                                              </Badge>
+                                            </div>
+                                          );
+                                        })}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">
+                                    Aucune disponibilité saisie
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="startDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Date de début *</FormLabel>
-                        <FormControl>
-                          <Input type="datetime-local" {...field} data-testid="input-session-start-date" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                {/* Slot Selection */}
+                {form.watch("formationId") && (() => {
+                  const instructorsWithAvail = getFormationInstructorsWithAvailabilities(form.watch("formationId"));
+                  const allSlots: Array<{date: string, timeSlot: string, instructorId: string, instructorName: string}> = [];
+                  
+                  instructorsWithAvail.forEach(({ instructor, availability }: any) => {
+                    if (availability && availability.slots && Array.isArray(availability.slots)) {
+                      availability.slots.forEach((slot: any) => {
+                        allSlots.push({
+                          date: slot.date,
+                          timeSlot: slot.timeSlot,
+                          instructorId: instructor.id,
+                          instructorName: instructor.name,
+                        });
+                      });
+                    }
+                  });
 
-                  <FormField
-                    control={form.control}
-                    name="endDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Date de fin *</FormLabel>
-                        <FormControl>
-                          <Input type="datetime-local" {...field} data-testid="input-session-end-date" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                  // Sort slots by date
+                  allSlots.sort((a, b) => a.date.localeCompare(b.date));
+
+                  const toggleSlot = (slot: {date: string, timeSlot: string, instructorId: string}) => {
+                    const isSelected = selectedSlots.some(
+                      s => s.date === slot.date && s.timeSlot === slot.timeSlot && s.instructorId === slot.instructorId
+                    );
+                    
+                    if (isSelected) {
+                      const newSlots = selectedSlots.filter(
+                        s => !(s.date === slot.date && s.timeSlot === slot.timeSlot && s.instructorId === slot.instructorId)
+                      );
+                      setSelectedSlots(newSlots);
+                    } else {
+                      const newSlots = [...selectedSlots, slot];
+                      setSelectedSlots(newSlots);
+                    }
+                  };
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <FormLabel>Créneaux de disponibilité *</FormLabel>
+                        {selectedSlots.length > 0 && (
+                          <Badge variant="secondary" data-testid="badge-selected-slots">
+                            {selectedSlots.length} créneau{selectedSlots.length > 1 ? 'x' : ''} sélectionné{selectedSlots.length > 1 ? 's' : ''}
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      {allSlots.length === 0 ? (
+                        <div className="p-4 bg-muted/30 rounded-md border text-sm text-muted-foreground text-center">
+                          Aucun créneau de disponibilité déclaré pour cette formation
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-muted/30 rounded-md border space-y-2 max-h-60 overflow-y-auto">
+                          {allSlots.map((slot, idx) => {
+                            const isSelected = selectedSlots.some(
+                              s => s.date === slot.date && s.timeSlot === slot.timeSlot && s.instructorId === slot.instructorId
+                            );
+                            const slotDate = new Date(slot.date);
+                            const timeSlotLabel = slot.timeSlot === 'full_day' ? 'Journée complète' :
+                                                 slot.timeSlot === 'morning' ? 'Matin' : 'Après-midi';
+                            
+                            return (
+                              <div
+                                key={`${slot.date}-${slot.timeSlot}-${slot.instructorId}`}
+                                onClick={() => toggleSlot({ date: slot.date, timeSlot: slot.timeSlot, instructorId: slot.instructorId })}
+                                className={`
+                                  p-3 rounded-md border cursor-pointer transition-all
+                                  ${isSelected 
+                                    ? 'bg-primary/10 border-primary hover-elevate' 
+                                    : 'bg-background hover-elevate active-elevate-2'
+                                  }
+                                `}
+                                data-testid={`slot-${idx}`}
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex-1">
+                                    <div className="font-medium text-sm">
+                                      {format(slotDate, "EEEE dd MMMM yyyy", { locale: fr })}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      Formateur: {slot.instructorName}
+                                    </div>
+                                  </div>
+                                  <Badge variant={isSelected ? "default" : "secondary"} className="text-xs">
+                                    {timeSlotLabel}
+                                  </Badge>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      
+                      {selectedSlots.length > 0 && form.getValues("startDate") && form.getValues("endDate") && (
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <div>Période: {format(new Date(form.getValues("startDate")), "dd/MM/yyyy HH:mm", { locale: fr })} → {format(new Date(form.getValues("endDate")), "dd/MM/yyyy HH:mm", { locale: fr })}</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <FormField
                   control={form.control}
