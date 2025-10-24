@@ -69,7 +69,7 @@ export default function ConsultantManagement() {
       const res = await fetch("/api/admin/interests", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch interests");
       const data = await res.json();
-      return data.interests;
+      return Array.isArray(data.interests) ? data.interests : [];
     },
   });
 
