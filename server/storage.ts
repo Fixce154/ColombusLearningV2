@@ -6,6 +6,7 @@ import {
   formationInterests,
   registrations,
   instructorFormations,
+  instructorAvailabilities,
   type User,
   type InsertUser,
   type Formation,
@@ -18,6 +19,8 @@ import {
   type InsertRegistration,
   type InstructorFormation,
   type InsertInstructorFormation,
+  type InstructorAvailability,
+  type InsertInstructorAvailability,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, asc, ne } from "drizzle-orm";
@@ -67,6 +70,13 @@ export interface IStorage {
   getInstructorFormations(instructorId: string): Promise<string[]>;
   addInstructorFormation(instructorId: string, formationId: string): Promise<InstructorFormation>;
   removeInstructorFormation(instructorId: string, formationId: string): Promise<boolean>;
+
+  // Instructor Availability methods
+  getInstructorAvailability(instructorId: string, formationId: string): Promise<InstructorAvailability | undefined>;
+  listInstructorAvailabilities(instructorId: string): Promise<InstructorAvailability[]>;
+  createInstructorAvailability(availability: InsertInstructorAvailability): Promise<InstructorAvailability>;
+  updateInstructorAvailability(instructorId: string, formationId: string, dates: Date[]): Promise<InstructorAvailability | undefined>;
+  deleteInstructorAvailability(instructorId: string, formationId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -354,6 +364,71 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(instructorFormations.instructorId, instructorId),
           eq(instructorFormations.formationId, formationId)
+        )
+      )
+      .returning();
+    return result.length > 0;
+  }
+
+  // Instructor Availability methods
+  async getInstructorAvailability(
+    instructorId: string,
+    formationId: string
+  ): Promise<InstructorAvailability | undefined> {
+    const [availability] = await db
+      .select()
+      .from(instructorAvailabilities)
+      .where(
+        and(
+          eq(instructorAvailabilities.instructorId, instructorId),
+          eq(instructorAvailabilities.formationId, formationId)
+        )
+      );
+    return availability || undefined;
+  }
+
+  async listInstructorAvailabilities(instructorId: string): Promise<InstructorAvailability[]> {
+    return await db
+      .select()
+      .from(instructorAvailabilities)
+      .where(eq(instructorAvailabilities.instructorId, instructorId));
+  }
+
+  async createInstructorAvailability(
+    availability: InsertInstructorAvailability
+  ): Promise<InstructorAvailability> {
+    const [createdAvailability] = await db
+      .insert(instructorAvailabilities)
+      .values(availability)
+      .returning();
+    return createdAvailability;
+  }
+
+  async updateInstructorAvailability(
+    instructorId: string,
+    formationId: string,
+    dates: Date[]
+  ): Promise<InstructorAvailability | undefined> {
+    const [availability] = await db
+      .update(instructorAvailabilities)
+      .set({ dates })
+      .where(
+        and(
+          eq(instructorAvailabilities.instructorId, instructorId),
+          eq(instructorAvailabilities.formationId, formationId)
+        )
+      )
+      .returning();
+    return availability || undefined;
+  }
+
+  async deleteInstructorAvailability(instructorId: string, formationId: string): Promise<boolean> {
+    const result = await db
+      .delete(instructorAvailabilities)
+      .where(
+        and(
+          eq(instructorAvailabilities.instructorId, instructorId),
+          eq(instructorAvailabilities.formationId, formationId)
         )
       )
       .returning();

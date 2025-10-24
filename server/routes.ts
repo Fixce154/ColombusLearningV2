@@ -273,6 +273,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get instructor's availabilities
+  app.get("/api/instructor/availabilities", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("formateur")) {
+        return res.status(403).json({ message: "Unauthorized - instructor role required" });
+      }
+
+      const availabilities = await storage.listInstructorAvailabilities(userId);
+      res.json(availabilities);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get availability for specific formation
+  app.get("/api/instructor/availabilities/:formationId", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("formateur")) {
+        return res.status(403).json({ message: "Unauthorized - instructor role required" });
+      }
+
+      const { formationId } = req.params;
+      const availability = await storage.getInstructorAvailability(userId, formationId);
+      
+      if (!availability) {
+        return res.status(404).json({ message: "Availability not found" });
+      }
+
+      res.json(availability);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create or update availability
+  app.post("/api/instructor/availabilities", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("formateur")) {
+        return res.status(403).json({ message: "Unauthorized - instructor role required" });
+      }
+
+      const { formationId, dates } = req.body;
+
+      if (!formationId || !dates || !Array.isArray(dates) || dates.length === 0) {
+        return res.status(400).json({ message: "formationId and dates array are required" });
+      }
+
+      // Check if formation exists
+      const formation = await storage.getFormation(formationId);
+      if (!formation) {
+        return res.status(404).json({ message: "Formation not found" });
+      }
+
+      // Check if instructor teaches this formation
+      const instructorFormations = await storage.getInstructorFormations(userId);
+      if (!instructorFormations.includes(formationId)) {
+        return res.status(403).json({ message: "You must be assigned to this formation first" });
+      }
+
+      // Validate dates - ensure they are in the future
+      const now = new Date();
+      now.setHours(0, 0, 0, 0); // Reset to start of day
+      const parsedDates = dates.map(d => new Date(d));
+      const hasPastDates = parsedDates.some(date => {
+        const dateOnly = new Date(date);
+        dateOnly.setHours(0, 0, 0, 0);
+        return dateOnly < now;
+      });
+
+      if (hasPastDates) {
+        return res.status(400).json({ message: "Cannot set availability for past dates" });
+      }
+
+      // Check if availability already exists
+      const existing = await storage.getInstructorAvailability(userId, formationId);
+      
+      if (existing) {
+        // Update existing availability
+        const updated = await storage.updateInstructorAvailability(userId, formationId, parsedDates);
+        res.json(updated);
+      } else {
+        // Create new availability
+        const availability = await storage.createInstructorAvailability({
+          instructorId: userId,
+          formationId,
+          dates: parsedDates
+        });
+        res.status(201).json(availability);
+      }
+    } catch (error: any) {
+      // Handle unique constraint violation
+      if (error.code === '23505') {
+        return res.status(400).json({ message: "Availability already exists for this formation" });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete availability
+  app.delete("/api/instructor/availabilities/:formationId", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("formateur")) {
+        return res.status(403).json({ message: "Unauthorized - instructor role required" });
+      }
+
+      const { formationId } = req.params;
+      const success = await storage.deleteInstructorAvailability(userId, formationId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Availability not found" });
+      }
+
+      res.json({ message: "Availability deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get all users (RH only)
   app.get("/api/users", requireAuth, async (req, res) => {
     try {

@@ -72,6 +72,16 @@ export const instructorFormations = pgTable("instructor_formations", {
   instructorFormationUnique: uniqueIndex("instructor_formation_unique_idx").on(table.instructorId, table.formationId),
 }));
 
+export const instructorAvailabilities = pgTable("instructor_availabilities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  instructorId: varchar("instructor_id").notNull(),
+  formationId: varchar("formation_id").notNull(),
+  dates: timestamp("dates").array().notNull(),
+  createdAt: timestamp("created_at").default(sql`now()`),
+}, (table) => ({
+  instructorFormationAvailabilityUnique: uniqueIndex("instructor_formation_availability_unique_idx").on(table.instructorId, table.formationId),
+}));
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertFormationSchema = createInsertSchema(formations).omit({ id: true });
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true }).extend({
@@ -81,6 +91,11 @@ export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true 
 export const insertFormationInterestSchema = createInsertSchema(formationInterests).omit({ id: true, expressedAt: true, status: true });
 export const insertRegistrationSchema = createInsertSchema(registrations).omit({ id: true, registeredAt: true, status: true });
 export const insertInstructorFormationSchema = createInsertSchema(instructorFormations).omit({ id: true, assignedAt: true });
+export const insertInstructorAvailabilitySchema = createInsertSchema(instructorAvailabilities).omit({ id: true, createdAt: true }).extend({
+  dates: z.array(z.union([z.date(), z.string()])).transform((dates) => 
+    dates.map((d) => typeof d === 'string' ? new Date(d) : d)
+  ),
+});
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -94,3 +109,5 @@ export type InsertRegistration = z.infer<typeof insertRegistrationSchema>;
 export type Registration = typeof registrations.$inferSelect;
 export type InsertInstructorFormation = z.infer<typeof insertInstructorFormationSchema>;
 export type InstructorFormation = typeof instructorFormations.$inferSelect;
+export type InsertInstructorAvailability = z.infer<typeof insertInstructorAvailabilitySchema>;
+export type InstructorAvailability = typeof instructorAvailabilities.$inferSelect;
