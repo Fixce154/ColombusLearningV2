@@ -60,6 +60,21 @@ Preferred communication style: Simple, everyday language.
 - **Seed Data**: Updated seed.ts to use roles array and apply business rules correctly
 - **Testing**: End-to-end Playwright verification of instructor activation flow, page navigation, and multi-role sidebar display
 
+### Instructor Resignation Feature
+- **Self-Service Role Downgrade**: Instructors can remove their formateur role via "Ne plus être formateur" button in sidebar
+- **Session Validation**: Resignation is only allowed if instructor has zero assigned sessions (instructorId check)
+- **API Route**: POST /api/users/resign-instructor endpoint with authentication and session validation
+  - Returns 400 error if instructor has assigned sessions
+  - Removes "formateur" from roles array if no sessions assigned
+- **Storage Method**: getSessionsByInstructor(instructorId) queries sessions table for instructor assignments
+- **UI Components**: 
+  - Conditional "Ne plus être formateur" button visible only to instructors (data-testid="button-resign-instructor")
+  - AlertDialog confirmation with explanation of session requirement
+  - Toast notifications for success/error feedback
+  - Automatic UI state update: button switches from "Ne plus être formateur" to "Devenir formateur" after successful resignation
+- **Query Invalidation**: /api/auth/me cache invalidated on role change to propagate updates throughout UI
+- **Testing**: End-to-end Playwright verification of both success (no sessions) and failure (with sessions) scenarios
+
 ### RH CRUD Administration System
 - **FormationManagement Page** (/formations): Complete CRUD interface for managing training catalog with form validation, real-time table updates, and confirmation dialogs
 - **SessionManagement Page** (/sessions): Complete CRUD interface for scheduling sessions with datetime pickers, instructor assignment, and expandable rows showing enrolled participants
