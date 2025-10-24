@@ -1,11 +1,22 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import DashboardStats from "@/components/DashboardStats";
 import TrainingListItem from "@/components/TrainingListItem";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Calendar, Clock, XCircle, Loader2, Heart, AlertCircle, CheckCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Plus, Calendar, Clock, XCircle, Loader2, Heart, AlertCircle, CheckCircle, Trash2 } from "lucide-react";
 import { Link } from "wouter";
+import { useState } from "react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { User, Registration, Formation, Session, FormationInterest } from "@shared/schema";
 
 interface DashboardProps {
@@ -13,6 +24,10 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ currentUser }: DashboardProps) {
+  const { toast } = useToast();
+  const [deleteInterestId, setDeleteInterestId] = useState<string | null>(null);
+  const [deleteRegistrationId, setDeleteRegistrationId] = useState<string | null>(null);
+
   // Fetch formation interests
   const { data: interests = [], isLoading: isLoadingInterests } = useQuery<FormationInterest[]>({
     queryKey: ["/api/interests"],
@@ -35,6 +50,55 @@ export default function Dashboard({ currentUser }: DashboardProps) {
       const res = await fetch("/api/sessions", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch sessions");
       return res.json();
+    },
+  });
+
+  // Delete interest mutation
+  const deleteInterestMutation = useMutation({
+    mutationFn: async (interestId: string) => {
+      await apiRequest(`/api/interests/${interestId}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/interests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({
+        title: "Intention annulée",
+        description: "Votre intention de formation a été annulée avec succès. Vos quotas ont été remboursés.",
+      });
+      setDeleteInterestId(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible d'annuler l'intention de formation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete registration mutation
+  const deleteRegistrationMutation = useMutation({
+    mutationFn: async (registrationId: string) => {
+      await apiRequest(`/api/registrations/${registrationId}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/registrations"] });
+      toast({
+        title: "Inscription annulée",
+        description: "Votre inscription a été annulée avec succès.",
+      });
+      setDeleteRegistrationId(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible d'annuler l'inscription",
+        variant: "destructive",
+      });
     },
   });
 
@@ -154,11 +218,23 @@ export default function Dashboard({ currentUser }: DashboardProps) {
                     )}
                   </div>
                   
-                  <Link href={`/training/${formation.id}`}>
-                    <Button variant="outline" size="sm" className="w-full">
-                      Voir les détails
-                    </Button>
-                  </Link>
+                  <div className="flex gap-2">
+                    <Link href={`/training/${formation.id}`} className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full" data-testid={`button-view-interest-${interest.id}`}>
+                        Voir les détails
+                      </Button>
+                    </Link>
+                    {interest.status !== "converted" && (
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={() => setDeleteInterestId(interest.id)}
+                        data-testid={`button-cancel-interest-${interest.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </Card>
               );
             })}
@@ -180,15 +256,33 @@ export default function Dashboard({ currentUser }: DashboardProps) {
           {upcomingTrainings.length > 0 ? (
             <div className="space-y-4">
               {upcomingTrainings.map((reg) => (
-                <TrainingListItem
-                  key={reg.id}
-                  title={getFormationTitle(reg.formationId)}
-                  status={reg.status}
-                  priority={reg.priority as "P1" | "P2" | "P3"}
-                  date={getSessionDate(reg.sessionId)}
-                  location={getSessionLocation(reg.sessionId)}
-                  onViewDetails={() => console.log("View training", reg.formationId)}
-                />
+                <Card key={reg.id} className="p-4 shadow-md hover-elevate">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <h3 className="font-semibold text-primary">{getFormationTitle(reg.formationId)}</h3>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4" />
+                          <span>{new Date(getSessionDate(reg.sessionId)).toLocaleDateString('fr-FR')}</span>
+                        </div>
+                        {getSessionLocation(reg.sessionId) && (
+                          <span>{getSessionLocation(reg.sessionId)}</span>
+                        )}
+                      </div>
+                      <Badge variant={reg.priority === "P1" ? "destructive" : reg.priority === "P2" ? "default" : "secondary"}>
+                        {reg.priority}
+                      </Badge>
+                    </div>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => setDeleteRegistrationId(reg.id)}
+                      data-testid={`button-cancel-registration-${reg.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </Card>
               ))}
             </div>
           ) : (
@@ -225,15 +319,33 @@ export default function Dashboard({ currentUser }: DashboardProps) {
           {pendingTrainings.length > 0 ? (
             <div className="space-y-4">
               {pendingTrainings.map((reg) => (
-                <TrainingListItem
-                  key={reg.id}
-                  title={getFormationTitle(reg.formationId)}
-                  status={reg.status}
-                  priority={reg.priority as "P1" | "P2" | "P3"}
-                  date={getSessionDate(reg.sessionId)}
-                  location={getSessionLocation(reg.sessionId)}
-                  onViewDetails={() => console.log("View training", reg.formationId)}
-                />
+                <Card key={reg.id} className="p-4 shadow-md hover-elevate">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <h3 className="font-semibold text-primary">{getFormationTitle(reg.formationId)}</h3>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4" />
+                          <span>{new Date(getSessionDate(reg.sessionId)).toLocaleDateString('fr-FR')}</span>
+                        </div>
+                        {getSessionLocation(reg.sessionId) && (
+                          <span>{getSessionLocation(reg.sessionId)}</span>
+                        )}
+                      </div>
+                      <Badge variant={reg.priority === "P1" ? "destructive" : reg.priority === "P2" ? "default" : "secondary"}>
+                        {reg.priority}
+                      </Badge>
+                    </div>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => setDeleteRegistrationId(reg.id)}
+                      data-testid={`button-cancel-registration-${reg.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </Card>
               ))}
             </div>
           ) : (
@@ -279,6 +391,91 @@ export default function Dashboard({ currentUser }: DashboardProps) {
           </div>
         </div>
       )}
+
+      {/* Delete Interest Confirmation Dialog */}
+      <Dialog open={deleteInterestId !== null} onOpenChange={() => setDeleteInterestId(null)}>
+        <DialogContent data-testid="dialog-confirm-delete-interest">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Annuler votre intention de formation ?</DialogTitle>
+            <DialogDescription className="text-base pt-2">
+              Êtes-vous sûr de vouloir annuler cette intention de formation ? 
+              {deleteInterestId && (() => {
+                const interest = interests.find(i => i.id === deleteInterestId);
+                if (interest && (interest.priority === "P1" || interest.priority === "P2")) {
+                  return (
+                    <strong className="block mt-2">
+                      Votre quota {interest.priority} vous sera remboursé.
+                    </strong>
+                  );
+                }
+                return null;
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setDeleteInterestId(null)}
+              disabled={deleteInterestMutation.isPending}
+              data-testid="button-cancel-delete-interest"
+            >
+              Non, garder
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => deleteInterestId && deleteInterestMutation.mutate(deleteInterestId)}
+              disabled={deleteInterestMutation.isPending}
+              data-testid="button-confirm-delete-interest"
+            >
+              {deleteInterestMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Annulation...
+                </>
+              ) : (
+                "Oui, annuler"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Registration Confirmation Dialog */}
+      <Dialog open={deleteRegistrationId !== null} onOpenChange={() => setDeleteRegistrationId(null)}>
+        <DialogContent data-testid="dialog-confirm-delete-registration">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Annuler votre inscription ?</DialogTitle>
+            <DialogDescription className="text-base pt-2">
+              Êtes-vous sûr de vouloir annuler votre inscription à cette session ? Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setDeleteRegistrationId(null)}
+              disabled={deleteRegistrationMutation.isPending}
+              data-testid="button-cancel-delete-registration"
+            >
+              Non, garder
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => deleteRegistrationId && deleteRegistrationMutation.mutate(deleteRegistrationId)}
+              disabled={deleteRegistrationMutation.isPending}
+              data-testid="button-confirm-delete-registration"
+            >
+              {deleteRegistrationMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Annulation...
+                </>
+              ) : (
+                "Oui, annuler"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
