@@ -118,6 +118,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/users/become-instructor", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if user is already an instructor
+      if (user.roles.includes("formateur")) {
+        return res.status(400).json({ message: "User is already an instructor" });
+      }
+
+      // Add formateur role
+      const updatedRoles = [...user.roles, "formateur"];
+      const updatedUser = await storage.updateUser(userId, { roles: updatedRoles });
+
+      if (!updatedUser) {
+        return res.status(500).json({ message: "Failed to update user" });
+      }
+
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json({ user: userWithoutPassword });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Formation Routes
   app.get("/api/formations", optionalAuth, async (req, res) => {
     try {
@@ -146,7 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== "rh") {
+      if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -165,7 +194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== "rh") {
+      if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -186,7 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== "rh") {
+      if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -235,7 +264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== "rh") {
+      if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -254,7 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== "rh") {
+      if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -275,7 +304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== "rh") {
+      if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -373,7 +402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Only RH can approve/reject, users can only withdraw their own
       if (req.body.status === "approved" || req.body.status === "converted") {
-        if (user.role !== "rh") {
+        if (!user.roles.includes("rh")) {
           return res.status(403).json({ message: "Unauthorized" });
         }
       } else if (interest.userId !== userId) {
@@ -499,7 +528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Only RH can validate registrations, users can only cancel their own
       if (req.body.status === "validated" || req.body.status === "completed") {
-        if (user.role !== "rh") {
+        if (!user.roles.includes("rh")) {
           return res.status(403).json({ message: "Unauthorized" });
         }
       } else if (registration.userId !== userId) {
@@ -572,7 +601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== "rh") {
+      if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -631,7 +660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== "rh") {
+      if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -648,7 +677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       
       // Only RH can see all users
-      if (!user || user.role !== "rh") {
+      if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 

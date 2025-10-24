@@ -10,9 +10,12 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Home, BookOpen, Calendar, Users, BarChart, GraduationCap, Heart, Settings } from "lucide-react";
+import { Home, BookOpen, Calendar, Users, BarChart, GraduationCap, Heart, Settings, Plus } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { User } from "@shared/schema";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface AppSidebarProps {
   currentUser: User;
@@ -25,61 +28,81 @@ interface MenuSection {
 
 export default function AppSidebar({ currentUser }: AppSidebarProps) {
   const [location] = useLocation();
+  const { toast } = useToast();
+
+  const becomeInstructorMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/users/become-instructor", "POST");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({
+        title: "Formateur activé",
+        description: "Vous êtes maintenant formateur. Les nouvelles options apparaissent dans le menu.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de devenir formateur",
+      });
+    },
+  });
 
   const getMenuSections = (): MenuSection[] => {
-    switch (currentUser.role) {
-      case "consultant":
-        return [
-          {
-            items: [
-              { title: "Tableau de bord", url: "/", icon: Home },
-              { title: "Catalogue", url: "/catalog", icon: BookOpen },
-              { title: "Mes formations", url: "/my-trainings", icon: Calendar },
-            ],
-          },
-        ];
-      case "rh":
-        return [
-          {
-            label: "Mes formations",
-            items: [
-              { title: "Tableau de bord", url: "/", icon: Home },
-              { title: "Catalogue", url: "/catalog", icon: BookOpen },
-              { title: "Mes formations", url: "/my-trainings", icon: Calendar },
-            ],
-          },
-          {
-            label: "Administration RH",
-            items: [
-              { title: "Formations", url: "/formations", icon: BookOpen },
-              { title: "Sessions", url: "/sessions", icon: Calendar },
-              { title: "Intentions", url: "/interests", icon: Heart },
-              { title: "Inscriptions", url: "/registrations", icon: Users },
-            ],
-          },
-        ];
-      case "formateur":
-        return [
-          {
-            items: [
-              { title: "Mes sessions", url: "/", icon: Home },
-              { title: "Disponibilités", url: "/availability", icon: Calendar },
-              { title: "Émargement", url: "/attendance", icon: Users },
-            ],
-          },
-        ];
-      case "manager":
-        return [
-          {
-            items: [
-              { title: "Mon équipe", url: "/", icon: Home },
-              { title: "Catalogue", url: "/catalog", icon: BookOpen },
-            ],
-          },
-        ];
-      default:
-        return [];
+    const sections: MenuSection[] = [];
+    const roles = currentUser.roles;
+
+    // Section "Mes formations" pour tous les consultants
+    if (roles.includes("consultant")) {
+      sections.push({
+        label: roles.includes("rh") || roles.includes("formateur") ? "Mes formations" : undefined,
+        items: [
+          { title: "Tableau de bord", url: "/", icon: Home },
+          { title: "Catalogue", url: "/catalog", icon: BookOpen },
+          { title: "Mes formations", url: "/my-trainings", icon: Calendar },
+        ],
+      });
     }
+
+    // Section "Formation" pour les formateurs
+    if (roles.includes("formateur")) {
+      sections.push({
+        label: "Formation",
+        items: [
+          { title: "Mes formations", url: "/instructor-formations", icon: BookOpen },
+          { title: "Mes disponibilités", url: "/instructor-availability", icon: Calendar },
+          { title: "Mes sessions", url: "/instructor-sessions", icon: Users },
+        ],
+      });
+    }
+
+    // Section "Administration RH" pour RH
+    if (roles.includes("rh")) {
+      sections.push({
+        label: "Administration RH",
+        items: [
+          { title: "Formations", url: "/formations", icon: BookOpen },
+          { title: "Sessions", url: "/sessions", icon: Calendar },
+          { title: "Intentions", url: "/interests", icon: Heart },
+          { title: "Inscriptions", url: "/registrations", icon: Users },
+        ],
+      });
+    }
+
+    // Section manager
+    if (roles.includes("manager")) {
+      sections.push({
+        label: "Management",
+        items: [
+          { title: "Mon équipe", url: "/team", icon: Home },
+          { title: "Suivi formations", url: "/team-trainings", icon: BarChart },
+        ],
+      });
+    }
+
+    return sections;
   };
 
   const menuSections = getMenuSections();
@@ -139,6 +162,31 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
+        
+        {!currentUser.roles.includes("formateur") && (
+          <SidebarGroup className="mt-6">
+            <SidebarGroupLabel className="text-sidebar-foreground/70 uppercase tracking-wider text-xs mb-2 px-3">
+              Devenir formateur
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => becomeInstructorMutation.mutate()}
+                    disabled={becomeInstructorMutation.isPending}
+                    className="h-12 px-4"
+                    data-testid="button-become-instructor"
+                  >
+                    <Plus className="w-5 h-5" />
+                    <span className="font-medium">
+                      {becomeInstructorMutation.isPending ? "Activation..." : "Activer"}
+                    </span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-6">
         <div className="flex items-center gap-3">
@@ -147,7 +195,9 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-medium text-sm text-sidebar-foreground truncate">{currentUser.name}</div>
-            <div className="text-xs text-sidebar-foreground/70 truncate">{getRoleLabel(currentUser.role)}</div>
+            <div className="text-xs text-sidebar-foreground/70 truncate">
+              {currentUser.roles.map(getRoleLabel).join(" • ")}
+            </div>
           </div>
         </div>
       </SidebarFooter>

@@ -8,7 +8,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
-  role: text("role").notNull(), // consultant, rh, formateur, manager
+  roles: text("roles").array().notNull(), // consultant, rh, formateur, manager
   seniority: text("seniority"), // junior, confirme, senior, expert
   businessUnit: text("business_unit"),
   p1Used: integer("p1_used").default(0),
