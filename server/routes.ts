@@ -425,6 +425,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
+      // Refund P1/P2 quotas if registration was pending or validated
+      if (registration.status === "pending" || registration.status === "validated") {
+        const user = await storage.getUser(userId);
+        if (user) {
+          if (registration.priority === "P1" && (user.p1Used || 0) > 0) {
+            await storage.updateUser(userId, { p1Used: (user.p1Used || 0) - 1 });
+          } else if (registration.priority === "P2" && (user.p2Used || 0) > 0) {
+            await storage.updateUser(userId, { p2Used: (user.p2Used || 0) - 1 });
+          }
+        }
+      }
+
       await storage.deleteRegistration(req.params.id);
       res.json({ message: "Registration deleted successfully" });
     } catch (error: any) {

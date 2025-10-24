@@ -18,6 +18,7 @@ function Router({ currentUser }: { currentUser: User }) {
   return (
     <Switch>
       <Route path="/" component={() => <Dashboard currentUser={currentUser} />} />
+      <Route path="/dashboard" component={() => <Dashboard currentUser={currentUser} />} />
       <Route path="/catalog" component={Catalog} />
       <Route path="/training/:id" component={() => <TrainingDetail currentUser={currentUser} />} />
       <Route path="/my-trainings" component={() => <Dashboard currentUser={currentUser} />} />
