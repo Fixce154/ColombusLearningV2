@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Form,
   FormControl,
@@ -12,6 +13,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { GraduationCap, AlertCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -22,7 +30,17 @@ const loginSchema = z.object({
   password: z.string().min(1, "Mot de passe requis"),
 });
 
+const registerSchema = z.object({
+  email: z.string().email("Email invalide"),
+  password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
+  name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
+  role: z.enum(["consultant", "rh", "formateur", "manager"]),
+  seniority: z.enum(["junior", "confirme", "senior", "expert"]).optional(),
+  businessUnit: z.string().optional(),
+});
+
 type LoginFormData = z.infer<typeof loginSchema>;
+type RegisterFormData = z.infer<typeof registerSchema>;
 
 interface LoginProps {
   onLoginSuccess: (user: User) => void;
@@ -32,7 +50,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const form = useForm<LoginFormData>({
+  const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
@@ -40,7 +58,19 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     },
   });
 
-  const onSubmit = async (data: LoginFormData) => {
+  const registerForm = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      name: "",
+      role: "consultant",
+      seniority: "junior",
+      businessUnit: "",
+    },
+  });
+
+  const onLogin = async (data: LoginFormData) => {
     setError(null);
     setIsLoading(true);
     
@@ -50,6 +80,21 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     } catch (err: any) {
       setError(err.message || "Échec de la connexion");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onRegister = async (data: RegisterFormData) => {
+    setError(null);
+    setIsLoading(true);
+    
+    try {
+      const response: { user: User } = await apiRequest("/api/auth/register", "POST", data);
+      onLoginSuccess(response.user);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    } catch (err: any) {
+      setError(err.message || "Échec de l'inscription");
     } finally {
       setIsLoading(false);
     }
@@ -76,95 +121,254 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             <div>
               <h1 className="text-3xl font-bold text-primary">Colombus Learning</h1>
               <p className="text-muted-foreground mt-2">
-                Connectez-vous à votre plateforme de formation
+                Votre plateforme de formation professionnelle
               </p>
             </div>
           </div>
 
-          {/* Login Form */}
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="email"
-                        placeholder="votre.nom@colombus.fr"
-                        data-testid="input-email"
-                        disabled={isLoading}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          {/* Tabs */}
+          <Tabs defaultValue="login" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 h-12">
+              <TabsTrigger value="login" data-testid="tab-login">Connexion</TabsTrigger>
+              <TabsTrigger value="register" data-testid="tab-register">Inscription</TabsTrigger>
+            </TabsList>
 
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mot de passe</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="password"
-                        placeholder="••••••••"
-                        data-testid="input-password"
-                        disabled={isLoading}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Login Tab */}
+            <TabsContent value="login" className="space-y-4 mt-6">
+              <Form {...loginForm}>
+                <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
+                  <FormField
+                    control={loginForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="email"
+                            placeholder="votre.nom@colombus.fr"
+                            data-testid="input-email"
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              {error && (
-                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-destructive">{error}</p>
+                  <FormField
+                    control={loginForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Mot de passe</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="password"
+                            placeholder="••••••••"
+                            data-testid="input-password"
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {error && (
+                    <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 flex items-start gap-2">
+                      <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-destructive">{error}</p>
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    className="w-full shadow-md"
+                    disabled={isLoading}
+                    data-testid="button-login"
+                  >
+                    {isLoading ? "Connexion..." : "Se connecter"}
+                  </Button>
+                </form>
+              </Form>
+
+              {/* Demo Accounts */}
+              <div className="pt-4 border-t">
+                <p className="text-sm text-muted-foreground mb-3 text-center">
+                  Comptes de démonstration
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {demoAccounts.map((account) => (
+                    <Button
+                      key={account.email}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        loginForm.setValue("email", account.email);
+                        loginForm.setValue("password", account.password);
+                      }}
+                      data-testid={`button-demo-${account.role.toLowerCase()}`}
+                      className="text-xs"
+                    >
+                      {account.role}
+                    </Button>
+                  ))}
                 </div>
-              )}
+              </div>
+            </TabsContent>
 
-              <Button
-                type="submit"
-                className="w-full shadow-md"
-                disabled={isLoading}
-                data-testid="button-login"
-              >
-                {isLoading ? "Connexion..." : "Se connecter"}
-              </Button>
-            </form>
-          </Form>
+            {/* Register Tab */}
+            <TabsContent value="register" className="space-y-4 mt-6">
+              <Form {...registerForm}>
+                <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
+                  <FormField
+                    control={registerForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nom complet</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Jean Dupont"
+                            data-testid="input-name"
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-          {/* Demo Accounts */}
-          <div className="pt-6 border-t">
-            <p className="text-sm text-muted-foreground mb-3 text-center">
-              Comptes de démonstration
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {demoAccounts.map((account) => (
-                <Button
-                  key={account.email}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    form.setValue("email", account.email);
-                    form.setValue("password", account.password);
-                  }}
-                  data-testid={`button-demo-${account.role.toLowerCase()}`}
-                  className="text-xs"
-                >
-                  {account.role}
-                </Button>
-              ))}
-            </div>
-          </div>
+                  <FormField
+                    control={registerForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="email"
+                            placeholder="jean.dupont@colombus.fr"
+                            data-testid="input-register-email"
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={registerForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Mot de passe</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="password"
+                            placeholder="••••••••"
+                            data-testid="input-register-password"
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={registerForm.control}
+                    name="role"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Rôle</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-role">
+                              <SelectValue placeholder="Sélectionnez votre rôle" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="consultant">Consultant</SelectItem>
+                            <SelectItem value="rh">Ressources Humaines</SelectItem>
+                            <SelectItem value="formateur">Formateur</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={registerForm.control}
+                    name="seniority"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Séniorité</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-seniority">
+                              <SelectValue placeholder="Sélectionnez votre niveau" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="junior">Junior</SelectItem>
+                            <SelectItem value="confirme">Confirmé</SelectItem>
+                            <SelectItem value="senior">Senior</SelectItem>
+                            <SelectItem value="expert">Expert</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={registerForm.control}
+                    name="businessUnit"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Unité métier (optionnel)</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Digital, Finance, RH..."
+                            data-testid="input-business-unit"
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {error && (
+                    <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 flex items-start gap-2">
+                      <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-destructive">{error}</p>
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    className="w-full shadow-md"
+                    disabled={isLoading}
+                    data-testid="button-register"
+                  >
+                    {isLoading ? "Inscription..." : "Créer un compte"}
+                  </Button>
+                </form>
+              </Form>
+            </TabsContent>
+          </Tabs>
         </div>
       </Card>
     </div>

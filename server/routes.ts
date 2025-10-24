@@ -30,22 +30,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Authentication Routes
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const validationSchema = insertUserSchema.extend({
+        password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
+      });
+      const data = validationSchema.parse(req.body);
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(data.email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Un compte existe déjà avec cet email" });
+      }
+
+      // Create user (in production, password would be hashed with bcrypt)
+      const user = await storage.createUser({
+        ...data,
+        p1Used: 0,
+        p2Used: 0,
+      });
+
+      // Set session
+      req.session.userId = user.id;
+
+      // Don't send password to client
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(201).json({ user: userWithoutPassword });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Données invalides", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password } = req.body;
       
       if (!email || !password) {
-        return res.status(400).json({ message: "Email and password required" });
+        return res.status(400).json({ message: "Email et mot de passe requis" });
       }
 
       const user = await storage.getUserByEmail(email);
       if (!user) {
-        return res.status(401).json({ message: "Invalid credentials" });
+        return res.status(401).json({ message: "Email ou mot de passe incorrect" });
       }
 
       // In production, this would use proper password hashing (bcrypt)
       if (user.password !== password) {
-        return res.status(401).json({ message: "Invalid credentials" });
+        return res.status(401).json({ message: "Email ou mot de passe incorrect" });
       }
 
       // Set session
