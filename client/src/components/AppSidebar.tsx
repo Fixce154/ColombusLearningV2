@@ -96,7 +96,6 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
         items: [
           { title: "Tableau de bord", url: "/", icon: Home },
           { title: "Catalogue", url: "/catalog", icon: BookOpen },
-          { title: "Mes formations", url: "/my-trainings", icon: Calendar },
         ],
       });
     }
