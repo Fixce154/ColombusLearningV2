@@ -207,12 +207,19 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
                         <span className="text-yellow-600">En attente d'organisation</span>
                       </>
                     )}
-                    {interest.status === "approved" && (
-                      <>
-                        <CheckCircle className="w-4 h-4 text-accent" />
-                        <span className="text-accent">Sessions en cours d'organisation</span>
-                      </>
-                    )}
+                    {interest.status === "approved" && (() => {
+                      const availableSessions = sessions.filter(s => s.formationId === interest.formationId);
+                      const hasAvailableSessions = availableSessions.length > 0;
+                      
+                      return (
+                        <>
+                          <CheckCircle className="w-4 h-4 text-accent" />
+                          <span className="text-accent">
+                            {hasAvailableSessions ? "Inscrivez-vous" : "Sessions en cours d'organisation"}
+                          </span>
+                        </>
+                      );
+                    })()}
                     {interest.status === "converted" && (
                       <>
                         <CheckCircle className="w-4 h-4 text-accent" />
