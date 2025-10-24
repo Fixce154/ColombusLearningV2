@@ -12,6 +12,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 24, 2025)
 
+### RH Interest Management Page (Latest)
+- **New Page**: InterestManagement.tsx at /interests route for RH users to view and approve/reject consultant formation interests
+- **Statistics Dashboard**: Shows real-time counts for pending, approved, and converted interests with visual KPI cards
+- **Tabbed Interface**: Separate tabs for pending (with actions), approved, and converted interests
+- **Aggregated View**: Formation-level statistics showing demand by formation with P1/P2/P3 priority breakdown
+- **Cache Management**: Aggressive refresh strategy (refetchOnMount: always, refetchOnWindowFocus: true, staleTime: 0) ensures RH always sees fresh data
+- **Manual Refresh**: "Rafraîchir" button with loading state (isFetching) for on-demand data refresh
+- **Navigation**: Added "Intentions" link to RH sidebar between "Catalogue" and "Inscriptions"
+- **Action Workflow**: RH can approve (status: pending → approved) or reject (status: pending → withdrawn) with confirmation dialog
+- **User Details**: Table shows consultant name, business unit, seniority, formation details, priority badge, and status
+
 ### Two-Phase Training Workflow Implementation
 - **New Formation Interest System**: Consultants first express interest in a formation with priority selection (P1/P2/P3), allowing RH to assess demand before organizing sessions
 - **Interest Expression**: Dedicated `formation_interests` table with unique constraint on (userId, formationId) prevents duplicate quota consumption
