@@ -12,6 +12,12 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 24, 2025)
 
+### Auto-Validated Registrations for Approved Intentions
+- **Streamlined Workflow**: When a consultant registers for a session after their intention was approved, the registration is automatically validated (no RH action needed)
+- **Automatic Status**: Registration created with status="validated" instead of "pending" if intention was "approved"
+- **Intention Conversion**: Approved intention automatically marked as "converted" when consultant registers
+- **Quota Management**: Quota consumed at intention expression, not duplicated at registration
+
 ### Automatic Quota Refund System & Rejected Intentions Management
 - **RH Rejection Refund**: When RH rejects an intention (status → "rejected"), the system automatically refunds the consultant's P1/P2 quota
 - **User Deletion Refund**: When a consultant deletes their own intention (pending/approved/rejected), quota is refunded

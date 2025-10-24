@@ -526,12 +526,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Vous êtes déjà inscrit à cette formation" });
       }
 
-      // IMPORTANT: Don't check P1/P2 quotas here - they're only consumed when RH validates
-      // Just create the registration with status="pending"
+      // Check if user has an approved intention for this formation
+      const intentions = await storage.listFormationInterests({ userId });
+      const approvedIntention = intentions.find(
+        i => i.formationId === data.formationId && i.status === "approved"
+      );
+
+      let registrationStatus = "pending";
+      
+      // If intention was approved, auto-validate the registration
+      // Note: quota was already consumed when intention was expressed, don't consume again
+      if (approvedIntention) {
+        registrationStatus = "validated";
+        
+        // Mark intention as converted
+        await storage.updateFormationInterest(approvedIntention.id, { status: "converted" });
+      }
+
       const registration = await storage.createRegistration({
         ...data,
         userId,
-        status: "pending",
+        status: registrationStatus,
       });
 
       res.status(201).json(registration);
