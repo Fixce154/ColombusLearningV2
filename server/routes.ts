@@ -420,7 +420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Only RH can approve/reject, users can only withdraw their own
-      if (req.body.status === "approved" || req.body.status === "converted") {
+      if (req.body.status === "approved" || req.body.status === "rejected" || req.body.status === "converted") {
         if (!user.roles.includes("rh")) {
           return res.status(403).json({ message: "Unauthorized" });
         }
