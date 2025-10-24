@@ -26,7 +26,6 @@ function StatCard({ title, value, icon, description, iconBg = "bg-accent" }: Sta
 
 interface DashboardStatsProps {
   upcomingCount: number;
-  pendingCount: number;
   completedCount: number;
   p1Used: number;
   p2Used: number;
@@ -34,26 +33,18 @@ interface DashboardStatsProps {
 
 export default function DashboardStats({
   upcomingCount,
-  pendingCount,
   completedCount,
   p1Used,
   p2Used,
 }: DashboardStatsProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" data-testid="dashboard-stats">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6" data-testid="dashboard-stats">
       <StatCard
         title="Formations à venir"
         value={upcomingCount}
         icon={<Calendar className="w-6 h-6" />}
         iconBg="bg-accent"
         data-testid="stat-upcoming"
-      />
-      <StatCard
-        title="En attente"
-        value={pendingCount}
-        icon={<Clock className="w-6 h-6" />}
-        iconBg="bg-destructive"
-        data-testid="stat-pending"
       />
       <StatCard
         title="Complétées"

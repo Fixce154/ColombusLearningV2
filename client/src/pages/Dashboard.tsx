@@ -122,7 +122,6 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
     return session && new Date(session.startDate) > new Date();
   });
 
-  const pendingTrainings = registrations.filter((r) => r.status === "pending");
   const completedTrainings = registrations.filter((r) => r.status === "completed");
   const cancelledTrainings = registrations.filter((r) => r.status === "cancelled");
 
@@ -162,7 +161,6 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
       {/* Stats Cards */}
       <DashboardStats
         upcomingCount={upcomingTrainings.length}
-        pendingCount={pendingTrainings.length}
         completedCount={completedTrainings.length}
         p1Used={currentUser.p1Used || 0}
         p2Used={currentUser.p2Used || 0}
@@ -264,123 +262,62 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
         </div>
       )}
 
-      {/* Training Lists */}
-      <div className="grid lg:grid-cols-2 gap-8">
-        {/* Upcoming Trainings */}
-        <div className="space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-accent/10 p-2.5 rounded-lg">
-              <Calendar className="w-5 h-5 text-accent" />
-            </div>
-            <h2 className="text-2xl font-semibold text-primary">Formations à venir</h2>
+      {/* Upcoming Trainings */}
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="bg-accent/10 p-2.5 rounded-lg">
+            <Calendar className="w-5 h-5 text-accent" />
           </div>
-          
-          {upcomingTrainings.length > 0 ? (
-            <div className="space-y-4">
-              {upcomingTrainings.map((reg) => (
-                <Card key={reg.id} className="p-4 shadow-md hover-elevate">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 space-y-2">
-                      <h3 className="font-semibold text-primary">{getFormationTitle(reg.formationId)}</h3>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          <span>{new Date(getSessionDate(reg.sessionId)).toLocaleDateString('fr-FR')}</span>
-                        </div>
-                        {getSessionLocation(reg.sessionId) && (
-                          <span>{getSessionLocation(reg.sessionId)}</span>
-                        )}
-                      </div>
-                      <Badge variant={reg.priority === "P1" ? "destructive" : reg.priority === "P2" ? "default" : "secondary"}>
-                        {reg.priority}
-                      </Badge>
-                    </div>
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={() => setDeleteRegistrationId(reg.id)}
-                      data-testid={`button-cancel-registration-${reg.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card className="p-12 text-center shadow-md">
-              <div className="flex flex-col items-center gap-4">
-                <div className="bg-muted p-4 rounded-full">
-                  <Calendar className="w-8 h-8 text-muted-foreground" />
-                </div>
-                <div className="space-y-2">
-                  <p className="font-medium text-foreground">Aucune formation à venir</p>
-                  <p className="text-sm text-muted-foreground">
-                    Explorez notre catalogue pour découvrir de nouvelles opportunités
-                  </p>
-                </div>
-              </div>
-            </Card>
-          )}
+          <h2 className="text-2xl font-semibold text-primary">Formations à venir</h2>
         </div>
-
-        {/* Pending Trainings */}
-        <div className="space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-destructive/10 p-2.5 rounded-lg">
-              <Clock className="w-5 h-5 text-destructive" />
-            </div>
-            <h2 className="text-2xl font-semibold text-primary">En attente de validation</h2>
+        
+        {upcomingTrainings.length > 0 ? (
+          <div className="grid md:grid-cols-2 gap-4">
+            {upcomingTrainings.map((reg) => (
+              <Card key={reg.id} className="p-4 shadow-md hover-elevate">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <h3 className="font-semibold text-primary">{getFormationTitle(reg.formationId)}</h3>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        <span>{new Date(getSessionDate(reg.sessionId)).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                      {getSessionLocation(reg.sessionId) && (
+                        <span>{getSessionLocation(reg.sessionId)}</span>
+                      )}
+                    </div>
+                    <Badge variant={reg.priority === "P1" ? "destructive" : reg.priority === "P2" ? "default" : "secondary"}>
+                      {reg.priority}
+                    </Badge>
+                  </div>
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={() => setDeleteRegistrationId(reg.id)}
+                    data-testid={`button-cancel-registration-${reg.id}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </Card>
+            ))}
           </div>
-          
-          {pendingTrainings.length > 0 ? (
-            <div className="space-y-4">
-              {pendingTrainings.map((reg) => (
-                <Card key={reg.id} className="p-4 shadow-md hover-elevate">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 space-y-2">
-                      <h3 className="font-semibold text-primary">{getFormationTitle(reg.formationId)}</h3>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          <span>{new Date(getSessionDate(reg.sessionId)).toLocaleDateString('fr-FR')}</span>
-                        </div>
-                        {getSessionLocation(reg.sessionId) && (
-                          <span>{getSessionLocation(reg.sessionId)}</span>
-                        )}
-                      </div>
-                      <Badge variant={reg.priority === "P1" ? "destructive" : reg.priority === "P2" ? "default" : "secondary"}>
-                        {reg.priority}
-                      </Badge>
-                    </div>
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={() => setDeleteRegistrationId(reg.id)}
-                      data-testid={`button-cancel-registration-${reg.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card className="p-12 text-center shadow-md">
-              <div className="flex flex-col items-center gap-4">
-                <div className="bg-muted p-4 rounded-full">
-                  <Clock className="w-8 h-8 text-muted-foreground" />
-                </div>
-                <div className="space-y-2">
-                  <p className="font-medium text-foreground">Aucune demande en attente</p>
-                  <p className="text-sm text-muted-foreground">
-                    Vos inscriptions seront affichées ici
-                  </p>
-                </div>
+        ) : (
+          <Card className="p-12 text-center shadow-md">
+            <div className="flex flex-col items-center gap-4">
+              <div className="bg-muted p-4 rounded-full">
+                <Calendar className="w-8 h-8 text-muted-foreground" />
               </div>
-            </Card>
-          )}
-        </div>
+              <div className="space-y-2">
+                <p className="font-medium text-foreground">Aucune formation à venir</p>
+                <p className="text-sm text-muted-foreground">
+                  Explorez notre catalogue pour découvrir de nouvelles opportunités
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* Cancelled Trainings (if any) */}
