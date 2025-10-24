@@ -300,11 +300,6 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
                     Explorez notre catalogue pour découvrir de nouvelles opportunités
                   </p>
                 </div>
-                <Link href="/catalog">
-                  <Button variant="default" className="mt-2">
-                    Parcourir le catalogue
-                  </Button>
-                </Link>
               </div>
             </Card>
           )}

@@ -10,7 +10,7 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Home, BookOpen, Calendar, Users, BarChart, GraduationCap } from "lucide-react";
+import { Home, BookOpen, Calendar, Users, BarChart, GraduationCap, Heart } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { User } from "@shared/schema";
 
@@ -33,6 +33,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
         return [
           { title: "Tableau de bord RH", url: "/", icon: Home },
           { title: "Catalogue", url: "/catalog", icon: BookOpen },
+          { title: "Intentions", url: "/interests", icon: Heart },
           { title: "Inscriptions", url: "/registrations", icon: Users },
         ];
       case "formateur":
