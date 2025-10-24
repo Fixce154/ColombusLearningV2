@@ -82,6 +82,21 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
     queryKey: ["/api/interests"],
   });
 
+  // Fetch all registrations to count enrolled students per session
+  const { data: allRegistrations = [] } = useQuery<Registration[]>({
+    queryKey: ["/api/admin/registrations"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/registrations", { credentials: "include" });
+      if (!res.ok) {
+        // If not RH, try to fetch user's own registrations
+        const userRes = await fetch("/api/registrations", { credentials: "include" });
+        if (!userRes.ok) return [];
+        return userRes.json();
+      }
+      return res.json();
+    },
+  });
+
   // Express interest mutation
   const expressInterestMutation = useMutation({
     mutationFn: async (data: { formationId: string; priority: string }) => {
@@ -398,7 +413,10 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
               
               <div className="space-y-4">
                 {sessions.map((session) => {
-                  const enrolledCount = Math.floor(Math.random() * (session.capacity - 2)) + 2;
+                  // Count actual enrolled students for this session
+                  const enrolledCount = Array.isArray(allRegistrations) 
+                    ? allRegistrations.filter(r => r.sessionId === session.id && r.status === "validated").length 
+                    : 0;
                   const isFull = enrolledCount >= session.capacity;
                   const isClickable = existingInterest?.status === "approved" && !isFull;
                   
