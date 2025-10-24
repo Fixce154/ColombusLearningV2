@@ -73,9 +73,7 @@ export default function InstructorAvailability() {
         title: "Disponibilités enregistrées",
         description: "Vos disponibilités ont été mises à jour avec succès",
       });
-      setSlots([]);
-      setSelectedDates([]);
-      setIsEditing(false);
+      // useEffect will reload the data automatically
     },
     onError: (error: any) => {
       toast({
@@ -97,9 +95,7 @@ export default function InstructorAvailability() {
         title: "Disponibilités supprimées",
         description: "Les disponibilités ont été supprimées avec succès",
       });
-      setSlots([]);
-      setSelectedDates([]);
-      setIsEditing(false);
+      // useEffect will reload the data automatically
     },
     onError: (error: any) => {
       toast({
@@ -110,18 +106,24 @@ export default function InstructorAvailability() {
     },
   });
 
+  // Synchronize slots and dates when existingAvailability changes
+  useEffect(() => {
+    if (selectedFormationId && existingAvailability && existingAvailability.slots && Array.isArray(existingAvailability.slots)) {
+      const availSlots = existingAvailability.slots as AvailabilitySlot[];
+      setSlots(availSlots);
+      setSelectedDates(availSlots.map((s: AvailabilitySlot) => new Date(s.date)));
+      setIsEditing(false);
+    } else if (selectedFormationId && !existingAvailability) {
+      // No existing availability for this formation
+      setSlots([]);
+      setSelectedDates([]);
+      setIsEditing(false);
+    }
+  }, [selectedFormationId, existingAvailability]);
+
   const handleFormationSelect = (formationId: string) => {
     setSelectedFormationId(formationId);
-    setSlots([]);
-    setSelectedDates([]);
-    setIsEditing(false);
-
-    // Load existing slots if available
-    const existing = validAvailabilities.find(a => a.formationId === formationId);
-    if (existing && existing.slots && Array.isArray(existing.slots)) {
-      setSlots(existing.slots as AvailabilitySlot[]);
-      setSelectedDates(existing.slots.map((s: AvailabilitySlot) => new Date(s.date)));
-    }
+    // Data will be loaded by useEffect
   };
 
   // Handle calendar date selection (multiple mode)
