@@ -23,10 +23,16 @@ interface DashboardProps {
   currentUser: User;
 }
 
-export default function Dashboard({ currentUser }: DashboardProps) {
+export default function Dashboard({ currentUser: _currentUser }: DashboardProps) {
   const { toast } = useToast();
   const [deleteInterestId, setDeleteInterestId] = useState<string | null>(null);
   const [deleteRegistrationId, setDeleteRegistrationId] = useState<string | null>(null);
+
+  // Fetch current user (to get updated quotas)
+  const { data: userData } = useQuery<{ user: User }>({
+    queryKey: ["/api/auth/me"],
+  });
+  const currentUser = userData?.user || _currentUser;
 
   // Fetch formation interests
   const { data: interests = [], isLoading: isLoadingInterests } = useQuery<FormationInterest[]>({
