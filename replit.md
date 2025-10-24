@@ -78,6 +78,27 @@ Preferred communication style: Simple, everyday language.
 - **Bug Fixes**: Query parameter alignment (active=false), SelectItem empty value handling (__NONE__ sentinel), date serialization
 - **Testing**: End-to-end Playwright verification of complete CRUD workflow
 
+### Consultant Archiving & Deletion System
+- **Archive Field**: Added `archived` boolean field to users table (default: false) for soft-delete functionality
+- **Two-Tab Interface**: ConsultantManagement now features "Actifs" and "Historique" tabs:
+  - Actifs tab: Shows consultants with archived=false, displays Archive button
+  - Historique tab: Shows consultants with archived=true, displays Delete button
+- **Archive Workflow**: 
+  - PATCH /api/users/:id/archive endpoint (RH only)
+  - Automatically removes pending/approved intentions
+  - Automatically removes pending/validated registrations
+  - Refunds P1/P2 quota used by removed intentions
+  - Preserves completed/converted/cancelled/rejected history
+  - Confirmation dialog with detailed consequences list
+- **Delete Workflow**:
+  - DELETE /api/users/:id endpoint (RH only)
+  - Hard deletes user record permanently
+  - Removes all intentions (all statuses)
+  - Removes all registrations (all statuses)
+  - Irreversible with explicit warning in confirmation dialog
+- **Storage Methods**: Updated listUsers(archived?: boolean) to filter by archived status, added deleteUser(id) for hard deletion
+- **Testing**: End-to-end Playwright verification of archive/delete workflow including tab switching, confirmation dialogs, and data cleanup
+
 ## System Architecture
 
 ### Frontend Architecture
