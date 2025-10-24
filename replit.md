@@ -19,17 +19,36 @@ Preferred communication style: Simple, everyday language.
 - **Dashboard Updates**: New "Mes intentions de formation" section displays pending/approved/converted interests separately from session registrations
 - **TrainingDetail Refactor**: Shows different UI states based on interest status (none → express interest, pending → info message, approved → session selection, converted → enrolled)
 
+### Cancellation System with Quota Refund
+- **Interest Cancellation**: DELETE /api/interests/:id refunds P1/P2 quotas when status is pending/approved
+- **Registration Cancellation**: DELETE /api/registrations/:id refunds P1/P2 quotas when status is pending/validated
+- **UI Integration**: Cancel buttons in Dashboard and TrainingDetail with confirmation dialogs
+- **Quota UI Fix**: TrainingDetail now fetches user data directly via useQuery to display real-time quota availability after cancellations
+
 ### Critical Bug Fixes & Security
 - **Quota Bypass Prevention**: Added unique database index and runtime duplicate check to prevent multiple interest expressions for same formation
 - **Session Enrollment Flow**: Restored ability to enroll in sessions after interest approval (interest.status: approved → converted)
+- **P2 Quota Display Bug**: Fixed TrainingDetail to use cached user data instead of stale prop, ensuring quota availability updates immediately after cancellation
 - **Data Integrity**: All mutations properly invalidate TanStack Query caches for real-time UI updates
 
 ### Technical Implementation
 - **Schema**: New `formation_interests` table with unique index on (userId, formationId), status field (pending/approved/converted/withdrawn)
-- **API Routes**: POST /api/interests, GET /api/interests (filtered by user), PATCH /api/interests/:id for status updates
+- **API Routes**: 
+  - POST /api/interests - Create interest with quota consumption
+  - GET /api/interests - List interests (filtered by user)
+  - PATCH /api/interests/:id - Update interest status (RH only for approve/convert)
+  - DELETE /api/interests/:id - Cancel interest with quota refund
+  - DELETE /api/registrations/:id - Cancel registration with quota refund
 - **Storage Layer**: createFormationInterest with duplicate prevention, listFormationInterests with flexible filtering
-- **Frontend**: PrioritySelector component, dual-dialog system (interest expression + session enrollment)
-- **Quota Management**: P1/P2 quotas consumed at interest expression, enforced server-side with seniority validation
+- **Frontend**: 
+  - PrioritySelector component with real-time quota availability
+  - Dual-dialog system (interest expression + session enrollment)
+  - TrainingDetail uses useQuery for current user to ensure quota UI updates
+  - Cancel buttons with confirmation dialogs in Dashboard and TrainingDetail
+- **Quota Management**: 
+  - P1/P2 quotas consumed at interest expression, enforced server-side with seniority validation
+  - Automatic refund on DELETE if status is pending/approved (interests) or pending/validated (registrations)
+  - Cache invalidation ensures immediate UI updates after quota changes
 
 ## System Architecture
 

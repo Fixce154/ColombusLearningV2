@@ -37,7 +37,7 @@ interface TrainingDetailProps {
   currentUser: User;
 }
 
-export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
+export default function TrainingDetail({ currentUser: _currentUser }: TrainingDetailProps) {
   const [, params] = useRoute("/training/:id");
   const [, setLocation] = useLocation();
   const [selectedPriority, setSelectedPriority] = useState<"P1" | "P2" | "P3">("P3");
@@ -46,6 +46,12 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
   const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false);
   const [showCancelInterestDialog, setShowCancelInterestDialog] = useState(false);
   const { toast } = useToast();
+
+  // Fetch current user (to get updated quotas)
+  const { data: userData } = useQuery<{ user: User }>({
+    queryKey: ["/api/auth/me"],
+  });
+  const currentUser = userData?.user || _currentUser;
 
   // Fetch formation
   const { data: formation, isLoading: isLoadingFormation } = useQuery<Formation>({
