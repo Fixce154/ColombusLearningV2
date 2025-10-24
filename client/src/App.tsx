@@ -58,9 +58,24 @@ function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void
 }
 
 function AppContent() {
-  const { data: userData, isLoading, refetch } = useQuery<{ user: User }>({
+  const { data: userData, isLoading, refetch } = useQuery<{ user: User } | null>({
     queryKey: ["/api/auth/me"],
     retry: false,
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        if (res.status === 401) {
+          return null;
+        }
+        if (!res.ok) {
+          throw new Error(`${res.status}: ${res.statusText}`);
+        }
+        return await res.json();
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        return null;
+      }
+    },
   });
 
   const handleLogin = (user: User) => {
