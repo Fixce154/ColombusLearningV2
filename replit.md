@@ -12,6 +12,19 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 24, 2025)
 
+### Multi-Role System & Instructor Features
+- **Schema Migration**: Migrated `role` (text) to `roles` (text[]) to support multiple simultaneous roles per user
+- **Role Pattern**: All role checks now use `user.roles.includes("roleName")` pattern throughout the codebase
+- **Become Instructor**: Added "Devenir formateur" button in sidebar for consultants to self-upgrade to instructor role
+- **API Route**: POST /api/users/become-instructor endpoint with authentication guard and duplicate prevention
+- **Instructor Pages**: Created three instructor pages:
+  - InstructorFormations (/instructor-formations): View formations assigned to teach
+  - InstructorAvailability (/instructor-availability): Manage teaching availability (placeholder)
+  - InstructorSessions (/instructor-sessions): View scheduled sessions with filtering by instructor
+- **Sidebar UX**: AppSidebar dynamically shows all relevant sections based on user's combined roles
+- **RoleSwitcher**: Displays primary role (first in array) with support for multiple role display
+- **Testing**: End-to-end Playwright verification of instructor activation flow and page navigation
+
 ### RH CRUD Administration System
 - **FormationManagement Page** (/formations): Complete CRUD interface for managing training catalog with form validation, real-time table updates, and confirmation dialogs
 - **SessionManagement Page** (/sessions): Complete CRUD interface for scheduling sessions with datetime pickers and instructor assignment
@@ -35,16 +48,18 @@ Preferred communication style: Simple, everyday language.
 - **Data Layer**: Drizzle ORM for PostgreSQL interactions, schema definitions in `shared/schema.ts`.
 - **Database**: Neon serverless PostgreSQL.
 - **Database Schema**:
-    - **Users**: User profiles with roles, seniority, business units, P1/P2 annual quota tracking.
+    - **Users**: User profiles with **roles (text[] - multi-role support)**, seniority, business units, P1/P2 annual quota tracking.
     - **Formations**: Training catalog details (title, description, objectives, duration, modality, seniority, themes, tags).
     - **Formation Interests**: Tracks consultant interest (userId, formationId, priority, status, expressedAt), with unique constraint.
-    - **Sessions**: Scheduled training instances (dates, location, capacity, instructor, status).
+    - **Sessions**: Scheduled training instances (dates, location, capacity, instructorId, status).
     - **Registrations**: Links users to sessions (priority, status, timestamp).
     - **Attendance**: Digital sign-in sheets.
 - **API**: RESTful, JSON format, `/api` prefix, credential-based authentication.
 
 ### Authentication & Authorization
-- **Current**: Mock user switching, session-based with role in user object, UI layer role-based access control.
+- **Current**: Mock user switching, session-based with **multi-role support** (`roles: text[]`), UI layer role-based access control with dynamic sidebar sections.
+- **Role System**: Users can have multiple simultaneous roles (consultant, RH, formateur, manager). All role checks use `user.roles.includes()` pattern.
+- **Self-Service Upgrade**: Consultants can activate instructor role via "Devenir formateur" button (POST /api/users/become-instructor).
 - **Planned**: Email-based authentication (magic link/SSO), Express session middleware with PostgreSQL store, API and UI level role-based permissions.
 
 ### Key Business Logic
