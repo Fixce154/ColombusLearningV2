@@ -75,7 +75,7 @@ export interface IStorage {
   getInstructorAvailability(instructorId: string, formationId: string): Promise<InstructorAvailability | undefined>;
   listInstructorAvailabilities(instructorId: string): Promise<InstructorAvailability[]>;
   createInstructorAvailability(availability: InsertInstructorAvailability): Promise<InstructorAvailability>;
-  updateInstructorAvailability(instructorId: string, formationId: string, dates: Date[]): Promise<InstructorAvailability | undefined>;
+  updateInstructorAvailability(instructorId: string, formationId: string, slots: any): Promise<InstructorAvailability | undefined>;
   deleteInstructorAvailability(instructorId: string, formationId: string): Promise<boolean>;
 }
 
@@ -407,11 +407,11 @@ export class DatabaseStorage implements IStorage {
   async updateInstructorAvailability(
     instructorId: string,
     formationId: string,
-    dates: Date[]
+    slots: any
   ): Promise<InstructorAvailability | undefined> {
     const [availability] = await db
       .update(instructorAvailabilities)
-      .set({ dates })
+      .set({ slots })
       .where(
         and(
           eq(instructorAvailabilities.instructorId, instructorId),

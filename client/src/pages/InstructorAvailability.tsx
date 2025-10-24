@@ -1,16 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, Plus, Trash2, Save, X } from "lucide-react";
+import { Trash2, Save, X, Clock, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Formation, InstructorAvailability } from "@shared/schema";
+import type { Formation, InstructorAvailability, AvailabilitySlot } from "@shared/schema";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Helper to extract number of days from duration string like "2 jours", "3 jours", "1 jour"
 function extractDaysFromDuration(duration: string): number {
@@ -18,9 +18,17 @@ function extractDaysFromDuration(duration: string): number {
   return match ? parseInt(match[1], 10) : 0;
 }
 
+// Time slot labels
+const TIME_SLOT_LABELS: Record<string, string> = {
+  full_day: "Journée complète",
+  morning: "Matin",
+  afternoon: "Après-midi",
+};
+
 export default function InstructorAvailability() {
   const { toast } = useToast();
   const [selectedFormationId, setSelectedFormationId] = useState<string>("");
+  const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -56,7 +64,7 @@ export default function InstructorAvailability() {
 
   // Mutation to save availability
   const saveMutation = useMutation({
-    mutationFn: async (data: { formationId: string; dates: string[] }) => {
+    mutationFn: async (data: { formationId: string; slots: AvailabilitySlot[] }) => {
       return apiRequest("/api/instructor/availabilities", "POST", data);
     },
     onSuccess: () => {
@@ -65,6 +73,7 @@ export default function InstructorAvailability() {
         title: "Disponibilités enregistrées",
         description: "Vos disponibilités ont été mises à jour avec succès",
       });
+      setSlots([]);
       setSelectedDates([]);
       setIsEditing(false);
     },
@@ -88,6 +97,7 @@ export default function InstructorAvailability() {
         title: "Disponibilités supprimées",
         description: "Les disponibilités ont été supprimées avec succès",
       });
+      setSlots([]);
       setSelectedDates([]);
       setIsEditing(false);
     },
@@ -102,32 +112,52 @@ export default function InstructorAvailability() {
 
   const handleFormationSelect = (formationId: string) => {
     setSelectedFormationId(formationId);
+    setSlots([]);
     setSelectedDates([]);
     setIsEditing(false);
 
-    // Load existing dates if available
+    // Load existing slots if available
     const existing = validAvailabilities.find(a => a.formationId === formationId);
-    if (existing && existing.dates) {
-      setSelectedDates(existing.dates.map(d => new Date(d)));
+    if (existing && existing.slots && Array.isArray(existing.slots)) {
+      setSlots(existing.slots as AvailabilitySlot[]);
+      setSelectedDates(existing.slots.map((s: AvailabilitySlot) => new Date(s.date)));
     }
   };
 
-  const handleAddDate = (date: Date | undefined) => {
-    if (!date) return;
-    
-    // Check if date already selected
-    const alreadySelected = selectedDates.some(
-      d => format(d, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+  // Handle calendar date selection (multiple mode)
+  const handleDateSelect = (dates: Date[] | undefined) => {
+    if (!dates) {
+      setSelectedDates([]);
+      setSlots([]);
+      return;
+    }
+
+    setSelectedDates(dates);
+    setIsEditing(true);
+
+    // Update slots: keep existing timeSlot for dates that were already selected, 
+    // add new dates with default timeSlot 'full_day'
+    const newSlots: AvailabilitySlot[] = dates.map(date => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const existingSlot = slots.find(s => s.date === dateStr);
+      return existingSlot || { date: dateStr, timeSlot: 'full_day' };
+    });
+
+    setSlots(newSlots);
+  };
+
+  const handleTimeSlotChange = (dateStr: string, timeSlot: 'full_day' | 'morning' | 'afternoon') => {
+    setSlots(prevSlots => 
+      prevSlots.map(slot => 
+        slot.date === dateStr ? { ...slot, timeSlot } : slot
+      )
     );
-    
-    if (!alreadySelected) {
-      setSelectedDates([...selectedDates, date]);
-      setIsEditing(true);
-    }
+    setIsEditing(true);
   };
 
-  const handleRemoveDate = (index: number) => {
-    setSelectedDates(selectedDates.filter((_, i) => i !== index));
+  const handleRemoveSlot = (dateStr: string) => {
+    setSlots(prevSlots => prevSlots.filter(slot => slot.date !== dateStr));
+    setSelectedDates(prevDates => prevDates.filter(date => format(date, 'yyyy-MM-dd') !== dateStr));
     setIsEditing(true);
   };
 
@@ -141,10 +171,10 @@ export default function InstructorAvailability() {
       return;
     }
 
-    if (selectedDates.length === 0) {
+    if (slots.length === 0) {
       toast({
         title: "Erreur",
-        description: "Veuillez saisir au moins une date",
+        description: "Veuillez saisir au moins une disponibilité",
         variant: "destructive",
       });
       return;
@@ -152,11 +182,11 @@ export default function InstructorAvailability() {
 
     // Check for past dates
     const now = new Date();
-    now.setHours(0, 0, 0, 0); // Reset to start of day for comparison
-    const hasPastDates = selectedDates.some(date => {
-      const dateOnly = new Date(date);
-      dateOnly.setHours(0, 0, 0, 0);
-      return dateOnly < now;
+    now.setHours(0, 0, 0, 0);
+    const hasPastDates = slots.some(slot => {
+      const slotDate = new Date(slot.date);
+      slotDate.setHours(0, 0, 0, 0);
+      return slotDate < now;
     });
 
     if (hasPastDates) {
@@ -168,255 +198,301 @@ export default function InstructorAvailability() {
       return;
     }
 
-    if (selectedDates.length !== requiredDays) {
-      let description;
-      if (selectedDates.length < requiredDays) {
-        const missing = requiredDays - selectedDates.length;
-        description = `Il manque ${missing} jour${missing > 1 ? 's' : ''}. Cette formation dure ${requiredDays} jour${requiredDays > 1 ? 's' : ''}.`;
-      } else {
-        const extra = selectedDates.length - requiredDays;
-        description = `Vous avez sélectionné ${extra} jour${extra > 1 ? 's' : ''} de trop. Cette formation dure ${requiredDays} jour${requiredDays > 1 ? 's' : ''}.`;
-      }
+    // Check for weekends
+    const hasWeekends = slots.some(slot => {
+      const slotDate = new Date(slot.date);
+      const dayOfWeek = slotDate.getDay();
+      return dayOfWeek === 0 || dayOfWeek === 6;
+    });
+
+    if (hasWeekends) {
       toast({
-        title: "Durée incorrecte",
-        description,
+        title: "Dates invalides",
+        description: "Les disponibilités ne peuvent être saisies que du lundi au vendredi",
         variant: "destructive",
       });
       return;
     }
 
-    // Sort dates chronologically
-    const sortedDates = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
+    // Sort slots by date before saving
+    const sortedSlots = [...slots].sort((a, b) => a.date.localeCompare(b.date));
 
     saveMutation.mutate({
       formationId: selectedFormationId,
-      dates: sortedDates.map(d => d.toISOString()),
+      slots: sortedSlots,
     });
   };
 
   const handleDelete = (formationId: string) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer ces disponibilités ?")) {
+    if (window.confirm("Êtes-vous sûr de vouloir supprimer ces disponibilités ?")) {
       deleteMutation.mutate(formationId);
     }
   };
 
   const handleCancel = () => {
-    // Reload existing dates
+    // Reload existing slots
     const existing = validAvailabilities.find(a => a.formationId === selectedFormationId);
-    if (existing && existing.dates) {
-      setSelectedDates(existing.dates.map(d => new Date(d)));
+    if (existing && existing.slots && Array.isArray(existing.slots)) {
+      setSlots(existing.slots as AvailabilitySlot[]);
+      setSelectedDates(existing.slots.map((s: AvailabilitySlot) => new Date(s.date)));
     } else {
+      setSlots([]);
       setSelectedDates([]);
     }
     setIsEditing(false);
   };
 
+  // Helper to check if a date is disabled (past date or weekend)
+  const isDateDisabled = (date: Date): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+
+    // Disable past dates
+    if (checkDate < today) return true;
+
+    // Disable weekends (Sunday = 0, Saturday = 6)
+    const dayOfWeek = date.getDay();
+    return dayOfWeek === 0 || dayOfWeek === 6;
+  };
+
+  // Count unique dates (days) from slots
+  const uniqueDaysCount = slots.length;
+
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Mes Disponibilités</h1>
+    <div className="container mx-auto p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold mb-2" data-testid="heading-availabilities">
+          Mes disponibilités
+        </h1>
         <p className="text-muted-foreground">
-          Saisissez vos disponibilités pour chaque formation que vous animez
+          Indiquez vos disponibilités pour les formations que vous enseignez
         </p>
       </div>
 
-      {myFormations.length === 0 ? (
+      {/* No formations assigned */}
+      {myFormations.length === 0 && (
+        <Alert>
+          <AlertDescription>
+            Vous n'êtes affecté à aucune formation. Veuillez vous affecter à des formations depuis la page "Mes formations".
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Formation selector */}
+      {myFormations.length > 0 && (
         <Card>
-          <CardContent className="p-12 text-center">
-            <CalendarIcon className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground mb-2">
-              Aucune formation assignée
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Sélectionnez d'abord les formations que vous souhaitez animer dans l'onglet "Mes formations"
-            </p>
+          <CardHeader>
+            <CardTitle>Sélectionnez une formation</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select 
+              value={selectedFormationId} 
+              onValueChange={handleFormationSelect}
+              data-testid="select-formation"
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Choisir une formation" />
+              </SelectTrigger>
+              <SelectContent>
+                {myFormations.map((formation) => (
+                  <SelectItem key={formation.id} value={formation.id}>
+                    {formation.title} ({formation.duration})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
-      ) : (
-        <div className="space-y-6">
-          {/* Formation Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Sélectionnez une formation</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={selectedFormationId} onValueChange={handleFormationSelect}>
-                <SelectTrigger data-testid="select-formation">
-                  <SelectValue placeholder="Choisir une formation..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {myFormations.map((formation) => (
-                    <SelectItem key={formation.id} value={formation.id}>
-                      {formation.title} - {formation.duration}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
+      )}
 
-          {/* Date Selection */}
-          {selectedFormation && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Disponibilités pour {selectedFormation.title}</span>
-                  <span className="text-sm font-normal text-muted-foreground">
-                    Durée : {selectedFormation.duration}
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Date Picker */}
-                <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Ajouter une date
-                  </label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left font-normal"
-                        data-testid="button-add-date"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        Choisir une date
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={undefined}
-                        onSelect={handleAddDate}
-                        disabled={(date) => {
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0);
-                          return date < today;
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+      {/* Availability editor */}
+      {selectedFormationId && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Disponibilités pour {selectedFormation?.title}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Durée de la formation : {selectedFormation?.duration}
+              {requiredDays > 0 && ` (${requiredDays} jour${requiredDays > 1 ? 's' : ''})`}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Calendar */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">
+                <CalendarIcon className="w-4 h-4 inline mr-2" />
+                Sélectionnez vos dates disponibles
+              </label>
+              <div className="border rounded-md p-4 inline-block">
+                <Calendar
+                  mode="multiple"
+                  selected={selectedDates}
+                  onSelect={handleDateSelect}
+                  disabled={isDateDisabled}
+                  locale={fr}
+                  className="rounded-md"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                ℹ️ Seuls les jours de semaine (lundi-vendredi) peuvent être sélectionnés
+              </p>
+            </div>
+
+            {/* Selected slots list with time slot selectors */}
+            {slots.length > 0 && (
+              <div>
+                <label className="text-sm font-medium mb-3 block">
+                  <Clock className="w-4 h-4 inline mr-2" />
+                  Vos disponibilités ({uniqueDaysCount} jour{uniqueDaysCount > 1 ? 's' : ''})
+                </label>
+                <div className="space-y-2">
+                  {[...slots]
+                    .sort((a, b) => a.date.localeCompare(b.date))
+                    .map((slot, index) => {
+                      const date = new Date(slot.date);
+                      return (
+                        <div
+                          key={slot.date}
+                          className="flex items-center gap-3 p-3 border rounded-md bg-card"
+                          data-testid={`slot-item-${index}`}
+                        >
+                          <span className="text-sm font-medium min-w-[180px]">
+                            {format(date, "EEEE d MMMM yyyy", { locale: fr })}
+                          </span>
+                          <Select
+                            value={slot.timeSlot}
+                            onValueChange={(value) => 
+                              handleTimeSlotChange(slot.date, value as 'full_day' | 'morning' | 'afternoon')
+                            }
+                            data-testid={`select-timeslot-${index}`}
+                          >
+                            <SelectTrigger className="w-[200px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="full_day">Journée complète</SelectItem>
+                              <SelectItem value="morning">Matin</SelectItem>
+                              <SelectItem value="afternoon">Après-midi</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveSlot(slot.date)}
+                            data-testid={`button-remove-slot-${index}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
                 </div>
 
-                {/* Selected Dates List */}
-                {selectedDates.length > 0 && (
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Dates sélectionnées ({selectedDates.length}/{requiredDays})
-                    </label>
-                    <div className="space-y-2">
-                      {selectedDates
-                        .sort((a, b) => a.getTime() - b.getTime())
-                        .map((date, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between p-3 border rounded-md"
-                            data-testid={`date-item-${index}`}
-                          >
-                            <span className="text-sm">
-                              {format(date, "EEEE d MMMM yyyy", { locale: fr })}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRemoveDate(index)}
-                              data-testid={`button-remove-date-${index}`}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                    </div>
-
-                    {/* Validation Message */}
-                    {selectedDates.length !== requiredDays && (
-                      <p className="text-sm text-destructive mt-2">
-                        {selectedDates.length < requiredDays 
-                          ? `Il manque ${requiredDays - selectedDates.length} jour${requiredDays - selectedDates.length > 1 ? 's' : ''}`
-                          : `Vous avez sélectionné ${selectedDates.length - requiredDays} jour${selectedDates.length - requiredDays > 1 ? 's' : ''} de trop`
-                        }
-                      </p>
-                    )}
-                  </div>
+                {/* Validation warning */}
+                {requiredDays > 0 && uniqueDaysCount < requiredDays && (
+                  <Alert className="mt-3">
+                    <AlertDescription>
+                      ⚠️ Il manque {requiredDays - uniqueDaysCount} jour{requiredDays - uniqueDaysCount > 1 ? 's' : ''} par rapport à la durée de la formation ({requiredDays} jour{requiredDays > 1 ? 's' : ''}). 
+                      Vous pouvez quand même enregistrer si d'autres formateurs complètent les jours manquants.
+                    </AlertDescription>
+                  </Alert>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex gap-2 pt-4">
-                  <Button
-                    onClick={handleSave}
-                    disabled={saveMutation.isPending || selectedDates.length === 0 || selectedDates.length !== requiredDays}
-                    data-testid="button-save-availability"
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    {saveMutation.isPending ? "Enregistrement..." : "Enregistrer"}
-                  </Button>
-                  {existingAvailability && (
-                    <>
-                      {isEditing && (
-                        <Button
-                          variant="outline"
-                          onClick={handleCancel}
-                          data-testid="button-cancel"
-                        >
-                          <X className="w-4 h-4 mr-2" />
-                          Annuler
-                        </Button>
-                      )}
-                      <Button
-                        variant="destructive"
-                        onClick={() => handleDelete(selectedFormationId)}
-                        disabled={deleteMutation.isPending}
-                        data-testid="button-delete-availability"
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        {deleteMutation.isPending ? "Suppression..." : "Supprimer"}
-                      </Button>
-                    </>
+                {uniqueDaysCount > requiredDays && (
+                  <Alert className="mt-3">
+                    <AlertDescription>
+                      ℹ️ Vous avez sélectionné {uniqueDaysCount - requiredDays} jour{uniqueDaysCount - requiredDays > 1 ? 's' : ''} de plus que la durée de la formation ({requiredDays} jour{requiredDays > 1 ? 's' : ''}).
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 pt-4">
+              <Button
+                onClick={handleSave}
+                disabled={saveMutation.isPending || slots.length === 0}
+                data-testid="button-save-availability"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {saveMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+              </Button>
+              {existingAvailability && (
+                <>
+                  {isEditing && (
+                    <Button
+                      variant="outline"
+                      onClick={handleCancel}
+                      data-testid="button-cancel"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Annuler
+                    </Button>
                   )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleDelete(selectedFormationId)}
+                    disabled={deleteMutation.isPending}
+                    data-testid="button-delete-availability"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    {deleteMutation.isPending ? "Suppression..." : "Supprimer"}
+                  </Button>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-          {/* Existing Availabilities Summary */}
-          {validAvailabilities.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Récapitulatif de vos disponibilités</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {validAvailabilities.map((availability) => {
-                    const formation = allFormations.find(f => f.id === availability.formationId);
-                    if (!formation) return null;
+      {/* Existing Availabilities Summary */}
+      {validAvailabilities.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Récapitulatif de vos disponibilités</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {validAvailabilities.map((availability) => {
+                const formation = allFormations.find(f => f.id === availability.formationId);
+                if (!formation) return null;
 
-                    const dates = Array.isArray(availability.dates) 
-                      ? availability.dates.map(d => new Date(d)).sort((a, b) => a.getTime() - b.getTime())
-                      : [];
+                const availSlots = Array.isArray(availability.slots) 
+                  ? (availability.slots as AvailabilitySlot[]).sort((a, b) => a.date.localeCompare(b.date))
+                  : [];
 
-                    return (
-                      <div
-                        key={availability.id}
-                        className="p-4 border rounded-md"
-                        data-testid={`availability-${availability.formationId}`}
-                      >
-                        <div className="font-medium mb-2">{formation.title}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {dates.map((date, i) => (
-                            <div key={i}>
-                              • {format(date, "EEEE d MMMM yyyy", { locale: fr })}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                return (
+                  <div
+                    key={availability.id}
+                    className="p-4 border rounded-md"
+                    data-testid={`availability-${availability.formationId}`}
+                  >
+                    <div className="font-medium mb-3">{formation.title}</div>
+                    <div className="space-y-1">
+                      {availSlots.map((slot, i) => {
+                        const date = new Date(slot.date);
+                        return (
+                          <div key={i} className="text-sm text-muted-foreground flex items-center gap-2">
+                            <span className="font-medium">•</span>
+                            <span>{format(date, "EEEE d MMMM yyyy", { locale: fr })}</span>
+                            <span className="text-xs bg-secondary px-2 py-0.5 rounded">
+                              {TIME_SLOT_LABELS[slot.timeSlot]}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

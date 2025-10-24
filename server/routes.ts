@@ -323,10 +323,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized - instructor role required" });
       }
 
-      const { formationId, dates } = req.body;
+      const { formationId, slots } = req.body;
 
-      if (!formationId || !dates || !Array.isArray(dates) || dates.length === 0) {
-        return res.status(400).json({ message: "formationId and dates array are required" });
+      if (!formationId || !slots || !Array.isArray(slots) || slots.length === 0) {
+        return res.status(400).json({ message: "formationId and slots array are required" });
       }
 
       // Check if formation exists
@@ -341,18 +341,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You must be assigned to this formation first" });
       }
 
-      // Validate dates - ensure they are in the future
+      // Validate slots
       const now = new Date();
       now.setHours(0, 0, 0, 0); // Reset to start of day
-      const parsedDates = dates.map(d => new Date(d));
-      const hasPastDates = parsedDates.some(date => {
-        const dateOnly = new Date(date);
-        dateOnly.setHours(0, 0, 0, 0);
-        return dateOnly < now;
-      });
+      
+      for (const slot of slots) {
+        if (!slot.date || !slot.timeSlot) {
+          return res.status(400).json({ message: "Each slot must have a date and timeSlot" });
+        }
 
-      if (hasPastDates) {
-        return res.status(400).json({ message: "Cannot set availability for past dates" });
+        if (!['full_day', 'morning', 'afternoon'].includes(slot.timeSlot)) {
+          return res.status(400).json({ message: "Invalid timeSlot value" });
+        }
+
+        // Check if date is in the future
+        const slotDate = new Date(slot.date);
+        slotDate.setHours(0, 0, 0, 0);
+        if (slotDate < now) {
+          return res.status(400).json({ message: "Cannot set availability for past dates" });
+        }
+
+        // Check if date is weekday (Monday-Friday)
+        const dayOfWeek = slotDate.getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+          return res.status(400).json({ message: "Availability can only be set for weekdays (Monday-Friday)" });
+        }
       }
 
       // Check if availability already exists
@@ -360,14 +373,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (existing) {
         // Update existing availability
-        const updated = await storage.updateInstructorAvailability(userId, formationId, parsedDates);
+        const updated = await storage.updateInstructorAvailability(userId, formationId, slots);
         res.json(updated);
       } else {
         // Create new availability
         const availability = await storage.createInstructorAvailability({
           instructorId: userId,
           formationId,
-          dates: parsedDates
+          slots
         });
         res.status(201).json(availability);
       }

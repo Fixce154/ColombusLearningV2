@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -72,11 +72,19 @@ export const instructorFormations = pgTable("instructor_formations", {
   instructorFormationUnique: uniqueIndex("instructor_formation_unique_idx").on(table.instructorId, table.formationId),
 }));
 
+// Availability slot schema
+export const availabilitySlotSchema = z.object({
+  date: z.string(), // ISO date string
+  timeSlot: z.enum(['full_day', 'morning', 'afternoon']),
+});
+
+export type AvailabilitySlot = z.infer<typeof availabilitySlotSchema>;
+
 export const instructorAvailabilities = pgTable("instructor_availabilities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   instructorId: varchar("instructor_id").notNull(),
   formationId: varchar("formation_id").notNull(),
-  dates: timestamp("dates").array().notNull(),
+  slots: jsonb("slots").$type<AvailabilitySlot[]>().notNull(),
   createdAt: timestamp("created_at").default(sql`now()`),
 }, (table) => ({
   instructorFormationAvailabilityUnique: uniqueIndex("instructor_formation_availability_unique_idx").on(table.instructorId, table.formationId),
@@ -92,9 +100,7 @@ export const insertFormationInterestSchema = createInsertSchema(formationInteres
 export const insertRegistrationSchema = createInsertSchema(registrations).omit({ id: true, registeredAt: true, status: true });
 export const insertInstructorFormationSchema = createInsertSchema(instructorFormations).omit({ id: true, assignedAt: true });
 export const insertInstructorAvailabilitySchema = createInsertSchema(instructorAvailabilities).omit({ id: true, createdAt: true }).extend({
-  dates: z.array(z.union([z.date(), z.string()])).transform((dates) => 
-    dates.map((d) => typeof d === 'string' ? new Date(d) : d)
-  ),
+  slots: z.array(availabilitySlotSchema),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
