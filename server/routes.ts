@@ -176,11 +176,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
-      const users = await storage.listUsers();
+      const archived = req.query.archived === "true";
+      const users = await storage.listUsers(archived);
       
       // Remove passwords from response
       const usersWithoutPasswords = users.map(({ password, ...user }) => user);
       res.json(usersWithoutPasswords);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Archive a consultant (RH only)
+  app.patch("/api/users/:id/archive", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Archive the user
+      await storage.updateUser(req.params.id, { archived: true });
+
+      // Delete pending and approved intentions
+      const interests = await storage.listFormationInterests({ userId: req.params.id });
+      for (const interest of interests) {
+        if (interest.status === "pending" || interest.status === "approved") {
+          // Refund quota before deleting
+          if (interest.priority === "P1" && (targetUser.p1Used || 0) > 0) {
+            await storage.updateUser(req.params.id, { p1Used: (targetUser.p1Used || 0) - 1 });
+          } else if (interest.priority === "P2" && (targetUser.p2Used || 0) > 0) {
+            await storage.updateUser(req.params.id, { p2Used: (targetUser.p2Used || 0) - 1 });
+          }
+          await storage.deleteFormationInterest(interest.id);
+        }
+      }
+
+      // Delete pending and validated registrations
+      const registrations = await storage.listRegistrations(req.params.id);
+      for (const registration of registrations) {
+        if (registration.status === "pending" || registration.status === "validated") {
+          await storage.deleteRegistration(registration.id);
+        }
+      }
+
+      res.json({ message: "User archived successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete a consultant permanently (RH only)
+  app.delete("/api/users/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Delete all intentions
+      const interests = await storage.listFormationInterests({ userId: req.params.id });
+      for (const interest of interests) {
+        await storage.deleteFormationInterest(interest.id);
+      }
+
+      // Delete all registrations
+      const registrations = await storage.listRegistrations(req.params.id);
+      for (const registration of registrations) {
+        await storage.deleteRegistration(registration.id);
+      }
+
+      // Delete the user
+      await storage.deleteUser(req.params.id);
+
+      res.json({ message: "User deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -25,7 +25,8 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined>;
-  listUsers(): Promise<User[]>;
+  listUsers(archived?: boolean): Promise<User[]>;
+  deleteUser(id: string): Promise<boolean>;
 
   // Formation methods
   getFormation(id: string): Promise<Formation | undefined>;
@@ -85,8 +86,13 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  async listUsers(): Promise<User[]> {
-    return await db.select().from(users);
+  async listUsers(archived: boolean = false): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.archived, archived));
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 
   // Formation methods
