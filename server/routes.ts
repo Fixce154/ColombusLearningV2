@@ -428,6 +428,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
+      // Refund quota if interest is being rejected
+      if (req.body.status === "rejected" && (interest.status === "pending" || interest.status === "approved")) {
+        const interestOwner = await storage.getUser(interest.userId);
+        if (interestOwner) {
+          if (interest.priority === "P1" && (interestOwner.p1Used || 0) > 0) {
+            await storage.updateUser(interest.userId, { p1Used: (interestOwner.p1Used || 0) - 1 });
+          } else if (interest.priority === "P2" && (interestOwner.p2Used || 0) > 0) {
+            await storage.updateUser(interest.userId, { p2Used: (interestOwner.p2Used || 0) - 1 });
+          }
+        }
+      }
+
       const updated = await storage.updateFormationInterest(req.params.id, req.body);
       res.json(updated);
     } catch (error: any) {

@@ -12,6 +12,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 24, 2025)
 
+### Automatic Quota Refund System
+- **RH Rejection Refund**: When RH rejects an intention (status → "rejected"), the system automatically refunds the consultant's P1/P2 quota
+- **User Deletion Refund**: When a consultant deletes their own intention (pending/approved/rejected), quota is refunded
+- **Rejected Intentions UI**: 
+  - Greyed cards (opacity-60 bg-muted/50) in Dashboard
+  - Red "La demande a été rejetée" status message
+  - Full-width "Supprimer" button for cleanup
+- **Status Flow**: Fixed InterestManagement to send "rejected" status (was incorrectly sending "withdrawn")
+- **Database Cleanup**: Corrected existing rejected intentions and refunded quotas
+
 ### Multi-Role System & Instructor Features
 - **Schema Migration**: Migrated `role` (text) to `roles` (text[]) to support multiple simultaneous roles per user
 - **Role Pattern**: All role checks now use `user.roles.includes("roleName")` pattern throughout the codebase
