@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Heart, CheckCircle, XCircle, Clock, Loader2, TrendingUp } from "lucide-react";
+import { Heart, CheckCircle, XCircle, Clock, Loader2, TrendingUp, RefreshCw } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { FormationInterest, Formation, User } from "@shared/schema";
@@ -50,13 +50,16 @@ export default function InterestManagement() {
   const { toast } = useToast();
 
   // Fetch all interests (RH access)
-  const { data: interestsData, isLoading: isLoadingInterests } = useQuery<AdminInterestsResponse>({
+  const { data: interestsData, isLoading: isLoadingInterests, isFetching, refetch } = useQuery<AdminInterestsResponse>({
     queryKey: ["/api/admin/interests"],
     queryFn: async () => {
       const res = await fetch("/api/admin/interests", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch interests");
       return res.json();
     },
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   const interests = interestsData?.interests || [];
@@ -237,14 +240,26 @@ export default function InterestManagement() {
     <div className="container mx-auto p-8 space-y-8">
       {/* Header */}
       <div className="space-y-2">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary/10 p-3 rounded-xl">
-            <Heart className="w-7 h-7 text-primary" />
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 p-3 rounded-xl">
+              <Heart className="w-7 h-7 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-primary">Gestion des intentions de formation</h1>
+              <p className="text-muted-foreground">Approuvez ou refusez les demandes d'intérêt des consultants</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-primary">Gestion des intentions de formation</h1>
-            <p className="text-muted-foreground">Approuvez ou refusez les demandes d'intérêt des consultants</p>
-          </div>
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            data-testid="button-refresh-interests"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            Rafraîchir
+          </Button>
         </div>
       </div>
 
@@ -429,30 +444,32 @@ export default function InterestManagement() {
             <AlertDialogTitle className={actionType === "approve" ? "text-accent" : "text-destructive"}>
               {actionType === "approve" ? "Approuver l'intention ?" : "Refuser l'intention ?"}
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-base pt-2">
-              {selectedInterest && (
-                <div className="space-y-2">
-                  <p>
-                    <strong>Consultant :</strong> {getUser(selectedInterest.userId)?.name}
-                  </p>
-                  <p>
-                    <strong>Formation :</strong> {getFormation(selectedInterest.formationId)?.title}
-                  </p>
-                  <p>
-                    <strong>Priorité :</strong> {selectedInterest.priority}
-                  </p>
-                  {actionType === "approve" && (
-                    <p className="mt-4 text-accent font-medium">
-                      Le consultant pourra s'inscrire aux sessions disponibles pour cette formation.
+            <AlertDialogDescription asChild>
+              <div className="text-base pt-2 space-y-2">
+                {selectedInterest && (
+                  <>
+                    <p>
+                      <strong>Consultant :</strong> {getUser(selectedInterest.userId)?.name}
                     </p>
-                  )}
-                  {actionType === "reject" && (
-                    <p className="mt-4 text-destructive font-medium">
-                      Le quota {selectedInterest.priority} du consultant sera remboursé si applicable.
+                    <p>
+                      <strong>Formation :</strong> {getFormation(selectedInterest.formationId)?.title}
                     </p>
-                  )}
-                </div>
-              )}
+                    <p>
+                      <strong>Priorité :</strong> {selectedInterest.priority}
+                    </p>
+                    {actionType === "approve" && (
+                      <p className="mt-4 text-accent font-medium">
+                        Le consultant pourra s'inscrire aux sessions disponibles pour cette formation.
+                      </p>
+                    )}
+                    {actionType === "reject" && (
+                      <p className="mt-4 text-destructive font-medium">
+                        Le quota {selectedInterest.priority} du consultant sera remboursé si applicable.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
