@@ -373,28 +373,28 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
               </p>
             </Card>
           )}
-          
-          {/* Express Interest Button */}
-          {!existingInterest && (
-            <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t shadow-lg pt-6 -mx-6 px-6 pb-6">
-              <Button 
-                size="lg" 
-                className="w-full shadow-md" 
-                onClick={() => setShowInterestDialog(true)} 
-                data-testid="button-express-interest"
-                disabled={isSeniorityMismatch}
-              >
-                Manifester mon intérêt pour cette formation
-              </Button>
-              {isSeniorityMismatch && (
-                <p className="text-sm text-muted-foreground text-center mt-3">
-                  Cette formation nécessite un niveau de séniorité {formation.seniorityRequired}
-                </p>
-              )}
-            </div>
-          )}
         </TabsContent>
       </Tabs>
+
+      {/* Express Interest Button - Always visible */}
+      {!existingInterest && (
+        <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t shadow-lg pt-6 pb-6">
+          <Button 
+            size="lg" 
+            className="w-full shadow-md" 
+            onClick={() => setShowInterestDialog(true)} 
+            data-testid="button-express-interest"
+            disabled={isSeniorityMismatch}
+          >
+            Manifester mon intérêt pour cette formation
+          </Button>
+          {isSeniorityMismatch && (
+            <p className="text-sm text-muted-foreground text-center mt-3">
+              Cette formation nécessite un niveau de séniorité {formation.seniorityRequired}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Express Interest Dialog */}
       <Dialog open={showInterestDialog} onOpenChange={setShowInterestDialog}>
