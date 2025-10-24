@@ -56,9 +56,7 @@ export default function Dashboard({ currentUser }: DashboardProps) {
   // Delete interest mutation
   const deleteInterestMutation = useMutation({
     mutationFn: async (interestId: string) => {
-      await apiRequest(`/api/interests/${interestId}`, {
-        method: "DELETE",
-      });
+      await apiRequest(`/api/interests/${interestId}`, "DELETE");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/interests"] });
@@ -81,9 +79,7 @@ export default function Dashboard({ currentUser }: DashboardProps) {
   // Delete registration mutation
   const deleteRegistrationMutation = useMutation({
     mutationFn: async (registrationId: string) => {
-      await apiRequest(`/api/registrations/${registrationId}`, {
-        method: "DELETE",
-      });
+      await apiRequest(`/api/registrations/${registrationId}`, "DELETE");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/registrations"] });

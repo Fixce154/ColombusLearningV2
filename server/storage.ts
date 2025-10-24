@@ -43,14 +43,14 @@ export interface IStorage {
   // Formation Interest methods
   getFormationInterest(id: string): Promise<FormationInterest | undefined>;
   listFormationInterests(filters?: { userId?: string; formationId?: string }): Promise<FormationInterest[]>;
-  createFormationInterest(interest: InsertFormationInterest): Promise<FormationInterest>;
+  createFormationInterest(interest: InsertFormationInterest & { status: string }): Promise<FormationInterest>;
   updateFormationInterest(id: string, updates: Partial<FormationInterest>): Promise<FormationInterest | undefined>;
   deleteFormationInterest(id: string): Promise<boolean>;
 
   // Registration methods
   getRegistration(id: string): Promise<Registration | undefined>;
   listRegistrations(userId?: string, sessionId?: string): Promise<Registration[]>;
-  createRegistration(registration: InsertRegistration): Promise<Registration>;
+  createRegistration(registration: InsertRegistration & { status: string }): Promise<Registration>;
   updateRegistration(id: string, updates: Partial<InsertRegistration>): Promise<Registration | undefined>;
   deleteRegistration(id: string): Promise<boolean>;
   getRegistrationCount(sessionId: string): Promise<number>;
@@ -188,7 +188,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(formationInterests).orderBy(desc(formationInterests.expressedAt));
   }
 
-  async createFormationInterest(insertInterest: InsertFormationInterest): Promise<FormationInterest> {
+  async createFormationInterest(insertInterest: InsertFormationInterest & { status: string }): Promise<FormationInterest> {
     const existingInterest = await db
       .select()
       .from(formationInterests)
@@ -255,7 +255,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(registrations).orderBy(desc(registrations.registeredAt));
   }
 
-  async createRegistration(insertRegistration: InsertRegistration): Promise<Registration> {
+  async createRegistration(insertRegistration: InsertRegistration & { status: string }): Promise<Registration> {
     const [registration] = await db.insert(registrations).values(insertRegistration).returning();
     return registration;
   }

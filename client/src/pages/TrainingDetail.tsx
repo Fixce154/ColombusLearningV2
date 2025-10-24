@@ -28,7 +28,7 @@ import ModalityBadge from "@/components/ModalityBadge";
 import SeniorityBadge from "@/components/SeniorityBadge";
 import SessionCard from "@/components/SessionCard";
 import PrioritySelector from "@/components/PrioritySelector";
-import { ArrowLeft, Clock, Target, BookOpen, Calendar, AlertCircle, CheckCircle, Loader2, XCircle } from "lucide-react";
+import { ArrowLeft, Clock, Target, BookOpen, Calendar, AlertCircle, CheckCircle, Loader2, XCircle, Trash2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { User, Formation, Session, Registration, FormationInterest } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
@@ -44,6 +44,7 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
   const [showInterestDialog, setShowInterestDialog] = useState(false);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false);
+  const [showCancelInterestDialog, setShowCancelInterestDialog] = useState(false);
   const { toast } = useToast();
 
   // Fetch formation
@@ -132,6 +133,29 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
     },
   });
 
+  // Delete interest mutation
+  const deleteInterestMutation = useMutation({
+    mutationFn: async (interestId: string) => {
+      await apiRequest(`/api/interests/${interestId}`, "DELETE");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/interests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({
+        title: "Intention annulée",
+        description: "Votre intention de formation a été annulée avec succès. Vos quotas ont été remboursés.",
+      });
+      setShowCancelInterestDialog(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible d'annuler l'intention de formation",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (isLoadingFormation || isLoadingSessions) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -212,12 +236,23 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
             <Alert className="border-yellow-500/50 bg-yellow-500/10">
               <AlertCircle className="w-5 h-5 text-yellow-600" />
               <AlertDescription className="text-foreground">
-                <div className="space-y-2">
-                  <p className="font-semibold">Intérêt manifesté avec priorité {existingInterest.priority}</p>
-                  <p>
-                    Les RH ont été informés de votre intérêt pour cette formation. Ils vont organiser les sessions en fonction de la demande. 
-                    Vous serez notifié dès qu'une session sera disponible.
-                  </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2 flex-1">
+                    <p className="font-semibold">Intérêt manifesté avec priorité {existingInterest.priority}</p>
+                    <p>
+                      Les RH ont été informés de votre intérêt pour cette formation. Ils vont organiser les sessions en fonction de la demande. 
+                      Vous serez notifié dès qu'une session sera disponible.
+                    </p>
+                  </div>
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={() => setShowCancelInterestDialog(true)}
+                    data-testid="button-cancel-interest"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Annuler
+                  </Button>
                 </div>
               </AlertDescription>
             </Alert>
@@ -226,7 +261,20 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
             <Alert className="border-accent/50 bg-accent/10">
               <CheckCircle className="w-5 h-5 text-accent" />
               <AlertDescription className="text-foreground">
-                Votre intérêt a été <strong>validé par les RH</strong>. Des sessions vont être organisées prochainement.
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    Votre intérêt a été <strong>validé par les RH</strong>. Des sessions vont être organisées prochainement.
+                  </div>
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={() => setShowCancelInterestDialog(true)}
+                    data-testid="button-cancel-interest"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Annuler
+                  </Button>
+                </div>
               </AlertDescription>
             </Alert>
           )}
@@ -493,6 +541,48 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
               disabled={enrollMutation.isPending}
             >
               {enrollMutation.isPending ? "Inscription en cours..." : "Confirmer l'inscription"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Interest Confirmation Dialog */}
+      <Dialog open={showCancelInterestDialog} onOpenChange={setShowCancelInterestDialog}>
+        <DialogContent data-testid="dialog-confirm-cancel-interest">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Annuler votre intention de formation ?</DialogTitle>
+            <DialogDescription className="text-base pt-2">
+              Êtes-vous sûr de vouloir annuler votre intention de formation pour "{formation.title}" ?
+              {existingInterest && (existingInterest.priority === "P1" || existingInterest.priority === "P2") && (
+                <strong className="block mt-2">
+                  Votre quota {existingInterest.priority} vous sera remboursé.
+                </strong>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowCancelInterestDialog(false)}
+              disabled={deleteInterestMutation.isPending}
+              data-testid="button-cancel-cancel-interest"
+            >
+              Non, garder
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => existingInterest && deleteInterestMutation.mutate(existingInterest.id)}
+              disabled={deleteInterestMutation.isPending}
+              data-testid="button-confirm-cancel-interest"
+            >
+              {deleteInterestMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Annulation...
+                </>
+              ) : (
+                "Oui, annuler"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
