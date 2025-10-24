@@ -47,14 +47,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Loader2, CalendarDays, MapPin, Users as UsersIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, CalendarDays, MapPin, Users as UsersIcon, ChevronDown, ChevronRight } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Session, Formation, User } from "@shared/schema";
+import type { Session, Formation, User, Registration } from "@shared/schema";
 import { insertSessionSchema } from "@shared/schema";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { z } from "zod";
+import PriorityBadge from "@/components/PriorityBadge";
 
 const sessionFormSchema = insertSessionSchema.extend({
   startDate: z.string(),
@@ -67,6 +68,7 @@ export default function SessionManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSession, setEditingSession] = useState<Session | null>(null);
   const [deleteSession, setDeleteSession] = useState<Session | null>(null);
+  const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: sessions = [], isLoading } = useQuery<Session[]>({
@@ -92,9 +94,29 @@ export default function SessionManagement() {
       if (res.status === 404) return [];
       if (!res.ok) throw new Error("Failed to fetch users");
       const users = await res.json();
-      return users.filter((u: User) => u.role === "formateur");
+      return users.filter((u: User) => u.roles.includes("formateur"));
     },
     retry: false,
+  });
+
+  const { data: allUsers = [] } = useQuery<User[]>({
+    queryKey: ["/api/users/all"],
+    queryFn: async () => {
+      const res = await fetch("/api/users", { credentials: "include" });
+      if (res.status === 404) return [];
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return res.json();
+    },
+    retry: false,
+  });
+
+  const { data: registrations = [] } = useQuery<Registration[]>({
+    queryKey: ["/api/admin/registrations"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/registrations", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch registrations");
+      return res.json();
+    },
   });
 
   const form = useForm<SessionFormData>({
@@ -224,6 +246,20 @@ export default function SessionManagement() {
 
   const getFormation = (id: string) => formations.find(f => f.id === id);
   const getInstructor = (id: string | null | undefined) => id ? instructors.find(u => u.id === id) : null;
+  const getUser = (id: string) => allUsers.find(u => u.id === id);
+  
+  const getSessionRegistrations = (sessionId: string) => {
+    return registrations.filter(r => r.sessionId === sessionId && r.status === "validated");
+  };
+
+  const getRemainingSeats = (sessionId: string, capacity: number) => {
+    const enrolledCount = getSessionRegistrations(sessionId).length;
+    return capacity - enrolledCount;
+  };
+
+  const toggleSession = (sessionId: string) => {
+    setExpandedSession(expandedSession === sessionId ? null : sessionId);
+  };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
@@ -273,12 +309,14 @@ export default function SessionManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10"></TableHead>
                     <TableHead>Formation</TableHead>
                     <TableHead>Date de début</TableHead>
                     <TableHead>Date de fin</TableHead>
                     <TableHead>Lieu</TableHead>
                     <TableHead>Formateur</TableHead>
-                    <TableHead>Capacité</TableHead>
+                    <TableHead>Inscrits / Capacité</TableHead>
+                    <TableHead>Places restantes</TableHead>
                     <TableHead>Statut</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -287,64 +325,119 @@ export default function SessionManagement() {
                   {sessions.map((session) => {
                     const formation = getFormation(session.formationId);
                     const instructor = getInstructor(session.instructorId);
+                    const sessionRegs = getSessionRegistrations(session.id);
+                    const remainingSeats = getRemainingSeats(session.id, session.capacity);
+                    const isExpanded = expandedSession === session.id;
+                    
                     return (
-                      <TableRow key={session.id} data-testid={`row-session-${session.id}`}>
-                        <TableCell className="font-medium">
-                          {formation?.title || "Formation inconnue"}
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(session.startDate), "dd MMM yyyy HH:mm", { locale: fr })}
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(session.endDate), "dd MMM yyyy HH:mm", { locale: fr })}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-muted-foreground" />
-                            {session.location || <span className="text-muted-foreground">Non défini</span>}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {instructor?.name || <span className="text-muted-foreground">Non assigné</span>}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <UsersIcon className="w-4 h-4 text-muted-foreground" />
-                            {session.capacity}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            session.status === "open" ? "default" :
-                            session.status === "full" ? "secondary" :
-                            session.status === "completed" ? "outline" : "destructive"
-                          }>
-                            {session.status === "open" ? "Ouvert" :
-                             session.status === "full" ? "Complet" :
-                             session.status === "completed" ? "Terminé" : "Annulé"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleEdit(session)}
-                              data-testid={`button-edit-${session.id}`}
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setDeleteSession(session)}
-                              data-testid={`button-delete-${session.id}`}
-                            >
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                      <>
+                        <TableRow 
+                          key={session.id} 
+                          data-testid={`row-session-${session.id}`}
+                          className="cursor-pointer hover-elevate"
+                          onClick={() => toggleSession(session.id)}
+                        >
+                          <TableCell>
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {formation?.title || "Formation inconnue"}
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(session.startDate), "dd MMM yyyy HH:mm", { locale: fr })}
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(session.endDate), "dd MMM yyyy HH:mm", { locale: fr })}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4 text-muted-foreground" />
+                              {session.location || <span className="text-muted-foreground">Non défini</span>}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {instructor?.name || <span className="text-muted-foreground">Non assigné</span>}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <UsersIcon className="w-4 h-4 text-muted-foreground" />
+                              <span className="font-semibold">{sessionRegs.length}</span> / {session.capacity}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={remainingSeats > 0 ? "default" : "destructive"}>
+                              {remainingSeats} {remainingSeats > 1 ? "places" : "place"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={
+                              session.status === "open" ? "default" :
+                              session.status === "full" ? "secondary" :
+                              session.status === "completed" ? "outline" : "destructive"
+                            }>
+                              {session.status === "open" ? "Ouvert" :
+                               session.status === "full" ? "Complet" :
+                               session.status === "completed" ? "Terminé" : "Annulé"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleEdit(session)}
+                                data-testid={`button-edit-${session.id}`}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setDeleteSession(session)}
+                                data-testid={`button-delete-${session.id}`}
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow>
+                            <TableCell colSpan={10} className="bg-muted/30 p-4">
+                              <div className="space-y-3">
+                                <h4 className="font-semibold text-sm flex items-center gap-2">
+                                  <UsersIcon className="w-4 h-4" />
+                                  Liste des inscrits ({sessionRegs.length})
+                                </h4>
+                                {sessionRegs.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground">Aucun inscrit pour le moment</p>
+                                ) : (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    {sessionRegs.map((reg) => {
+                                      const user = getUser(reg.userId);
+                                      return (
+                                        <div key={reg.id} className="flex items-center gap-2 text-sm bg-background p-2 rounded-md border">
+                                          <div className="flex-1">
+                                            <div className="font-medium">{user?.name || "Utilisateur inconnu"}</div>
+                                            <div className="text-xs text-muted-foreground">
+                                              {user?.businessUnit || ""} {user?.seniority ? `• ${user.seniority}` : ""}
+                                            </div>
+                                          </div>
+                                          <PriorityBadge priority={reg.priority as "P1" | "P2" | "P3"} />
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
                     );
                   })}
                 </TableBody>

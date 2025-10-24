@@ -12,6 +12,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 24, 2025)
 
+### Enhanced Session Management Interface
+- **Seats Tracking**: Display number of enrolled students and remaining seats for each session
+- **Expandable Sessions**: Click on any session row to expand and view the full list of enrolled students
+- **Student Details**: Expanded view shows student name, business unit, seniority, and priority level
+- **Visual Indicators**: Color-coded badges for remaining seats (green if available, red if full)
+- **Responsive Grid**: Student list displayed in responsive 1-3 column grid based on screen size
+
 ### Auto-Validated Registrations for Approved Intentions
 - **Streamlined Workflow**: When a consultant registers for a session after their intention was approved, the registration is automatically validated (no RH action needed)
 - **Automatic Status**: Registration created with status="validated" instead of "pending" if intention was "approved"
