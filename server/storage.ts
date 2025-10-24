@@ -32,6 +32,7 @@ export interface IStorage {
   listFormations(activeOnly?: boolean): Promise<Formation[]>;
   createFormation(formation: InsertFormation): Promise<Formation>;
   updateFormation(id: string, updates: Partial<InsertFormation>): Promise<Formation | undefined>;
+  deleteFormation(id: string): Promise<boolean>;
 
   // Session methods
   getSession(id: string): Promise<Session | undefined>;
@@ -39,6 +40,7 @@ export interface IStorage {
   getUpcomingSessions(formationId?: string): Promise<Session[]>;
   createSession(session: InsertSession): Promise<Session>;
   updateSession(id: string, updates: Partial<InsertSession>): Promise<Session | undefined>;
+  deleteSession(id: string): Promise<boolean>;
 
   // Formation Interest methods
   getFormationInterest(id: string): Promise<FormationInterest | undefined>;
@@ -113,6 +115,11 @@ export class DatabaseStorage implements IStorage {
     return formation || undefined;
   }
 
+  async deleteFormation(id: string): Promise<boolean> {
+    const result = await db.delete(formations).where(eq(formations.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
   // Session methods
   async getSession(id: string): Promise<Session | undefined> {
     const [session] = await db.select().from(sessions).where(eq(sessions.id, id));
@@ -158,6 +165,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(sessions.id, id))
       .returning();
     return session || undefined;
+  }
+
+  async deleteSession(id: string): Promise<boolean> {
+    const result = await db.delete(sessions).where(eq(sessions.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 
   // Formation Interest methods

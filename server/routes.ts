@@ -141,6 +141,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/formations", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== "rh") {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const validationSchema = insertFormationSchema;
+      const data = validationSchema.parse(req.body);
+      
+      const formation = await storage.createFormation(data);
+      res.status(201).json(formation);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/formations/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== "rh") {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const formation = await storage.getFormation(req.params.id);
+      if (!formation) {
+        return res.status(404).json({ message: "Formation not found" });
+      }
+
+      const updated = await storage.updateFormation(req.params.id, req.body);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/formations/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== "rh") {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const formation = await storage.getFormation(req.params.id);
+      if (!formation) {
+        return res.status(404).json({ message: "Formation not found" });
+      }
+
+      await storage.deleteFormation(req.params.id);
+      res.json({ message: "Formation deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Session Routes
   app.get("/api/sessions", optionalAuth, async (req, res) => {
     try {
@@ -164,6 +225,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Session not found" });
       }
       res.json(session);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/sessions", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== "rh") {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const validationSchema = insertSessionSchema;
+      const data = validationSchema.parse(req.body);
+      
+      const session = await storage.createSession(data);
+      res.status(201).json(session);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/sessions/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== "rh") {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const session = await storage.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      const updated = await storage.updateSession(req.params.id, req.body);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/sessions/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== "rh") {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const session = await storage.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      await storage.deleteSession(req.params.id);
+      res.json({ message: "Session deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
