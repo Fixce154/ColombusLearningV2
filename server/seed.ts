@@ -187,28 +187,6 @@ async function seed() {
   const createdSessions = await db.insert(sessions).values(sessionsData).returning();
   console.log(`✓ Created ${createdSessions.length} sessions`);
 
-  // Create some sample registrations
-  const consultant = createdUsers.find((u) => u.roles.includes("consultant"));
-  if (consultant && createdSessions.length > 0) {
-    await db.insert(registrations).values([
-      {
-        userId: consultant.id,
-        sessionId: createdSessions[0].id,
-        formationId: createdSessions[0].formationId,
-        priority: "P1",
-        status: "validated",
-      },
-      {
-        userId: consultant.id,
-        sessionId: createdSessions[1].id,
-        formationId: createdSessions[1].formationId,
-        priority: "P3",
-        status: "pending",
-      },
-    ]);
-    console.log("✓ Created sample registrations");
-  }
-
   console.log("✅ Database seeded successfully!");
 }
 
