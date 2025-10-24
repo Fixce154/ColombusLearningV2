@@ -10,6 +10,22 @@ The application is built as a full-stack web application with a desktop-first, r
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes (October 24, 2025)
+
+### Registration Workflow Complete
+- **Frontend-Backend Integration**: All pages (Catalog, TrainingDetail, Dashboard, RegistrationManagement) now use real API data
+- **Consultant Registration Flow**: Consultants can browse catalog, select formations, choose sessions, and enroll with P1/P2/P3 priority
+- **RH Validation Interface**: New RegistrationManagement page allows RH to validate/reject registrations with real-time updates
+- **Quota Management**: P1/P2 quotas only consumed when RH validates (not at enrollment), enforced server-side
+- **User Feedback**: Warning banners show "place réservée" during pending status, success toasts on validation
+- **Bug Fixes**: SessionCard now handles string dates correctly, RH toast messages display correct action
+
+### Technical Implementation
+- **API Routes**: Complete CRUD operations for formations, sessions, registrations, users
+- **Validation**: Server-side quota checking and capacity enforcement
+- **Schema Updates**: insertRegistrationSchema omits status (set by backend) for security
+- **End-to-End Testing**: Automated Playwright tests verify complete consultant → RH → consultant workflow
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -34,9 +50,10 @@ Preferred communication style: Simple, everyday language.
 - Comprehensive design guidelines documented in `design_guidelines.md`
 
 **State Management Strategy:**
-- Currently using mock data stored in `client/src/lib/mockData.ts` (to be replaced with API integration)
+- TanStack Query for server state management with real-time data fetching and caching
 - Role-based UI rendering with dynamic component visibility based on user role (consultant, rh, formateur, manager)
-- Session storage for temporary user authentication state (mock switcher functionality)
+- Session-based authentication with express-session and PostgreSQL store
+- All pages now connected to backend API (no mock data)
 
 ### Backend Architecture
 
