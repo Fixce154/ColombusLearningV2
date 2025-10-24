@@ -63,6 +63,15 @@ export const registrations = pgTable("registrations", {
   attended: boolean("attended").default(false),
 });
 
+export const instructorFormations = pgTable("instructor_formations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  instructorId: varchar("instructor_id").notNull(),
+  formationId: varchar("formation_id").notNull(),
+  assignedAt: timestamp("assigned_at").default(sql`now()`),
+}, (table) => ({
+  instructorFormationUnique: uniqueIndex("instructor_formation_unique_idx").on(table.instructorId, table.formationId),
+}));
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertFormationSchema = createInsertSchema(formations).omit({ id: true });
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true }).extend({
@@ -71,6 +80,7 @@ export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true 
 });
 export const insertFormationInterestSchema = createInsertSchema(formationInterests).omit({ id: true, expressedAt: true, status: true });
 export const insertRegistrationSchema = createInsertSchema(registrations).omit({ id: true, registeredAt: true, status: true });
+export const insertInstructorFormationSchema = createInsertSchema(instructorFormations).omit({ id: true, assignedAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -82,3 +92,5 @@ export type InsertFormationInterest = z.infer<typeof insertFormationInterestSche
 export type FormationInterest = typeof formationInterests.$inferSelect;
 export type InsertRegistration = z.infer<typeof insertRegistrationSchema>;
 export type Registration = typeof registrations.$inferSelect;
+export type InsertInstructorFormation = z.infer<typeof insertInstructorFormationSchema>;
+export type InstructorFormation = typeof instructorFormations.$inferSelect;

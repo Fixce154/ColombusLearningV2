@@ -204,6 +204,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get instructor's formations
+  app.get("/api/instructor/formations", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("formateur")) {
+        return res.status(403).json({ message: "Unauthorized - instructor role required" });
+      }
+
+      const formationIds = await storage.getInstructorFormations(userId);
+      res.json(formationIds);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Add formation to instructor
+  app.post("/api/instructor/formations/:formationId", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("formateur")) {
+        return res.status(403).json({ message: "Unauthorized - instructor role required" });
+      }
+
+      const { formationId } = req.params;
+      
+      // Check if formation exists
+      const formation = await storage.getFormation(formationId);
+      if (!formation) {
+        return res.status(404).json({ message: "Formation not found" });
+      }
+
+      const instructorFormation = await storage.addInstructorFormation(userId, formationId);
+      res.status(201).json(instructorFormation);
+    } catch (error: any) {
+      // Handle unique constraint violation
+      if (error.code === '23505') {
+        return res.status(400).json({ message: "Formation already assigned to instructor" });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Remove formation from instructor
+  app.delete("/api/instructor/formations/:formationId", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("formateur")) {
+        return res.status(403).json({ message: "Unauthorized - instructor role required" });
+      }
+
+      const { formationId } = req.params;
+      const success = await storage.removeInstructorFormation(userId, formationId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Formation assignment not found" });
+      }
+
+      res.json({ message: "Formation removed successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get all users (RH only)
   app.get("/api/users", requireAuth, async (req, res) => {
     try {

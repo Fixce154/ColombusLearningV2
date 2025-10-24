@@ -5,6 +5,7 @@ import {
   sessions,
   formationInterests,
   registrations,
+  instructorFormations,
   type User,
   type InsertUser,
   type Formation,
@@ -15,6 +16,8 @@ import {
   type InsertFormationInterest,
   type Registration,
   type InsertRegistration,
+  type InstructorFormation,
+  type InsertInstructorFormation,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, asc, ne } from "drizzle-orm";
@@ -59,6 +62,11 @@ export interface IStorage {
   updateRegistration(id: string, updates: Partial<InsertRegistration>): Promise<Registration | undefined>;
   deleteRegistration(id: string): Promise<boolean>;
   getRegistrationCount(sessionId: string): Promise<number>;
+
+  // Instructor Formation methods
+  getInstructorFormations(instructorId: string): Promise<string[]>;
+  addInstructorFormation(instructorId: string, formationId: string): Promise<InstructorFormation>;
+  removeInstructorFormation(instructorId: string, formationId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -320,6 +328,36 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return result[0]?.count || 0;
+  }
+
+  // Instructor Formation methods
+  async getInstructorFormations(instructorId: string): Promise<string[]> {
+    const result = await db
+      .select()
+      .from(instructorFormations)
+      .where(eq(instructorFormations.instructorId, instructorId));
+    return result.map(r => r.formationId);
+  }
+
+  async addInstructorFormation(instructorId: string, formationId: string): Promise<InstructorFormation> {
+    const [instructorFormation] = await db
+      .insert(instructorFormations)
+      .values({ instructorId, formationId })
+      .returning();
+    return instructorFormation;
+  }
+
+  async removeInstructorFormation(instructorId: string, formationId: string): Promise<boolean> {
+    const result = await db
+      .delete(instructorFormations)
+      .where(
+        and(
+          eq(instructorFormations.instructorId, instructorId),
+          eq(instructorFormations.formationId, formationId)
+        )
+      )
+      .returning();
+    return result.length > 0;
   }
 }
 
