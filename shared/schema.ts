@@ -13,6 +13,7 @@ export const users = pgTable("users", {
   businessUnit: text("business_unit"),
   p1Used: integer("p1_used").default(0),
   p2Used: integer("p2_used").default(0),
+  archived: boolean("archived").default(false),
 });
 
 export const formations = pgTable("formations", {
