@@ -1,4 +1,4 @@
-import { useState, Fragment } from "react";
+import { useState, Fragment, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,13 @@ export default function ConsultantManagement() {
   const [archiveDialogUser, setArchiveDialogUser] = useState<User | null>(null);
   const [deleteDialogUser, setDeleteDialogUser] = useState<User | null>(null);
   const { toast } = useToast();
+
+  // Rafraîchir les données quand on change d'onglet
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/interests"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/registrations"] });
+  }, [activeTab]);
 
   const { data: activeUsers = [], isLoading: isLoadingActiveUsers } = useQuery<User[]>({
     queryKey: ["/api/users", { archived: false }],
