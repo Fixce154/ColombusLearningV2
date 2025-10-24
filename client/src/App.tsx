@@ -1,18 +1,17 @@
-import { useState } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/AppSidebar";
-import RoleSwitcher from "@/components/RoleSwitcher";
 import Dashboard from "@/pages/Dashboard";
 import Catalog from "@/pages/Catalog";
 import TrainingDetail from "@/pages/TrainingDetail";
+import Login from "@/pages/Login";
 import NotFound from "@/pages/not-found";
-import { mockUsers } from "@/lib/mockData";
 import type { User } from "@shared/schema";
+import { Loader2 } from "lucide-react";
 
 function Router({ currentUser }: { currentUser: User }) {
   return (
@@ -26,34 +25,81 @@ function Router({ currentUser }: { currentUser: User }) {
   );
 }
 
-function App() {
-  // TODO: remove mock functionality - Start with first consultant user
-  const [currentUser, setCurrentUser] = useState<User>(mockUsers[0]);
-
+function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void }) {
   const style = {
     "--sidebar-width": "18rem",
     "--sidebar-width-icon": "4rem",
   };
 
   return (
+    <SidebarProvider style={style as React.CSSProperties}>
+      <div className="flex h-screen w-full bg-background">
+        <AppSidebar currentUser={user} />
+        <div className="flex flex-col flex-1 min-w-0">
+          <header className="flex items-center justify-between gap-6 px-6 py-5 border-b bg-card shadow-sm">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <button
+              onClick={onLogout}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              data-testid="button-logout"
+            >
+              Se déconnecter
+            </button>
+          </header>
+          <main className="flex-1 overflow-auto">
+            <div className="container max-w-7xl mx-auto px-6 py-8">
+              <Router currentUser={user} />
+            </div>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+function AppContent() {
+  const { data: userData, isLoading, refetch } = useQuery<{ user: User }>({
+    queryKey: ["/api/auth/me"],
+    retry: false,
+  });
+
+  const handleLogin = (user: User) => {
+    refetch();
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      queryClient.clear();
+      refetch();
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!userData?.user) {
+    return <Login onLoginSuccess={handleLogin} />;
+  }
+
+  return <AuthenticatedApp user={userData.user} onLogout={handleLogout} />;
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full bg-background">
-            <AppSidebar currentUser={currentUser} />
-            <div className="flex flex-col flex-1 min-w-0">
-              <header className="flex items-center justify-between gap-6 px-6 py-5 border-b bg-card shadow-sm">
-                <SidebarTrigger data-testid="button-sidebar-toggle" />
-                <RoleSwitcher currentUser={currentUser} onUserChange={setCurrentUser} />
-              </header>
-              <main className="flex-1 overflow-auto">
-                <div className="container max-w-7xl mx-auto px-6 py-8">
-                  <Router currentUser={currentUser} />
-                </div>
-              </main>
-            </div>
-          </div>
-        </SidebarProvider>
+        <AppContent />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
