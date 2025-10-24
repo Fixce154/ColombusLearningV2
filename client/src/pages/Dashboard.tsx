@@ -183,11 +183,13 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
               const formation = formations.find(f => f.id === interest.formationId);
               if (!formation) return null;
               
+              const isRejected = interest.status === "rejected";
+              
               return (
-                <Card key={interest.id} className="p-6 space-y-4 shadow-md hover-elevate">
+                <Card key={interest.id} className={`p-6 space-y-4 shadow-md ${isRejected ? 'opacity-60 bg-muted/50' : 'hover-elevate'}`}>
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-3">
-                      <h3 className="font-semibold text-primary line-clamp-2 flex-1">
+                      <h3 className={`font-semibold line-clamp-2 flex-1 ${isRejected ? 'text-muted-foreground' : 'text-primary'}`}>
                         {formation.title}
                       </h3>
                       <Badge variant={interest.priority === "P1" ? "destructive" : interest.priority === "P2" ? "default" : "secondary"}>
@@ -226,22 +228,32 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
                         <span className="text-accent">Inscrit à une session</span>
                       </>
                     )}
+                    {interest.status === "rejected" && (
+                      <>
+                        <XCircle className="w-4 h-4 text-destructive" />
+                        <span className="text-destructive font-medium">La demande a été rejetée</span>
+                      </>
+                    )}
                   </div>
                   
                   <div className="flex gap-2">
-                    <Link href={`/training/${formation.id}`} className="flex-1">
-                      <Button variant="outline" size="sm" className="w-full" data-testid={`button-view-interest-${interest.id}`}>
-                        Voir les détails
-                      </Button>
-                    </Link>
+                    {!isRejected && (
+                      <Link href={`/training/${formation.id}`} className="flex-1">
+                        <Button variant="outline" size="sm" className="w-full" data-testid={`button-view-interest-${interest.id}`}>
+                          Voir les détails
+                        </Button>
+                      </Link>
+                    )}
                     {interest.status !== "converted" && (
                       <Button 
                         variant="destructive" 
                         size="sm" 
                         onClick={() => setDeleteInterestId(interest.id)}
                         data-testid={`button-cancel-interest-${interest.id}`}
+                        className={isRejected ? 'w-full' : ''}
                       >
                         <Trash2 className="w-4 h-4" />
+                        {isRejected && <span className="ml-2">Supprimer</span>}
                       </Button>
                     )}
                   </div>
