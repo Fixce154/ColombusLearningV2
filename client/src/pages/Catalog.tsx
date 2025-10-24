@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import SearchBar from "@/components/SearchBar";
 import FilterPanel from "@/components/FilterPanel";
 import TrainingCard from "@/components/TrainingCard";
-import { BookOpen } from "lucide-react";
-import { mockFormations, mockSessions } from "@/lib/mockData";
+import { BookOpen, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
+import type { Formation, Session } from "@shared/schema";
 
 export default function Catalog() {
   const [, setLocation] = useLocation();
@@ -13,8 +14,23 @@ export default function Catalog() {
   const [selectedModalities, setSelectedModalities] = useState<string[]>([]);
   const [selectedSeniority, setSelectedSeniority] = useState<string[]>([]);
 
+  // Fetch formations from API
+  const { data: formations = [], isLoading: isLoadingFormations } = useQuery<Formation[]>({
+    queryKey: ["/api/formations"],
+  });
+
+  // Fetch upcoming sessions from API
+  const { data: sessions = [], isLoading: isLoadingSessions } = useQuery<Session[]>({
+    queryKey: ["/api/sessions"],
+    queryFn: async () => {
+      const res = await fetch("/api/sessions?upcoming=true", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch sessions");
+      return res.json();
+    },
+  });
+
   const filteredFormations = useMemo(() => {
-    return mockFormations.filter((formation) => {
+    return formations.filter((formation) => {
       if (!formation.active) return false;
 
       if (searchQuery) {
@@ -41,13 +57,13 @@ export default function Catalog() {
 
       return true;
     });
-  }, [searchQuery, selectedThemes, selectedModalities, selectedSeniority]);
+  }, [formations, searchQuery, selectedThemes, selectedModalities, selectedSeniority]);
 
   const getNextSession = (formationId: string) => {
-    const sessions = mockSessions
-      .filter((s) => s.formationId === formationId && s.status === "open" && s.startDate > new Date())
-      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-    return sessions[0]?.startDate;
+    const formationSessions = sessions
+      .filter((s) => s.formationId === formationId && s.status === "open")
+      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+    return formationSessions[0] ? new Date(formationSessions[0].startDate) : undefined;
   };
 
   const handleReset = () => {
@@ -55,6 +71,17 @@ export default function Catalog() {
     setSelectedModalities([]);
     setSelectedSeniority([]);
   };
+
+  if (isLoadingFormations || isLoadingSessions) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Chargement du catalogue...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -103,7 +130,7 @@ export default function Catalog() {
                   {filteredFormations.length > 1 ? "s" : ""}
                 </p>
                 {(searchQuery || selectedThemes.length > 0 || selectedModalities.length > 0 || selectedSeniority.length > 0) && (
-                  <p className="text-sm text-muted-foreground">sur {mockFormations.filter(f => f.active).length} au total</p>
+                  <p className="text-sm text-muted-foreground">sur {formations.filter(f => f.active).length} au total</p>
                 )}
               </div>
               <div className="grid md:grid-cols-2 gap-6">

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,13 +23,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import ModalityBadge from "@/components/ModalityBadge";
 import SeniorityBadge from "@/components/SeniorityBadge";
 import SessionCard from "@/components/SessionCard";
 import PrioritySelector from "@/components/PrioritySelector";
-import { ArrowLeft, Clock, Target, BookOpen, Calendar } from "lucide-react";
-import { mockFormations, mockSessions, mockUsers } from "@/lib/mockData";
-import type { User } from "@shared/schema";
+import { ArrowLeft, Clock, Target, BookOpen, Calendar, AlertCircle, CheckCircle, Loader2, XCircle } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { User, Formation, Session, Registration } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 interface TrainingDetailProps {
   currentUser: User;
@@ -41,12 +44,72 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
   const [selectedPriority, setSelectedPriority] = useState<"P1" | "P2" | "P3">("P3");
   const [showEnrollDialog, setShowEnrollDialog] = useState(false);
   const [showSeniorityAlert, setShowSeniorityAlert] = useState(false);
+  const { toast } = useToast();
 
-  // TODO: remove mock functionality
-  const formation = mockFormations.find((f) => f.id === params?.id);
-  const sessions = mockSessions.filter(
-    (s) => s.formationId === params?.id && s.startDate > new Date()
-  );
+  // Fetch formation
+  const { data: formation, isLoading: isLoadingFormation } = useQuery<Formation>({
+    queryKey: ["/api/formations", params?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/formations/${params?.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Formation not found");
+      return res.json();
+    },
+    enabled: !!params?.id,
+  });
+
+  // Fetch sessions for this formation
+  const { data: sessions = [], isLoading: isLoadingSessions } = useQuery<Session[]>({
+    queryKey: ["/api/sessions", params?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/sessions?formationId=${params?.id}&upcoming=true`, { 
+        credentials: "include" 
+      });
+      if (!res.ok) throw new Error("Failed to fetch sessions");
+      return res.json();
+    },
+    enabled: !!params?.id,
+  });
+
+  // Fetch user's registrations
+  const { data: registrations = [] } = useQuery<Registration[]>({
+    queryKey: ["/api/registrations"],
+  });
+
+  // Enrollment mutation
+  const enrollMutation = useMutation({
+    mutationFn: async (data: { sessionId: string; formationId: string; priority: string }) => {
+      return apiRequest("/api/registrations", "POST", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/registrations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({
+        title: "Inscription enregistrée !",
+        description: "Votre demande d'inscription a été envoyée. Elle est en attente de validation par les RH.",
+      });
+      setShowEnrollDialog(false);
+      setShowSeniorityAlert(false);
+      setSelectedSession(null);
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de s'inscrire à cette session",
+      });
+    },
+  });
+
+  if (isLoadingFormation || isLoadingSessions) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Chargement de la formation...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!formation) {
     return (
@@ -81,14 +144,20 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
   };
 
   const confirmEnroll = () => {
-    console.log("Enrolling in session", selectedSession, "with priority", selectedPriority);
-    setShowEnrollDialog(false);
-    setShowSeniorityAlert(false);
-    setLocation("/");
+    if (!selectedSession || !formation) return;
+    
+    enrollMutation.mutate({
+      sessionId: selectedSession,
+      formationId: formation.id,
+      priority: selectedPriority,
+    });
   };
 
   const p1Available = (currentUser.p1Used || 0) < 1;
   const p2Available = (currentUser.p2Used || 0) < 1;
+
+  // Check if user is already registered for any session of this formation
+  const existingRegistration = registrations.find(r => r.formationId === formation.id);
 
   return (
     <div className="space-y-8">
@@ -97,6 +166,42 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
         <ArrowLeft className="w-4 h-4" />
         Retour au catalogue
       </Button>
+
+      {/* Existing Registration Alert */}
+      {existingRegistration && (
+        <>
+          {existingRegistration.status === "pending" && (
+            <Alert className="border-yellow-500/50 bg-yellow-500/10">
+              <AlertCircle className="w-5 h-5 text-yellow-600" />
+              <AlertDescription className="text-foreground">
+                <div className="space-y-2">
+                  <p className="font-semibold">Inscription en attente de validation par les RH</p>
+                  <p>
+                    Une <strong>place vous est réservée</strong> pour cette formation pendant l'examen de votre demande. 
+                    Vous recevrez une notification dès que votre inscription sera validée ou refusée.
+                  </p>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+          {existingRegistration.status === "validated" && (
+            <Alert className="border-accent/50 bg-accent/10">
+              <CheckCircle className="w-5 h-5 text-accent" />
+              <AlertDescription className="text-foreground">
+                Vous êtes déjà inscrit à cette formation avec le statut <strong>validé</strong>.
+              </AlertDescription>
+            </Alert>
+          )}
+          {existingRegistration.status === "cancelled" && (
+            <Alert className="border-destructive/50 bg-destructive/10">
+              <XCircle className="w-5 h-5 text-destructive" />
+              <AlertDescription className="text-foreground">
+                Votre inscription précédente a été <strong>refusée</strong>. Vous pouvez vous inscrire à nouveau.
+              </AlertDescription>
+            </Alert>
+          )}
+        </>
+      )}
 
       {/* Header */}
       <div className="space-y-6">
@@ -180,10 +285,22 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
                 </p>
               </div>
               
+              {existingRegistration && existingRegistration.status !== "cancelled" && (
+                <Alert className="border-yellow-500/50 bg-yellow-500/10">
+                  <AlertCircle className="w-5 h-5 text-yellow-600" />
+                  <AlertDescription className="text-foreground">
+                    Une place vous est <strong>réservée</strong> pour cette formation pendant la validation de votre inscription.
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               <div className="space-y-4">
                 {sessions.map((session) => {
-                  const enrolledCount = Math.floor(Math.random() * 8) + 2;
+                  // For demo, using a simple calculation - in real app this would come from registration count
+                  const enrolledCount = Math.floor(Math.random() * (session.capacity - 2)) + 2;
                   const isFull = enrolledCount >= session.capacity;
+                  const isUserRegistered = registrations.some(r => r.sessionId === session.id);
+                  
                   return (
                     <SessionCard
                       key={session.id}
@@ -191,17 +308,23 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
                       instructorName="Pierre Bernard"
                       enrolledCount={enrolledCount}
                       isSelected={selectedSession === session.id}
-                      isFull={isFull}
-                      onClick={() => setSelectedSession(session.id)}
+                      isFull={isFull || isUserRegistered}
+                      onClick={() => !isFull && !isUserRegistered && setSelectedSession(session.id)}
                     />
                   );
                 })}
               </div>
 
-              {selectedSession && (
+              {selectedSession && !existingRegistration && (
                 <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t shadow-lg pt-6 -mx-6 px-6 pb-6">
-                  <Button size="lg" className="w-full shadow-md" onClick={handleEnroll} data-testid="button-enroll">
-                    S'inscrire à cette session
+                  <Button 
+                    size="lg" 
+                    className="w-full shadow-md" 
+                    onClick={handleEnroll} 
+                    data-testid="button-enroll"
+                    disabled={enrollMutation.isPending}
+                  >
+                    {enrollMutation.isPending ? "Inscription en cours..." : "S'inscrire à cette session"}
                   </Button>
                 </div>
               )}
@@ -246,7 +369,7 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
             <DialogTitle className="text-2xl text-primary">Inscription à la formation</DialogTitle>
             <DialogDescription className="text-base pt-2">
               Sélectionnez votre niveau de priorité pour cette formation. Votre demande sera soumise au service RH pour
-              validation.
+              validation. <strong>Une place vous sera réservée pendant l'examen de votre demande.</strong>
             </DialogDescription>
           </DialogHeader>
 
@@ -260,11 +383,21 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
           </div>
 
           <DialogFooter className="gap-3">
-            <Button variant="outline" onClick={() => setShowEnrollDialog(false)} data-testid="button-cancel-enroll">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowEnrollDialog(false)} 
+              data-testid="button-cancel-enroll"
+              disabled={enrollMutation.isPending}
+            >
               Annuler
             </Button>
-            <Button onClick={confirmEnroll} className="shadow-md" data-testid="button-confirm-enroll">
-              Confirmer l'inscription
+            <Button 
+              onClick={confirmEnroll} 
+              className="shadow-md" 
+              data-testid="button-confirm-enroll"
+              disabled={enrollMutation.isPending}
+            >
+              {enrollMutation.isPending ? "Inscription..." : "Confirmer l'inscription"}
             </Button>
           </DialogFooter>
         </DialogContent>

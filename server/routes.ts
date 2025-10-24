@@ -201,27 +201,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Session not found" });
       }
 
-      // Check capacity
+      // Check capacity - count only validated and pending registrations
       const enrolledCount = await storage.getRegistrationCount(data.sessionId);
       if (enrolledCount >= session.capacity) {
-        return res.status(400).json({ message: "Session is full" });
+        return res.status(400).json({ message: "La session est complète" });
       }
 
-      // Check priority availability
-      if (data.priority === "P1" && (user.p1Used || 0) >= 1) {
-        return res.status(400).json({ message: "P1 priority already used this year" });
-      }
-      if (data.priority === "P2" && (user.p2Used || 0) >= 1) {
-        return res.status(400).json({ message: "P2 priority already used this year" });
-      }
-
-      // Check if already registered
-      const existing = await storage.listRegistrations(userId, data.sessionId);
-      if (existing.length > 0) {
-        return res.status(400).json({ message: "Already registered for this session" });
+      // Check if already registered for this formation
+      const existingForFormation = await storage.listRegistrations(userId);
+      const alreadyRegistered = existingForFormation.find(
+        r => r.formationId === data.formationId && r.status !== "cancelled"
+      );
+      if (alreadyRegistered) {
+        return res.status(400).json({ message: "Vous êtes déjà inscrit à cette formation" });
       }
 
-      // Create registration
+      // IMPORTANT: Don't check P1/P2 quotas here - they're only consumed when RH validates
+      // Just create the registration with status="pending"
       const registration = await storage.createRegistration({
         ...data,
         userId,
@@ -260,15 +256,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
-      // Update P1/P2 usage when validating
-      if (req.body.status === "validated" && registration.status !== "validated") {
+      // When RH validates, check P1/P2 quotas and update usage
+      if (req.body.status === "validated" && registration.status === "pending") {
         const registrationUser = await storage.getUser(registration.userId);
-        if (registrationUser) {
-          if (registration.priority === "P1") {
-            await storage.updateUser(registration.userId, { p1Used: (registrationUser.p1Used || 0) + 1 });
-          } else if (registration.priority === "P2") {
-            await storage.updateUser(registration.userId, { p2Used: (registrationUser.p2Used || 0) + 1 });
+        if (!registrationUser) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        // Check and consume P1/P2 quotas
+        if (registration.priority === "P1") {
+          if ((registrationUser.p1Used || 0) >= 1) {
+            return res.status(400).json({ message: "L'utilisateur a déjà utilisé sa priorité P1 cette année" });
           }
+          await storage.updateUser(registration.userId, { p1Used: (registrationUser.p1Used || 0) + 1 });
+        } else if (registration.priority === "P2") {
+          if ((registrationUser.p2Used || 0) >= 1) {
+            return res.status(400).json({ message: "L'utilisateur a déjà utilisé sa priorité P2 cette année" });
+          }
+          await storage.updateUser(registration.userId, { p2Used: (registrationUser.p2Used || 0) + 1 });
         }
       }
 
@@ -311,6 +316,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const registrations = await storage.listRegistrations();
       res.json(registrations);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/users", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      // Only RH can see all users
+      if (!user || user.role !== "rh") {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const users = await storage.listUsers();
+      // Don't send passwords
+      const usersWithoutPasswords = users.map(({ password: _, ...user }) => user);
+      res.json(usersWithoutPasswords);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -21,6 +21,10 @@ export default function SessionCard({
   onClick,
 }: SessionCardProps) {
   const capacityPercentage = (enrolledCount / session.capacity) * 100;
+  
+  // Convert string dates to Date objects
+  const startDate = new Date(session.startDate);
+  const endDate = new Date(session.endDate);
 
   return (
     <Card
@@ -40,7 +44,7 @@ export default function SessionCard({
             </div>
             <div className="flex-1">
               <div className="font-semibold text-primary">
-                {session.startDate.toLocaleDateString("fr-FR", {
+                {startDate.toLocaleDateString("fr-FR", {
                   weekday: "long",
                   day: "numeric",
                   month: "long",
@@ -48,8 +52,8 @@ export default function SessionCard({
                 })}
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                {session.startDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} -{" "}
-                {session.endDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                {startDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} -{" "}
+                {endDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
               </div>
             </div>
           </div>

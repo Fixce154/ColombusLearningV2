@@ -1,28 +1,70 @@
+import { useQuery } from "@tanstack/react-query";
 import DashboardStats from "@/components/DashboardStats";
 import TrainingListItem from "@/components/TrainingListItem";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Calendar, Clock } from "lucide-react";
+import { Plus, Calendar, Clock, XCircle, Loader2 } from "lucide-react";
 import { Link } from "wouter";
-import type { User } from "@shared/schema";
-import { mockFormations, mockSessions, mockRegistrations } from "@/lib/mockData";
+import type { User, Registration, Formation, Session } from "@shared/schema";
 
 interface DashboardProps {
   currentUser: User;
 }
 
 export default function Dashboard({ currentUser }: DashboardProps) {
-  // TODO: remove mock functionality - Get user's registrations
-  const userRegistrations = mockRegistrations.filter((r) => r.userId === currentUser.id);
-
-  const upcomingTrainings = userRegistrations.filter((r) => {
-    if (r.status !== "validated") return false;
-    const session = mockSessions.find((s) => s.id === r.sessionId);
-    return session && session.startDate > new Date();
+  // Fetch user's registrations
+  const { data: registrations = [], isLoading: isLoadingRegistrations } = useQuery<Registration[]>({
+    queryKey: ["/api/registrations"],
   });
 
-  const pendingTrainings = userRegistrations.filter((r) => r.status === "pending");
-  const completedTrainings = userRegistrations.filter((r) => r.status === "completed");
+  // Fetch all formations to display titles
+  const { data: formations = [] } = useQuery<Formation[]>({
+    queryKey: ["/api/formations"],
+  });
+
+  // Fetch all sessions to display dates
+  const { data: sessions = [] } = useQuery<Session[]>({
+    queryKey: ["/api/sessions"],
+    queryFn: async () => {
+      const res = await fetch("/api/sessions", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch sessions");
+      return res.json();
+    },
+  });
+
+  if (isLoadingRegistrations) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Chargement de votre tableau de bord...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const upcomingTrainings = registrations.filter((r) => {
+    if (r.status !== "validated") return false;
+    const session = sessions.find((s) => s.id === r.sessionId);
+    return session && new Date(session.startDate) > new Date();
+  });
+
+  const pendingTrainings = registrations.filter((r) => r.status === "pending");
+  const completedTrainings = registrations.filter((r) => r.status === "completed");
+  const cancelledTrainings = registrations.filter((r) => r.status === "cancelled");
+
+  const getFormationTitle = (formationId: string) => {
+    return formations.find(f => f.id === formationId)?.title || "Formation inconnue";
+  };
+
+  const getSessionDate = (sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId);
+    return session ? new Date(session.startDate) : new Date();
+  };
+
+  const getSessionLocation = (sessionId: string) => {
+    return sessions.find(s => s.id === sessionId)?.location || "";
+  };
 
   return (
     <div className="space-y-8">
@@ -66,23 +108,17 @@ export default function Dashboard({ currentUser }: DashboardProps) {
           
           {upcomingTrainings.length > 0 ? (
             <div className="space-y-4">
-              {upcomingTrainings.map((reg) => {
-                const session = mockSessions.find((s) => s.id === reg.sessionId);
-                const formation = mockFormations.find((f) => f.id === reg.formationId);
-                if (!session || !formation) return null;
-
-                return (
-                  <TrainingListItem
-                    key={reg.id}
-                    title={formation.title}
-                    status={reg.status}
-                    priority={reg.priority as "P1" | "P2" | "P3"}
-                    date={session.startDate}
-                    location={session.location || ""}
-                    onViewDetails={() => console.log("View training", formation.id)}
-                  />
-                );
-              })}
+              {upcomingTrainings.map((reg) => (
+                <TrainingListItem
+                  key={reg.id}
+                  title={getFormationTitle(reg.formationId)}
+                  status={reg.status}
+                  priority={reg.priority as "P1" | "P2" | "P3"}
+                  date={getSessionDate(reg.sessionId)}
+                  location={getSessionLocation(reg.sessionId)}
+                  onViewDetails={() => console.log("View training", reg.formationId)}
+                />
+              ))}
             </div>
           ) : (
             <Card className="p-12 text-center shadow-md">
@@ -117,23 +153,17 @@ export default function Dashboard({ currentUser }: DashboardProps) {
           
           {pendingTrainings.length > 0 ? (
             <div className="space-y-4">
-              {pendingTrainings.map((reg) => {
-                const session = mockSessions.find((s) => s.id === reg.sessionId);
-                const formation = mockFormations.find((f) => f.id === reg.formationId);
-                if (!session || !formation) return null;
-
-                return (
-                  <TrainingListItem
-                    key={reg.id}
-                    title={formation.title}
-                    status={reg.status}
-                    priority={reg.priority as "P1" | "P2" | "P3"}
-                    date={session.startDate}
-                    location={session.location || ""}
-                    onViewDetails={() => console.log("View training", formation.id)}
-                  />
-                );
-              })}
+              {pendingTrainings.map((reg) => (
+                <TrainingListItem
+                  key={reg.id}
+                  title={getFormationTitle(reg.formationId)}
+                  status={reg.status}
+                  priority={reg.priority as "P1" | "P2" | "P3"}
+                  date={getSessionDate(reg.sessionId)}
+                  location={getSessionLocation(reg.sessionId)}
+                  onViewDetails={() => console.log("View training", reg.formationId)}
+                />
+              ))}
             </div>
           ) : (
             <Card className="p-12 text-center shadow-md">
@@ -152,6 +182,32 @@ export default function Dashboard({ currentUser }: DashboardProps) {
           )}
         </div>
       </div>
+
+      {/* Cancelled Trainings (if any) */}
+      {cancelledTrainings.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-destructive/10 p-2.5 rounded-lg">
+              <XCircle className="w-5 h-5 text-destructive" />
+            </div>
+            <h2 className="text-2xl font-semibold text-primary">Inscriptions refusées</h2>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-4">
+            {cancelledTrainings.map((reg) => (
+              <TrainingListItem
+                key={reg.id}
+                title={getFormationTitle(reg.formationId)}
+                status={reg.status}
+                priority={reg.priority as "P1" | "P2" | "P3"}
+                date={getSessionDate(reg.sessionId)}
+                location={getSessionLocation(reg.sessionId)}
+                onViewDetails={() => console.log("View training", reg.formationId)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

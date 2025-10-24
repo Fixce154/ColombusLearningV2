@@ -33,9 +33,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
         return [
           { title: "Tableau de bord RH", url: "/", icon: Home },
           { title: "Catalogue", url: "/catalog", icon: BookOpen },
-          { title: "Sessions", url: "/sessions", icon: Calendar },
           { title: "Inscriptions", url: "/registrations", icon: Users },
-          { title: "Reporting", url: "/reporting", icon: BarChart },
         ];
       case "formateur":
         return [
