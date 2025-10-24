@@ -3,15 +3,21 @@ import DashboardStats from "@/components/DashboardStats";
 import TrainingListItem from "@/components/TrainingListItem";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Calendar, Clock, XCircle, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Calendar, Clock, XCircle, Loader2, Heart, AlertCircle, CheckCircle } from "lucide-react";
 import { Link } from "wouter";
-import type { User, Registration, Formation, Session } from "@shared/schema";
+import type { User, Registration, Formation, Session, FormationInterest } from "@shared/schema";
 
 interface DashboardProps {
   currentUser: User;
 }
 
 export default function Dashboard({ currentUser }: DashboardProps) {
+  // Fetch formation interests
+  const { data: interests = [], isLoading: isLoadingInterests } = useQuery<FormationInterest[]>({
+    queryKey: ["/api/interests"],
+  });
+
   // Fetch user's registrations
   const { data: registrations = [], isLoading: isLoadingRegistrations } = useQuery<Registration[]>({
     queryKey: ["/api/registrations"],
@@ -94,6 +100,71 @@ export default function Dashboard({ currentUser }: DashboardProps) {
         p1Used={currentUser.p1Used || 0}
         p2Used={currentUser.p2Used || 0}
       />
+
+      {/* Formation Interests Section */}
+      {interests.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 p-2.5 rounded-lg">
+              <Heart className="w-5 h-5 text-primary" />
+            </div>
+            <h2 className="text-2xl font-semibold text-primary">Mes intentions de formation</h2>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {interests.map((interest) => {
+              const formation = formations.find(f => f.id === interest.formationId);
+              if (!formation) return null;
+              
+              return (
+                <Card key={interest.id} className="p-6 space-y-4 shadow-md hover-elevate">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="font-semibold text-primary line-clamp-2 flex-1">
+                        {formation.title}
+                      </h3>
+                      <Badge variant={interest.priority === "P1" ? "destructive" : interest.priority === "P2" ? "default" : "secondary"}>
+                        {interest.priority}
+                      </Badge>
+                    </div>
+                    
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {formation.description}
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 text-sm">
+                    {interest.status === "pending" && (
+                      <>
+                        <AlertCircle className="w-4 h-4 text-yellow-600" />
+                        <span className="text-yellow-600">En attente d'organisation</span>
+                      </>
+                    )}
+                    {interest.status === "approved" && (
+                      <>
+                        <CheckCircle className="w-4 h-4 text-accent" />
+                        <span className="text-accent">Sessions en cours d'organisation</span>
+                      </>
+                    )}
+                    {interest.status === "converted" && (
+                      <>
+                        <CheckCircle className="w-4 h-4 text-accent" />
+                        <span className="text-accent">Inscrit à une session</span>
+                      </>
+                    )}
+                  </div>
+                  
+                  <Link href={`/training/${formation.id}`}>
+                    <Button variant="outline" size="sm" className="w-full">
+                      Voir les détails
+                    </Button>
+                  </Link>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Training Lists */}
       <div className="grid lg:grid-cols-2 gap-8">

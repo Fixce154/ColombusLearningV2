@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -47,7 +47,9 @@ export const formationInterests = pgTable("formation_interests", {
   priority: text("priority").notNull(), // P1, P2, P3
   status: text("status").notNull(), // pending, approved, converted, withdrawn
   expressedAt: timestamp("expressed_at").default(sql`now()`),
-});
+}, (table) => ({
+  userFormationUnique: uniqueIndex("user_formation_unique_idx").on(table.userId, table.formationId),
+}));
 
 export const registrations = pgTable("registrations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

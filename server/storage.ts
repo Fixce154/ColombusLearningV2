@@ -17,7 +17,7 @@ import {
   type InsertRegistration,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, sql, desc, asc } from "drizzle-orm";
+import { eq, and, sql, desc, asc, ne } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -188,6 +188,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFormationInterest(insertInterest: InsertFormationInterest): Promise<FormationInterest> {
+    const existingInterest = await db
+      .select()
+      .from(formationInterests)
+      .where(
+        and(
+          eq(formationInterests.userId, insertInterest.userId),
+          eq(formationInterests.formationId, insertInterest.formationId),
+          ne(formationInterests.status, "withdrawn")
+        )
+      )
+      .limit(1);
+
+    if (existingInterest.length > 0) {
+      throw new Error("Vous avez déjà manifesté votre intérêt pour cette formation");
+    }
+
     const [interest] = await db.insert(formationInterests).values(insertInterest).returning();
     return interest;
   }

@@ -42,6 +42,8 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
   const [, setLocation] = useLocation();
   const [selectedPriority, setSelectedPriority] = useState<"P1" | "P2" | "P3">("P3");
   const [showInterestDialog, setShowInterestDialog] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false);
   const { toast } = useToast();
 
   // Fetch formation
@@ -96,6 +98,40 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
     },
   });
 
+  // Session enrollment mutation
+  const enrollMutation = useMutation({
+    mutationFn: async (data: { sessionId: string; formationId: string; priority: string; interestId: string }) => {
+      const registration = await apiRequest("/api/registrations", "POST", {
+        sessionId: data.sessionId,
+        formationId: data.formationId,
+        priority: data.priority,
+      });
+      
+      await apiRequest(`/api/interests/${data.interestId}`, "PATCH", {
+        status: "converted",
+      });
+      
+      return registration;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/interests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/registrations"] });
+      toast({
+        title: "Inscription confirmée !",
+        description: "Vous êtes maintenant inscrit à cette session. Votre demande sera validée par les RH.",
+      });
+      setShowEnrollmentDialog(false);
+      setSelectedSession(null);
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de s'inscrire à cette session",
+      });
+    },
+  });
+
   if (isLoadingFormation || isLoadingSessions) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -135,6 +171,23 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
     expressInterestMutation.mutate({
       formationId: formation.id,
       priority: selectedPriority,
+    });
+  };
+
+  const handleSessionSelect = (session: Session) => {
+    if (!existingInterest || existingInterest.status !== "approved") return;
+    setSelectedSession(session);
+    setShowEnrollmentDialog(true);
+  };
+
+  const confirmEnrollment = () => {
+    if (!selectedSession || !formation || !existingInterest) return;
+    
+    enrollMutation.mutate({
+      sessionId: selectedSession.id,
+      formationId: formation.id,
+      priority: existingInterest.priority,
+      interestId: existingInterest.id,
     });
   };
 
@@ -263,28 +316,37 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
         <TabsContent value="sessions" className="space-y-6 mt-8">
           {sessions.length > 0 ? (
             <>
-              <div className="bg-accent/5 border border-accent/20 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-primary mb-2">Sessions disponibles</h3>
-                <p className="text-sm text-muted-foreground">
-                  Sélectionnez une session pour vous inscrire. Les places sont limitées.
-                </p>
-              </div>
-              
-              {existingRegistration && existingRegistration.status !== "cancelled" && (
-                <Alert className="border-yellow-500/50 bg-yellow-500/10">
-                  <AlertCircle className="w-5 h-5 text-yellow-600" />
-                  <AlertDescription className="text-foreground">
-                    Une place vous est <strong>réservée</strong> pour cette formation pendant la validation de votre inscription.
-                  </AlertDescription>
-                </Alert>
+              {/* Info banner based on interest status */}
+              {!existingInterest && (
+                <div className="bg-accent/5 border border-accent/20 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-primary mb-2">Sessions planifiées</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Consultez les sessions disponibles. Pour vous inscrire à une session, manifestez d'abord votre intérêt pour cette formation.
+                  </p>
+                </div>
+              )}
+              {existingInterest?.status === "pending" && (
+                <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-primary mb-2">Sessions planifiées</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Vous avez manifesté votre intérêt pour cette formation. Les RH vont analyser la demande et organiser les sessions en conséquence.
+                  </p>
+                </div>
+              )}
+              {existingInterest?.status === "approved" && (
+                <div className="bg-accent/10 border border-accent/30 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-primary mb-2">Prêt à vous inscrire !</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Votre intérêt a été validé par les RH. Sélectionnez une session ci-dessous pour finaliser votre inscription.
+                  </p>
+                </div>
               )}
               
               <div className="space-y-4">
                 {sessions.map((session) => {
-                  // For demo, using a simple calculation - in real app this would come from registration count
                   const enrolledCount = Math.floor(Math.random() * (session.capacity - 2)) + 2;
                   const isFull = enrolledCount >= session.capacity;
-                  const isUserRegistered = registrations.some(r => r.sessionId === session.id);
+                  const isClickable = existingInterest?.status === "approved" && !isFull;
                   
                   return (
                     <SessionCard
@@ -292,27 +354,13 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
                       session={session}
                       instructorName="Pierre Bernard"
                       enrolledCount={enrolledCount}
-                      isSelected={selectedSession === session.id}
-                      isFull={isFull || isUserRegistered}
-                      onClick={() => !isFull && !isUserRegistered && setSelectedSession(session.id)}
+                      isSelected={selectedSession?.id === session.id}
+                      isFull={isFull}
+                      onClick={isClickable ? () => handleSessionSelect(session) : undefined}
                     />
                   );
                 })}
               </div>
-
-              {selectedSession && !existingRegistration && (
-                <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t shadow-lg pt-6 -mx-6 px-6 pb-6">
-                  <Button 
-                    size="lg" 
-                    className="w-full shadow-md" 
-                    onClick={handleEnroll} 
-                    data-testid="button-enroll"
-                    disabled={enrollMutation.isPending}
-                  >
-                    {enrollMutation.isPending ? "Inscription en cours..." : "S'inscrire à cette session"}
-                  </Button>
-                </div>
-              )}
             </>
           ) : (
             <Card className="p-16 text-center shadow-md">
@@ -321,40 +369,41 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
               </div>
               <h3 className="text-2xl font-semibold text-primary mb-3">Aucune session planifiée</h3>
               <p className="text-muted-foreground max-w-md mx-auto">
-                Les prochaines sessions seront bientôt disponibles. Vous serez notifié dès qu'une date sera confirmée.
+                Manifestez votre intérêt pour cette formation. Les RH organiseront les sessions en fonction de la demande.
               </p>
             </Card>
+          )}
+          
+          {/* Express Interest Button */}
+          {!existingInterest && (
+            <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t shadow-lg pt-6 -mx-6 px-6 pb-6">
+              <Button 
+                size="lg" 
+                className="w-full shadow-md" 
+                onClick={() => setShowInterestDialog(true)} 
+                data-testid="button-express-interest"
+                disabled={isSeniorityMismatch}
+              >
+                Manifester mon intérêt pour cette formation
+              </Button>
+              {isSeniorityMismatch && (
+                <p className="text-sm text-muted-foreground text-center mt-3">
+                  Cette formation nécessite un niveau de séniorité {formation.seniorityRequired}
+                </p>
+              )}
+            </div>
           )}
         </TabsContent>
       </Tabs>
 
-      {/* Seniority Alert Dialog */}
-      <AlertDialog open={showSeniorityAlert} onOpenChange={setShowSeniorityAlert}>
-        <AlertDialogContent className="shadow-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl text-primary">Niveau de séniorité requis</AlertDialogTitle>
-            <AlertDialogDescription className="text-base leading-relaxed pt-2">
-              Cette formation est recommandée pour les profils <strong>{formation.seniorityRequired}</strong>. Votre niveau actuel est{" "}
-              <strong>{currentUser.seniority}</strong>. Souhaitez-vous tout de même soumettre votre demande d'inscription ?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-seniority">Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={() => setShowEnrollDialog(true)} data-testid="button-confirm-seniority">
-              Continuer l'inscription
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Enrollment Dialog */}
-      <Dialog open={showEnrollDialog} onOpenChange={setShowEnrollDialog}>
+      {/* Express Interest Dialog */}
+      <Dialog open={showInterestDialog} onOpenChange={setShowInterestDialog}>
         <DialogContent className="max-w-3xl shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl text-primary">Inscription à la formation</DialogTitle>
+            <DialogTitle className="text-2xl text-primary">Manifester votre intérêt</DialogTitle>
             <DialogDescription className="text-base pt-2">
-              Sélectionnez votre niveau de priorité pour cette formation. Votre demande sera soumise au service RH pour
-              validation. <strong>Une place vous sera réservée pendant l'examen de votre demande.</strong>
+              Sélectionnez votre niveau de priorité pour cette formation. Les RH seront informés et organiseront 
+              les sessions en fonction de la demande. <strong>Vous serez notifié dès qu'une session sera disponible.</strong>
             </DialogDescription>
           </DialogHeader>
 
@@ -370,19 +419,80 @@ export default function TrainingDetail({ currentUser }: TrainingDetailProps) {
           <DialogFooter className="gap-3">
             <Button 
               variant="outline" 
-              onClick={() => setShowEnrollDialog(false)} 
-              data-testid="button-cancel-enroll"
+              onClick={() => setShowInterestDialog(false)} 
+              data-testid="button-cancel-interest"
+              disabled={expressInterestMutation.isPending}
+            >
+              Annuler
+            </Button>
+            <Button 
+              onClick={confirmExpressInterest} 
+              className="shadow-md" 
+              data-testid="button-confirm-interest"
+              disabled={expressInterestMutation.isPending}
+            >
+              {expressInterestMutation.isPending ? "Envoi en cours..." : "Confirmer mon intérêt"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Session Enrollment Dialog */}
+      <Dialog open={showEnrollmentDialog} onOpenChange={setShowEnrollmentDialog}>
+        <DialogContent className="max-w-2xl shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl text-primary">Confirmer votre inscription</DialogTitle>
+            <DialogDescription className="text-base pt-2">
+              Vous êtes sur le point de vous inscrire à cette session. Votre demande sera soumise à validation par les RH.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedSession && (
+            <Card className="p-6 border-accent/30">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="w-4 h-4 text-accent" />
+                  <span className="font-medium">
+                    {new Date(selectedSession.startDate).toLocaleDateString("fr-FR", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+                {selectedSession.location && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>{selectedSession.location}</span>
+                  </div>
+                )}
+                {existingInterest && (
+                  <Badge variant={existingInterest.priority === "P1" ? "destructive" : existingInterest.priority === "P2" ? "default" : "secondary"}>
+                    Priorité {existingInterest.priority}
+                  </Badge>
+                )}
+              </div>
+            </Card>
+          )}
+
+          <DialogFooter className="gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowEnrollmentDialog(false);
+                setSelectedSession(null);
+              }}
+              data-testid="button-cancel-enrollment"
               disabled={enrollMutation.isPending}
             >
               Annuler
             </Button>
             <Button 
-              onClick={confirmEnroll} 
+              onClick={confirmEnrollment} 
               className="shadow-md" 
-              data-testid="button-confirm-enroll"
+              data-testid="button-confirm-enrollment"
               disabled={enrollMutation.isPending}
             >
-              {enrollMutation.isPending ? "Inscription..." : "Confirmer l'inscription"}
+              {enrollMutation.isPending ? "Inscription en cours..." : "Confirmer l'inscription"}
             </Button>
           </DialogFooter>
         </DialogContent>
