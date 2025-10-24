@@ -45,6 +45,7 @@ export interface IStorage {
   listFormationInterests(filters?: { userId?: string; formationId?: string }): Promise<FormationInterest[]>;
   createFormationInterest(interest: InsertFormationInterest): Promise<FormationInterest>;
   updateFormationInterest(id: string, updates: Partial<FormationInterest>): Promise<FormationInterest | undefined>;
+  deleteFormationInterest(id: string): Promise<boolean>;
 
   // Registration methods
   getRegistration(id: string): Promise<Registration | undefined>;
@@ -218,6 +219,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(formationInterests.id, id))
       .returning();
     return interest || undefined;
+  }
+
+  async deleteFormationInterest(id: string): Promise<boolean> {
+    const result = await db.delete(formationInterests).where(eq(formationInterests.id, id)).returning();
+    return result.length > 0;
   }
 
   // Registration methods

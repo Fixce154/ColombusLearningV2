@@ -265,6 +265,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/interests/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const interest = await storage.getFormationInterest(req.params.id);
+      
+      if (!interest) {
+        return res.status(404).json({ message: "Interest not found" });
+      }
+
+      if (interest.userId !== userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Refund P1/P2 quotas if interest was pending or approved
+      if (interest.status === "pending" || interest.status === "approved") {
+        const user = await storage.getUser(userId);
+        if (user) {
+          if (interest.priority === "P1" && (user.p1Used || 0) > 0) {
+            await storage.updateUser(userId, { p1Used: (user.p1Used || 0) - 1 });
+          } else if (interest.priority === "P2" && (user.p2Used || 0) > 0) {
+            await storage.updateUser(userId, { p2Used: (user.p2Used || 0) - 1 });
+          }
+        }
+      }
+
+      await storage.deleteFormationInterest(req.params.id);
+      res.json({ message: "Interest deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Registration Routes
   app.get("/api/registrations", requireAuth, async (req, res) => {
     try {
