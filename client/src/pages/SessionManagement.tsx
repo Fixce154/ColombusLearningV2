@@ -79,7 +79,7 @@ export default function SessionManagement() {
   const { data: formations = [] } = useQuery<Formation[]>({
     queryKey: ["/api/formations"],
     queryFn: async () => {
-      const res = await fetch("/api/formations?activeOnly=false", { credentials: "include" });
+      const res = await fetch("/api/formations?active=false", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch formations");
       return res.json();
     },
@@ -489,14 +489,17 @@ export default function SessionManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Formateur</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                      <Select 
+                        onValueChange={(value) => field.onChange(value === "__NONE__" ? undefined : value)} 
+                        value={field.value ?? "__NONE__"}
+                      >
                         <FormControl>
                           <SelectTrigger data-testid="select-session-instructor">
                             <SelectValue placeholder="Non assigné" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Non assigné</SelectItem>
+                          <SelectItem value="__NONE__">Non assigné</SelectItem>
                           {instructors.map((instructor) => (
                             <SelectItem key={instructor.id} value={instructor.id}>
                               {instructor.name}

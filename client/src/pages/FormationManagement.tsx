@@ -71,7 +71,7 @@ export default function FormationManagement() {
   const { data: formations = [], isLoading } = useQuery<Formation[]>({
     queryKey: ["/api/formations"],
     queryFn: async () => {
-      const res = await fetch("/api/formations?activeOnly=false", { credentials: "include" });
+      const res = await fetch("/api/formations?active=false", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch formations");
       return res.json();
     },
@@ -411,14 +411,17 @@ export default function FormationManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Niveau requis</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                      <Select 
+                        onValueChange={(value) => field.onChange(value === "__NONE__" ? undefined : value)} 
+                        value={field.value ?? "__NONE__"}
+                      >
                         <FormControl>
                           <SelectTrigger data-testid="select-formation-seniority">
                             <SelectValue placeholder="Tous niveaux" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Tous niveaux</SelectItem>
+                          <SelectItem value="__NONE__">Tous niveaux</SelectItem>
                           <SelectItem value="junior">Junior</SelectItem>
                           <SelectItem value="confirme">Confirmé</SelectItem>
                           <SelectItem value="senior">Senior</SelectItem>

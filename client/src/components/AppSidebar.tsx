@@ -10,7 +10,7 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Home, BookOpen, Calendar, Users, BarChart, GraduationCap, Heart } from "lucide-react";
+import { Home, BookOpen, Calendar, Users, BarChart, GraduationCap, Heart, Settings } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { User } from "@shared/schema";
 
@@ -18,42 +18,71 @@ interface AppSidebarProps {
   currentUser: User;
 }
 
+interface MenuSection {
+  label?: string;
+  items: Array<{ title: string; url: string; icon: any }>;
+}
+
 export default function AppSidebar({ currentUser }: AppSidebarProps) {
   const [location] = useLocation();
 
-  const getMenuItems = () => {
+  const getMenuSections = (): MenuSection[] => {
     switch (currentUser.role) {
       case "consultant":
         return [
-          { title: "Tableau de bord", url: "/", icon: Home },
-          { title: "Catalogue", url: "/catalog", icon: BookOpen },
-          { title: "Mes formations", url: "/my-trainings", icon: Calendar },
+          {
+            items: [
+              { title: "Tableau de bord", url: "/", icon: Home },
+              { title: "Catalogue", url: "/catalog", icon: BookOpen },
+              { title: "Mes formations", url: "/my-trainings", icon: Calendar },
+            ],
+          },
         ];
       case "rh":
         return [
-          { title: "Tableau de bord RH", url: "/", icon: Home },
-          { title: "Formations", url: "/formations", icon: BookOpen },
-          { title: "Sessions", url: "/sessions", icon: Calendar },
-          { title: "Intentions", url: "/interests", icon: Heart },
-          { title: "Inscriptions", url: "/registrations", icon: Users },
+          {
+            label: "Mes formations",
+            items: [
+              { title: "Tableau de bord", url: "/", icon: Home },
+              { title: "Catalogue", url: "/catalog", icon: BookOpen },
+              { title: "Mes formations", url: "/my-trainings", icon: Calendar },
+            ],
+          },
+          {
+            label: "Administration RH",
+            items: [
+              { title: "Formations", url: "/formations", icon: BookOpen },
+              { title: "Sessions", url: "/sessions", icon: Calendar },
+              { title: "Intentions", url: "/interests", icon: Heart },
+              { title: "Inscriptions", url: "/registrations", icon: Users },
+            ],
+          },
         ];
       case "formateur":
         return [
-          { title: "Mes sessions", url: "/", icon: Home },
-          { title: "Disponibilités", url: "/availability", icon: Calendar },
-          { title: "Émargement", url: "/attendance", icon: Users },
+          {
+            items: [
+              { title: "Mes sessions", url: "/", icon: Home },
+              { title: "Disponibilités", url: "/availability", icon: Calendar },
+              { title: "Émargement", url: "/attendance", icon: Users },
+            ],
+          },
         ];
       case "manager":
         return [
-          { title: "Mon équipe", url: "/", icon: Home },
-          { title: "Catalogue", url: "/catalog", icon: BookOpen },
+          {
+            items: [
+              { title: "Mon équipe", url: "/", icon: Home },
+              { title: "Catalogue", url: "/catalog", icon: BookOpen },
+            ],
+          },
         ];
       default:
         return [];
     }
   };
 
-  const menuItems = getMenuItems();
+  const menuSections = getMenuSections();
 
   const getRoleLabel = (role: string) => {
     switch (role) {
@@ -84,28 +113,32 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
         </div>
       </SidebarHeader>
       <SidebarContent className="px-4 py-6">
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/70 uppercase tracking-wider text-xs mb-2 px-3">
-            Navigation
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-1">
-              {menuItems.map((item) => {
-                const isActive = location === item.url;
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive} className="h-12 px-4">
-                      <Link href={item.url} data-testid={`link-${item.url.slice(1) || "home"}`}>
-                        <item.icon className="w-5 h-5" />
-                        <span className="font-medium">{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {menuSections.map((section, index) => (
+          <SidebarGroup key={index} className={index > 0 ? "mt-6" : ""}>
+            {section.label && (
+              <SidebarGroupLabel className="text-sidebar-foreground/70 uppercase tracking-wider text-xs mb-2 px-3">
+                {section.label}
+              </SidebarGroupLabel>
+            )}
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-1">
+                {section.items.map((item) => {
+                  const isActive = location === item.url;
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild isActive={isActive} className="h-12 px-4">
+                        <Link href={item.url} data-testid={`link-${item.url.slice(1) || "home"}`}>
+                          <item.icon className="w-5 h-5" />
+                          <span className="font-medium">{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-6">
         <div className="flex items-center gap-3">
