@@ -12,19 +12,24 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 24, 2025)
 
-### Registration Workflow Complete
-- **Frontend-Backend Integration**: All pages (Catalog, TrainingDetail, Dashboard, RegistrationManagement) now use real API data
-- **Consultant Registration Flow**: Consultants can browse catalog, select formations, choose sessions, and enroll with P1/P2/P3 priority
-- **RH Validation Interface**: New RegistrationManagement page allows RH to validate/reject registrations with real-time updates
-- **Quota Management**: P1/P2 quotas only consumed when RH validates (not at enrollment), enforced server-side
-- **User Feedback**: Warning banners show "place réservée" during pending status, success toasts on validation
-- **Bug Fixes**: SessionCard now handles string dates correctly, RH toast messages display correct action
+### Two-Phase Training Workflow Implementation
+- **New Formation Interest System**: Consultants first express interest in a formation with priority selection (P1/P2/P3), allowing RH to assess demand before organizing sessions
+- **Interest Expression**: Dedicated `formation_interests` table with unique constraint on (userId, formationId) prevents duplicate quota consumption
+- **Complete Workflow**: Interest expression → RH approval → Session enrollment → Registration validation
+- **Dashboard Updates**: New "Mes intentions de formation" section displays pending/approved/converted interests separately from session registrations
+- **TrainingDetail Refactor**: Shows different UI states based on interest status (none → express interest, pending → info message, approved → session selection, converted → enrolled)
+
+### Critical Bug Fixes & Security
+- **Quota Bypass Prevention**: Added unique database index and runtime duplicate check to prevent multiple interest expressions for same formation
+- **Session Enrollment Flow**: Restored ability to enroll in sessions after interest approval (interest.status: approved → converted)
+- **Data Integrity**: All mutations properly invalidate TanStack Query caches for real-time UI updates
 
 ### Technical Implementation
-- **API Routes**: Complete CRUD operations for formations, sessions, registrations, users
-- **Validation**: Server-side quota checking and capacity enforcement
-- **Schema Updates**: insertRegistrationSchema omits status (set by backend) for security
-- **End-to-End Testing**: Automated Playwright tests verify complete consultant → RH → consultant workflow
+- **Schema**: New `formation_interests` table with unique index on (userId, formationId), status field (pending/approved/converted/withdrawn)
+- **API Routes**: POST /api/interests, GET /api/interests (filtered by user), PATCH /api/interests/:id for status updates
+- **Storage Layer**: createFormationInterest with duplicate prevention, listFormationInterests with flexible filtering
+- **Frontend**: PrioritySelector component, dual-dialog system (interest expression + session enrollment)
+- **Quota Management**: P1/P2 quotas consumed at interest expression, enforced server-side with seniority validation
 
 ## System Architecture
 
@@ -70,6 +75,7 @@ Preferred communication style: Simple, everyday language.
 **Database Schema Design:**
 - **Users table**: Stores user profiles with role-based access (consultant, rh, formateur, manager), seniority levels, business units, and priority usage tracking (P1/P2 annual quotas)
 - **Formations table**: Training catalog with detailed metadata including title, description, objectives, prerequisites, duration, modality (presentiel/distanciel/hybride), seniority requirements, themes, and tags
+- **Formation Interests table**: NEW - Tracks consultant interest expressions before session enrollment. Fields: formationId, userId, priority (P1/P2/P3), status (pending/approved/converted/withdrawn), expressedAt. Unique index on (userId, formationId) prevents duplicate quota consumption.
 - **Sessions table**: Scheduled training instances with dates, locations, capacity limits, instructor assignments, and status tracking
 - **Registrations table**: Junction table linking users to sessions with priority levels (P1/P2/P3), status (pending/validated/completed/cancelled), and registration timestamps
 - **Attendance table**: Digital sign-in sheets tracking participant presence with timestamps
