@@ -47,7 +47,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Loader2, CalendarDays, MapPin, Users as UsersIcon, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, CalendarDays, MapPin, Users as UsersIcon, ChevronDown, ChevronRight, Clock } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Session, Formation, User, Registration } from "@shared/schema";
@@ -115,6 +115,24 @@ export default function SessionManagement() {
     queryFn: async () => {
       const res = await fetch("/api/admin/registrations", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch registrations");
+      return res.json();
+    },
+  });
+
+  const { data: instructorFormations = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/instructor-formations"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/instructor-formations", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch instructor formations");
+      return res.json();
+    },
+  });
+
+  const { data: allAvailabilities = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/availabilities"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/availabilities", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch availabilities");
       return res.json();
     },
   });
@@ -259,6 +277,26 @@ export default function SessionManagement() {
 
   const toggleSession = (sessionId: string) => {
     setExpandedSession(expandedSession === sessionId ? null : sessionId);
+  };
+
+  // Helper to get instructors and their availabilities for a specific formation
+  const getFormationInstructorsWithAvailabilities = (formationId: string) => {
+    // Get instructor IDs for this formation
+    const instructorIds = instructorFormations
+      .filter((inf: any) => inf.formationId === formationId)
+      .map((inf: any) => inf.instructorId);
+
+    // Get instructor details and their availabilities
+    return instructorIds.map((instructorId: string) => {
+      const instructor = instructors.find((i: User) => i.id === instructorId);
+      const availability = allAvailabilities.find(
+        (av: any) => av.instructorId === instructorId && av.formationId === formationId
+      );
+      return {
+        instructor,
+        availability,
+      };
+    }).filter((item: any) => item.instructor); // Filter out if instructor not found
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
@@ -486,6 +524,68 @@ export default function SessionManagement() {
                     </FormItem>
                   )}
                 />
+
+                {/* Display instructors and their availabilities for the selected formation */}
+                {form.watch("formationId") && (
+                  <div className="p-4 bg-muted/30 rounded-md border space-y-3">
+                    <h4 className="font-semibold text-sm flex items-center gap-2">
+                      <UsersIcon className="w-4 h-4" />
+                      Formateurs et disponibilités pour cette formation
+                    </h4>
+                    {(() => {
+                      const instructorsWithAvail = getFormationInstructorsWithAvailabilities(form.watch("formationId"));
+                      
+                      if (instructorsWithAvail.length === 0) {
+                        return (
+                          <p className="text-sm text-muted-foreground">
+                            Aucun formateur assigné à cette formation
+                          </p>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-3">
+                          {instructorsWithAvail.map(({ instructor, availability }: any) => (
+                            <div key={instructor.id} className="bg-background p-3 rounded-md border space-y-2">
+                              <div className="font-medium text-sm">{instructor.name}</div>
+                              {availability && availability.slots && Array.isArray(availability.slots) && availability.slots.length > 0 ? (
+                                <div className="space-y-1">
+                                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    Disponibilités :
+                                  </div>
+                                  <div className="grid grid-cols-1 gap-1">
+                                    {[...availability.slots]
+                                      .sort((a: any, b: any) => a.date.localeCompare(b.date))
+                                      .map((slot: any, idx: number) => {
+                                        const slotDate = new Date(slot.date);
+                                        const timeSlotLabel = slot.timeSlot === 'full_day' ? 'Journée complète' :
+                                                             slot.timeSlot === 'morning' ? 'Matin' : 'Après-midi';
+                                        return (
+                                          <div key={idx} className="text-xs flex items-center gap-2">
+                                            <span className="font-mono">
+                                              {format(slotDate, "EEE dd MMM yyyy", { locale: fr })}
+                                            </span>
+                                            <Badge variant="secondary" className="text-xs">
+                                              {timeSlotLabel}
+                                            </Badge>
+                                          </div>
+                                        );
+                                      })}
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">
+                                  Aucune disponibilité saisie
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField

@@ -416,6 +416,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all instructor-formation assignments (RH only)
+  app.get("/api/admin/instructor-formations", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const assignments = await storage.getAllInstructorFormations();
+      res.json(assignments);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get all instructor availabilities (RH only)
+  app.get("/api/admin/availabilities", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const availabilities = await storage.getAllInstructorAvailabilities();
+      res.json(availabilities);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get all users (RH only)
   app.get("/api/users", requireAuth, async (req, res) => {
     try {

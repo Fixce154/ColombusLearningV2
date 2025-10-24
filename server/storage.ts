@@ -70,10 +70,12 @@ export interface IStorage {
   getInstructorFormations(instructorId: string): Promise<string[]>;
   addInstructorFormation(instructorId: string, formationId: string): Promise<InstructorFormation>;
   removeInstructorFormation(instructorId: string, formationId: string): Promise<boolean>;
+  getAllInstructorFormations(): Promise<InstructorFormation[]>;
 
   // Instructor Availability methods
   getInstructorAvailability(instructorId: string, formationId: string): Promise<InstructorAvailability | undefined>;
   listInstructorAvailabilities(instructorId: string): Promise<InstructorAvailability[]>;
+  getAllInstructorAvailabilities(): Promise<InstructorAvailability[]>;
   createInstructorAvailability(availability: InsertInstructorAvailability): Promise<InstructorAvailability>;
   updateInstructorAvailability(instructorId: string, formationId: string, slots: any): Promise<InstructorAvailability | undefined>;
   deleteInstructorAvailability(instructorId: string, formationId: string): Promise<boolean>;
@@ -370,6 +372,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
+  async getAllInstructorFormations(): Promise<InstructorFormation[]> {
+    return await db.select().from(instructorFormations);
+  }
+
   // Instructor Availability methods
   async getInstructorAvailability(
     instructorId: string,
@@ -392,6 +398,10 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(instructorAvailabilities)
       .where(eq(instructorAvailabilities.instructorId, instructorId));
+  }
+
+  async getAllInstructorAvailabilities(): Promise<InstructorAvailability[]> {
+    return await db.select().from(instructorAvailabilities);
   }
 
   async createInstructorAvailability(
