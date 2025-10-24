@@ -166,6 +166,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/users/resign-instructor", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if user is an instructor
+      if (!user.roles.includes("formateur")) {
+        return res.status(400).json({ message: "User is not an instructor" });
+      }
+
+      // Check if instructor has assigned sessions
+      const assignedSessions = await storage.getSessionsByInstructor(userId);
+      if (assignedSessions.length > 0) {
+        return res.status(400).json({ 
+          message: "Cannot remove instructor role while sessions are assigned",
+          sessionCount: assignedSessions.length
+        });
+      }
+
+      // Remove formateur role
+      const updatedRoles = user.roles.filter(role => role !== "formateur");
+      const updatedUser = await storage.updateUser(userId, { roles: updatedRoles });
+
+      if (!updatedUser) {
+        return res.status(500).json({ message: "Failed to update user" });
+      }
+
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json({ user: userWithoutPassword });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get all users (RH only)
   app.get("/api/users", requireAuth, async (req, res) => {
     try {

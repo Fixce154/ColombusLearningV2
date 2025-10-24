@@ -39,6 +39,7 @@ export interface IStorage {
   getSession(id: string): Promise<Session | undefined>;
   listSessions(formationId?: string): Promise<Session[]>;
   getUpcomingSessions(formationId?: string): Promise<Session[]>;
+  getSessionsByInstructor(instructorId: string): Promise<Session[]>;
   createSession(session: InsertSession): Promise<Session>;
   updateSession(id: string, updates: Partial<InsertSession>): Promise<Session | undefined>;
   deleteSession(id: string): Promise<boolean>;
@@ -157,6 +158,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(sessions)
       .where(sql`${sessions.startDate} > ${now}`)
+      .orderBy(asc(sessions.startDate));
+  }
+
+  async getSessionsByInstructor(instructorId: string): Promise<Session[]> {
+    return await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.instructorId, instructorId))
       .orderBy(asc(sessions.startDate));
   }
 
