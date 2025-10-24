@@ -345,7 +345,7 @@ export default function InstructorAvailability() {
                 <div className="flex gap-2 pt-4">
                   <Button
                     onClick={handleSave}
-                    disabled={saveMutation.isPending || selectedDates.length === 0}
+                    disabled={saveMutation.isPending || selectedDates.length === 0 || selectedDates.length !== requiredDays}
                     data-testid="button-save-availability"
                   >
                     <Save className="w-4 h-4 mr-2" />

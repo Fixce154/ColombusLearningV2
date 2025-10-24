@@ -27,6 +27,7 @@ Preferred communication style: Simple, everyday language.
     - **Registrations**: Links users to sessions.
     - **Attendance**: Digital sign-in sheets.
     - **instructor_formations**: Links instructors to formations they teach (many-to-many).
+    - **instructor_availabilities**: Stores instructor availability dates for formations (instructorId, formationId, dates array, with unique constraint).
 - **API**: RESTful, JSON format, `/api` prefix, credential-based authentication.
 
 ### Authentication & Authorization
@@ -39,7 +40,8 @@ Preferred communication style: Simple, everyday language.
 - **Registration Workflow**: Consultants express interest (which can be auto-validated if approved), RH approves, then enroll in sessions with priority selection, seniority validation, and capacity checking.
 - **Session Management**: Defined capacity limits, real-time enrollment tracking, status states (open, full, completed, cancelled), instructor assignment.
 - **RH Administration**: Comprehensive CRUD interfaces for formations, sessions, and consultants, including consultant archiving and hard deletion with associated data cleanup.
-- **Instructor Features**: Instructors can view assigned formations, manage teaching availability (placeholder), and view scheduled sessions. They can also self-assign/unassign formations to teach.
+- **Instructor Features**: Instructors can view assigned formations, manage teaching availability with multi-date selection and duration validation, and view scheduled sessions. They can also self-assign/unassign formations to teach.
+- **Instructor Availability System**: Complete CRUD interface for instructors to set availability dates for formations they teach. Includes dual validation (client and server) for future dates only (same day at midnight allowed) and exact date count matching formation duration (e.g., "2 jours" requires exactly 2 dates). Real-time validation messages indicate missing or excess dates with precise feedback.
 
 ## External Dependencies
 
