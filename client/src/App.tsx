@@ -8,7 +8,7 @@ import AppSidebar from "@/components/AppSidebar";
 import Dashboard from "@/pages/Dashboard";
 import Catalog from "@/pages/Catalog";
 import TrainingDetail from "@/pages/TrainingDetail";
-import RegistrationManagement from "@/pages/RegistrationManagement";
+import ConsultantManagement from "@/pages/ConsultantManagement";
 import InterestManagement from "@/pages/InterestManagement";
 import FormationManagement from "@/pages/FormationManagement";
 import SessionManagement from "@/pages/SessionManagement";
@@ -29,7 +29,7 @@ function Router({ currentUser }: { currentUser: User }) {
       <Route path="/training/:id" component={() => <TrainingDetail currentUser={currentUser} />} />
       <Route path="/my-trainings" component={() => <Dashboard currentUser={currentUser} />} />
       <Route path="/interests" component={InterestManagement} />
-      <Route path="/registrations" component={RegistrationManagement} />
+      <Route path="/consultants" component={ConsultantManagement} />
       <Route path="/formations" component={FormationManagement} />
       <Route path="/sessions" component={SessionManagement} />
       <Route path="/instructor-formations" component={InstructorFormations} />

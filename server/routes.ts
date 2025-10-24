@@ -166,6 +166,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all users (RH only)
+  app.get("/api/users", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const users = await storage.listUsers();
+      
+      // Remove passwords from response
+      const usersWithoutPasswords = users.map(({ password, ...user }) => user);
+      res.json(usersWithoutPasswords);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Formation Routes
   app.get("/api/formations", optionalAuth, async (req, res) => {
     try {
@@ -486,6 +506,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sessionId = req.query.sessionId as string | undefined;
       
       const registrations = await storage.listRegistrations(userId, sessionId);
+      res.json(registrations);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get all registrations (RH only)
+  app.get("/api/admin/registrations", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const registrations = await storage.listAllRegistrations();
       res.json(registrations);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

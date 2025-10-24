@@ -52,6 +52,7 @@ export interface IStorage {
   // Registration methods
   getRegistration(id: string): Promise<Registration | undefined>;
   listRegistrations(userId?: string, sessionId?: string): Promise<Registration[]>;
+  listAllRegistrations(): Promise<Registration[]>;
   createRegistration(registration: InsertRegistration & { status: string }): Promise<Registration>;
   updateRegistration(id: string, updates: Partial<InsertRegistration>): Promise<Registration | undefined>;
   deleteRegistration(id: string): Promise<boolean>;
@@ -264,6 +265,10 @@ export class DatabaseStorage implements IStorage {
         .where(eq(registrations.sessionId, sessionId))
         .orderBy(desc(registrations.registeredAt));
     }
+    return await db.select().from(registrations).orderBy(desc(registrations.registeredAt));
+  }
+
+  async listAllRegistrations(): Promise<Registration[]> {
     return await db.select().from(registrations).orderBy(desc(registrations.registeredAt));
   }
 

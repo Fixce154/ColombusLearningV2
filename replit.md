@@ -62,9 +62,18 @@ Preferred communication style: Simple, everyday language.
 
 ### RH CRUD Administration System
 - **FormationManagement Page** (/formations): Complete CRUD interface for managing training catalog with form validation, real-time table updates, and confirmation dialogs
-- **SessionManagement Page** (/sessions): Complete CRUD interface for scheduling sessions with datetime pickers and instructor assignment
-- **Sidebar Reorganization**: RH users see two menu sections - "Mes formations" (consultant features) and "Administration RH" (admin tools)
-- **API Routes**: Full CRUD endpoints (POST/PATCH/DELETE) for formations and sessions with RH role authorization
+- **SessionManagement Page** (/sessions): Complete CRUD interface for scheduling sessions with datetime pickers, instructor assignment, and expandable rows showing enrolled participants
+- **ConsultantManagement Page** (/consultants): Replaced "Inscriptions" tab with comprehensive consultant management featuring:
+  - Global statistics dashboard (total consultants, intentions, validated registrations)
+  - Consultants table with year-specific metrics (intentions, registrations, P1/P2 quota usage)
+  - Expandable rows showing detailed breakdown of intentions and registrations by status
+  - Individual consultant history dialog with complete timeline of all intentions and registrations
+- **Sidebar Reorganization**: RH users see two menu sections - "Mes formations" (consultant features) and "Administration RH" (admin tools with "Consultants" replacing "Inscriptions")
+- **API Routes**: 
+  - Full CRUD endpoints (POST/PATCH/DELETE) for formations and sessions with RH role authorization
+  - GET /api/users - Fetch all users (RH only)
+  - GET /api/admin/registrations - Fetch all registrations across all consultants (RH only)
+- **Storage Layer**: Added listUsers() and listAllRegistrations() methods to IStorage interface and DatabaseStorage implementation
 - **Schema Fix**: insertSessionSchema now accepts Date objects and ISO 8601 strings with automatic conversion
 - **Bug Fixes**: Query parameter alignment (active=false), SelectItem empty value handling (__NONE__ sentinel), date serialization
 - **Testing**: End-to-end Playwright verification of complete CRUD workflow
