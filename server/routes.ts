@@ -6,7 +6,6 @@ import { pool } from "./db";
 import { storage } from "./storage";
 import { requireAuth, optionalAuth, type AuthRequest } from "./auth";
 import { insertUserSchema, insertFormationSchema, insertSessionSchema, insertFormationInterestSchema, insertRegistrationSchema } from "@shared/schema";
-import { INSTRUCTOR_ROLES, InstructorRole, isInstructor } from "@shared/roles";
 import { z } from "zod";
 
 const PgSession = connectPgSimple(session);
@@ -468,12 +467,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const createManagedUserSchema = z.object({
+    name: z.string().min(1, "Le nom est requis"),
+    email: z.string().email("Email invalide"),
+    password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
+    roles: z
+      .array(z.enum(USER_ROLES))
+      .nonempty("Au moins un rôle est requis"),
+    businessUnit: z.string().optional(),
+    seniority: z.string().optional(),
+  });
+
   // Get all users (RH only)
   app.get("/api/users", requireAuth, async (req, res) => {
     try {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
-      
+
       if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
@@ -485,6 +495,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const usersWithoutPasswords = users.map(({ password, ...user }) => user);
       res.json(usersWithoutPasswords);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create a managed user (RH only)
+  app.post("/api/admin/users", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const parsed = createManagedUserSchema.parse(req.body);
+
+      const existingUser = await storage.getUserByEmail(parsed.email);
+      if (existingUser) {
+        return res.status(409).json({ message: "Un utilisateur avec cet email existe déjà" });
+      }
+
+      const normalizedRoles = Array.from(
+        new Set(
+          parsed.roles.flatMap((role) => {
+            if (role === "rh" || role === "manager") {
+              return [role, "consultant"] as const;
+            }
+            return [role];
+          })
+        )
+      );
+
+      const createdUser = await storage.createUser({
+        name: parsed.name,
+        email: parsed.email,
+        password: parsed.password,
+        roles: normalizedRoles,
+        businessUnit: parsed.businessUnit,
+        seniority: parsed.seniority,
+        archived: false,
+        p1Used: 0,
+        p2Used: 0,
+      });
+
+      const { password: _, ...userWithoutPassword } = createdUser;
+      res.status(201).json({ user: userWithoutPassword });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Données invalides", errors: error.errors });
+      }
       res.status(500).json({ message: error.message });
     }
   });
