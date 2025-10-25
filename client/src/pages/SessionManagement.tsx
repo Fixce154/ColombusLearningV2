@@ -52,6 +52,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Session, Formation, User, Registration } from "@shared/schema";
 import { insertSessionSchema } from "@shared/schema";
+import { isInstructor } from "@shared/roles";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { z } from "zod";
@@ -95,7 +96,7 @@ export default function SessionManagement() {
       if (res.status === 404) return [];
       if (!res.ok) throw new Error("Failed to fetch users");
       const users = await res.json();
-      return users.filter((u: User) => u.roles.includes("formateur"));
+      return users.filter((u: User) => isInstructor(u.roles));
     },
     retry: false,
   });

@@ -10,6 +10,7 @@ import {
 import { User, ChevronDown, Check } from "lucide-react";
 import { mockUsers } from "@/lib/mockData";
 import type { User as UserType } from "@shared/schema";
+import { formatRoles } from "@shared/roles";
 
 interface RoleSwitcherProps {
   currentUser: UserType;
@@ -17,21 +18,6 @@ interface RoleSwitcherProps {
 }
 
 export default function RoleSwitcher({ currentUser, onUserChange }: RoleSwitcherProps) {
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case "consultant":
-        return "Consultant";
-      case "rh":
-        return "RH";
-      case "formateur":
-        return "Formateur";
-      case "manager":
-        return "Manager";
-      default:
-        return role;
-    }
-  };
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -42,7 +28,7 @@ export default function RoleSwitcher({ currentUser, onUserChange }: RoleSwitcher
           <div className="flex flex-col items-start">
             <span className="font-medium text-sm">{currentUser.name}</span>
             <span className="text-xs text-muted-foreground">
-              {currentUser.roles.map(getRoleLabel).join(" • ")}
+              {formatRoles(currentUser.roles)}
             </span>
           </div>
           <ChevronDown className="w-4 h-4 text-muted-foreground" />
@@ -67,7 +53,7 @@ export default function RoleSwitcher({ currentUser, onUserChange }: RoleSwitcher
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm">{user.name}</div>
                 <div className="text-xs text-muted-foreground truncate">
-                  {user.roles.map(getRoleLabel).join(" • ")} • {user.email}
+                  {formatRoles(user.roles)} • {user.email}
                 </div>
               </div>
               {currentUser.id === user.id && (
