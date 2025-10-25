@@ -27,18 +27,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatRoles, isInstructor } from "@shared/roles";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface AppSidebarProps {
   currentUser: User;
@@ -64,6 +56,12 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
   const [showResignDialog, setShowResignDialog] = useState(false);
   const [isSectionDialogOpen, setIsSectionDialogOpen] = useState(false);
   const [activeSectionIndex, setActiveSectionIndex] = useState<number | null>(null);
+  const [activeItemKey, setActiveItemKey] = useState<string | null>(null);
+  const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [panelPosition, setPanelPosition] = useState<{ top: number; left: number } | null>(
+    null,
+  );
 
   const becomeInstructorMutation = useMutation({
     mutationFn: async () => {
@@ -184,22 +182,97 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
     return sections;
   };
 
-  const menuSections = getMenuSections();
+  const menuSections = useMemo(() => getMenuSections(), [
+    JSON.stringify(currentUser.roles ?? []),
+  ]);
+
   useEffect(() => {
-    if (menuSections.length === 0) {
+    if (
+      activeSectionIndex !== null &&
+      (activeSectionIndex < 0 || activeSectionIndex >= menuSections.length)
+    ) {
       setActiveSectionIndex(null);
       setIsSectionDialogOpen(false);
+      setActiveItemKey(null);
+    }
+  }, [menuSections, activeSectionIndex]);
+
+  useEffect(() => {
+    if (activeSectionIndex === null) return;
+
+    const section = menuSections[activeSectionIndex];
+    if (!section) return;
+
+    if (section.items.length === 0) {
+      setActiveItemKey(null);
       return;
     }
 
-    if (
-      activeSectionIndex === null ||
-      activeSectionIndex < 0 ||
-      activeSectionIndex >= menuSections.length
-    ) {
-      setActiveSectionIndex(menuSections.length > 0 ? 0 : null);
+    if (!section.items.some((item) => item.title === activeItemKey)) {
+      setActiveItemKey(section.items[0]?.title ?? null);
     }
-  }, [menuSections, activeSectionIndex]);
+  }, [menuSections, activeSectionIndex, activeItemKey]);
+
+  const updatePanelPosition = (index: number) => {
+    const targetButton = buttonRefs.current[index];
+    if (!targetButton) return;
+    const rect = targetButton.getBoundingClientRect();
+    setPanelPosition({
+      top: rect.top + rect.height / 2 + window.scrollY,
+      left: rect.right + 12 + window.scrollX,
+    });
+  };
+
+  useEffect(() => {
+    if (!isSectionDialogOpen || activeSectionIndex === null) return;
+
+    const handleReposition = () => updatePanelPosition(activeSectionIndex);
+    handleReposition();
+
+    window.addEventListener("resize", handleReposition);
+    window.addEventListener("scroll", handleReposition, true);
+
+    return () => {
+      window.removeEventListener("resize", handleReposition);
+      window.removeEventListener("scroll", handleReposition, true);
+    };
+  }, [isSectionDialogOpen, activeSectionIndex]);
+
+  useEffect(() => {
+    if (!isSectionDialogOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (panelRef.current?.contains(target)) return;
+
+      const isClickOnButton = buttonRefs.current.some((button) =>
+        button ? button.contains(target as Node) : false,
+      );
+
+      if (!isClickOnButton) {
+        setIsSectionDialogOpen(false);
+        setActiveSectionIndex(null);
+        setActiveItemKey(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsSectionDialogOpen(false);
+        setActiveSectionIndex(null);
+        setActiveItemKey(null);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isSectionDialogOpen]);
 
   const activeSection =
     activeSectionIndex !== null ? menuSections[activeSectionIndex] : undefined;
@@ -223,9 +296,21 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
               <TooltipTrigger asChild>
                 <button
                   type="button"
+                  ref={(button) => {
+                    buttonRefs.current[index] = button;
+                  }}
                   onClick={() => {
+                    if (isSectionDialogOpen && activeSectionIndex === index) {
+                      setIsSectionDialogOpen(false);
+                      setActiveSectionIndex(null);
+                      setActiveItemKey(null);
+                      return;
+                    }
+
                     setActiveSectionIndex(index);
+                    setActiveItemKey(menuSections[index]?.items[0]?.title ?? null);
                     setIsSectionDialogOpen(true);
+                    updatePanelPosition(index);
                   }}
                   className={`flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
                     activeSectionIndex === index && isSectionDialogOpen
@@ -260,104 +345,112 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
         </Tooltip>
       </div>
 
-      <Dialog
-        open={isSectionDialogOpen && Boolean(activeSection)}
-        onOpenChange={(open) => {
-          setIsSectionDialogOpen(open);
-          if (!open) {
-            setActiveSectionIndex(null);
-          }
-        }}
-      >
-        <DialogContent className="w-[400px] max-w-[90vw]">
-          {activeSection && activeSection.items.length > 0 ? (
-            <Tabs
-              key={`${activeSectionIndex}-${activeSection.items[0]?.title ?? ""}`}
-              defaultValue={activeSection.items[0]?.title ?? ""}
-              className="w-full"
-            >
-              <DialogHeader>
-                <DialogTitle>{getSectionTitle(activeSection)}</DialogTitle>
-                {activeSection.label && (
-                  <DialogDescription>
-                    Sélectionnez un onglet pour accéder rapidement à la rubrique souhaitée.
-                  </DialogDescription>
-                )}
-              </DialogHeader>
-              <TabsList className="mt-4 flex flex-wrap justify-start gap-2">
-                {activeSection.items.map((item) => (
-                  <TabsTrigger key={item.title} value={item.title} className="whitespace-nowrap">
-                    {item.title}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+      {isSectionDialogOpen && activeSection ? (
+        <div
+          ref={panelRef}
+          className="fixed z-50 w-[420px] max-w-[calc(100vw-6rem)] -translate-y-1/2 transform rounded-3xl border border-white/20 bg-white/95 text-foreground shadow-xl backdrop-blur"
+          style={{
+            top: panelPosition?.top ?? 0,
+            left: panelPosition?.left ?? 0,
+          }}
+        >
+          <div className="flex">
+            <div className="flex w-40 flex-col gap-1 rounded-l-3xl bg-[#00313F]/5 p-4">
+              <p className="px-2 text-xs font-semibold uppercase tracking-[0.28em] text-[#00313F]/70">
+                {getSectionTitle(activeSection)}
+              </p>
               {activeSection.items.map((item) => {
-                const isActive = item.url ? location === item.url : false;
+                const isActive = activeItemKey === item.title;
                 return (
-                  <TabsContent key={item.title} value={item.title} className="mt-6">
+                  <button
+                    key={item.title}
+                    type="button"
+                    onClick={() => setActiveItemKey(item.title)}
+                    className={`flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-medium transition ${
+                      isActive
+                        ? "bg-white text-[#00313F] shadow-sm"
+                        : "text-[#00313F]/80 hover:bg-white/60 hover:text-[#00313F]"
+                    }`}
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 text-[#00313F]">
+                      <item.icon className="h-4 w-4" />
+                    </span>
+                    <span className="text-sm leading-tight">{item.title}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex-1 space-y-4 p-5">
+              {activeSection.items.length === 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  Aucun contenu disponible pour cette rubrique.
+                </div>
+              ) : null}
+              {activeSection.items.map((item) => {
+                const isActive = activeItemKey === item.title;
+                if (!isActive) return null;
+
+                const isCurrentLocation = item.url ? location === item.url : false;
+
+                return (
+                  <div key={item.title} className="space-y-4">
                     <div className="flex items-start gap-4">
                       <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#00313F]/10 text-[#00313F]">
                         <item.icon className="h-5 w-5" />
                       </div>
-                      <div className="flex-1 space-y-3">
-                        <div>
-                          <p className="text-base font-semibold text-foreground">{item.title}</p>
-                          {item.description && (
-                            <p className="text-sm text-muted-foreground">{item.description}</p>
-                          )}
-                        </div>
-                        {item.url ? (
-                          <Button
-                            asChild
-                            className="w-full justify-start gap-2"
-                            variant={isActive ? "default" : "secondary"}
-                          >
-                            <Link
-                              href={item.url}
-                              data-testid={`link-${item.url.slice(1) || "home"}`}
-                              onClick={() => setIsSectionDialogOpen(false)}
-                            >
-                              <item.icon className="h-4 w-4" />
-                              <span>Ouvrir</span>
-                            </Link>
-                          </Button>
-                        ) : null}
-                        {item.action === "becomeInstructor" && (
-                          <Button
-                            onClick={() => becomeInstructorMutation.mutate()}
-                            disabled={becomeInstructorMutation.isPending}
-                            className="w-full justify-center gap-2"
-                            variant="default"
-                            data-testid="button-become-instructor"
-                          >
-                            <Plus className="h-4 w-4" />
-                            {becomeInstructorMutation.isPending ? "Activation..." : "Activer le rôle"}
-                          </Button>
-                        )}
-                        {item.action === "resignInstructor" && (
-                          <Button
-                            onClick={() => setShowResignDialog(true)}
-                            className="w-full justify-center gap-2"
-                            variant="destructive"
-                            data-testid="button-resign-instructor"
-                          >
-                            <Minus className="h-4 w-4" />
-                            Ne plus être formateur
-                          </Button>
+                      <div className="flex-1 space-y-1">
+                        <p className="text-base font-semibold text-foreground">{item.title}</p>
+                        {item.description && (
+                          <p className="text-sm text-muted-foreground">{item.description}</p>
                         )}
                       </div>
                     </div>
-                  </TabsContent>
+                    {item.url ? (
+                      <Button
+                        asChild
+                        className="w-full justify-start gap-2"
+                        variant={isCurrentLocation ? "default" : "secondary"}
+                      >
+                        <Link
+                          href={item.url}
+                          data-testid={`link-${item.url.slice(1) || "home"}`}
+                          onClick={() => setIsSectionDialogOpen(false)}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          <span>Ouvrir</span>
+                        </Link>
+                      </Button>
+                    ) : null}
+                    {item.action === "becomeInstructor" && (
+                      <Button
+                        onClick={() => becomeInstructorMutation.mutate()}
+                        disabled={becomeInstructorMutation.isPending}
+                        className="w-full justify-center gap-2"
+                        variant="default"
+                        data-testid="button-become-instructor"
+                      >
+                        <Plus className="h-4 w-4" />
+                        {becomeInstructorMutation.isPending ? "Activation..." : "Activer le rôle"}
+                      </Button>
+                    )}
+                    {item.action === "resignInstructor" && (
+                      <Button
+                        onClick={() => setShowResignDialog(true)}
+                        className="w-full justify-center gap-2"
+                        variant="destructive"
+                        data-testid="button-resign-instructor"
+                      >
+                        <Minus className="h-4 w-4" />
+                        Ne plus être formateur
+                      </Button>
+                    )}
+                  </div>
                 );
               })}
-            </Tabs>
-          ) : (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              Aucun contenu disponible pour cette rubrique.
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      ) : null}
 
       <AlertDialog open={showResignDialog} onOpenChange={setShowResignDialog}>
         <AlertDialogContent className="surface-soft border-black/5 bg-white text-foreground">
