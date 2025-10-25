@@ -29,13 +29,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Loader2, ChevronDown, ChevronRight, Heart, UserCheck, Calendar, Award, Archive, Trash2 } from "lucide-react";
+import { Users, Loader2, ChevronDown, ChevronRight, Heart, UserCheck, Calendar, Award, Archive, Trash2, UserPlus } from "lucide-react";
 import type { User, FormationInterest, Registration, Formation, Session } from "@shared/schema";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PriorityBadge from "@/components/PriorityBadge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import CreateExternalInstructorDialog from "@/components/CreateExternalInstructorDialog";
 
 export default function ConsultantManagement() {
   const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
@@ -43,6 +44,7 @@ export default function ConsultantManagement() {
   const [selectedConsultant, setSelectedConsultant] = useState<User | null>(null);
   const [archiveDialogUser, setArchiveDialogUser] = useState<User | null>(null);
   const [deleteDialogUser, setDeleteDialogUser] = useState<User | null>(null);
+  const [showCreateExternalInstructor, setShowCreateExternalInstructor] = useState(false);
   const { toast } = useToast();
 
   const { data: activeUsers = [], isLoading: isLoadingActiveUsers } = useQuery<User[]>({
@@ -200,16 +202,28 @@ export default function ConsultantManagement() {
     <div className="h-full overflow-y-auto">
       <div className="container mx-auto p-8 space-y-8">
         {/* Header */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/10 p-3 rounded-xl">
-              <Users className="w-7 h-7 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-primary">Gestion des Consultants</h1>
-              <p className="text-muted-foreground">Vue d'ensemble et historique des formations par consultant</p>
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-3 rounded-xl">
+                <Users className="w-7 h-7 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-primary">Gestion des Consultants</h1>
+                <p className="text-muted-foreground">Vue d'ensemble et historique des formations par consultant</p>
+              </div>
             </div>
           </div>
+
+          <Button
+            variant="outline"
+            className="h-11"
+            onClick={() => setShowCreateExternalInstructor(true)}
+            data-testid="button-create-external-instructor"
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Créer un formateur externe
+          </Button>
         </div>
 
         {/* Statistics Cards */}
@@ -490,6 +504,11 @@ export default function ConsultantManagement() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <CreateExternalInstructorDialog
+          open={showCreateExternalInstructor}
+          onOpenChange={setShowCreateExternalInstructor}
+        />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={!!deleteDialogUser} onOpenChange={() => setDeleteDialogUser(null)}>

@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
+import { formatRoles, isInstructor } from "@shared/roles";
 
 interface AppSidebarProps {
   currentUser: User;
@@ -92,7 +93,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
     // Un RH est forcément consultant, donc on affiche aussi pour les RH
     if (roles.includes("consultant") || roles.includes("rh")) {
       sections.push({
-        label: roles.includes("rh") || roles.includes("formateur") ? "Mes formations" : undefined,
+        label: roles.includes("rh") || isInstructor(roles) ? "Mes formations" : undefined,
         items: [
           { title: "Tableau de bord", url: "/", icon: Home },
           { title: "Catalogue", url: "/catalog", icon: BookOpen },
@@ -101,7 +102,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
     }
 
     // Section "Formation" pour les formateurs
-    if (roles.includes("formateur")) {
+    if (isInstructor(roles)) {
       sections.push({
         label: "Formation",
         items: [
@@ -140,21 +141,6 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
   };
 
   const menuSections = getMenuSections();
-
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case "consultant":
-        return "Consultant";
-      case "rh":
-        return "Ressources Humaines";
-      case "formateur":
-        return "Formateur";
-      case "manager":
-        return "Manager";
-      default:
-        return role;
-    }
-  };
 
   return (
     <Sidebar className="border-r-0">
@@ -197,7 +183,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
           </SidebarGroup>
         ))}
         
-        {!currentUser.roles.includes("formateur") && (
+        {!isInstructor(currentUser.roles) && (
           <SidebarGroup className="mt-6">
             <SidebarGroupLabel className="text-sidebar-foreground/70 uppercase tracking-wider text-xs mb-2 px-3">
               Devenir formateur
@@ -222,7 +208,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
           </SidebarGroup>
         )}
 
-        {currentUser.roles.includes("formateur") && (
+        {isInstructor(currentUser.roles) && (
           <SidebarGroup className="mt-6">
             <SidebarGroupLabel className="text-sidebar-foreground/70 uppercase tracking-wider text-xs mb-2 px-3">
               Gérer mon rôle
@@ -252,7 +238,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
           <div className="flex-1 min-w-0">
             <div className="font-medium text-sm text-sidebar-foreground truncate">{currentUser.name}</div>
             <div className="text-xs text-sidebar-foreground/70 truncate">
-              {currentUser.roles.map(getRoleLabel).join(" • ")}
+              {formatRoles(currentUser.roles)}
             </div>
           </div>
         </div>
