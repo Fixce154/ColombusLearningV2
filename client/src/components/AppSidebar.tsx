@@ -56,7 +56,6 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
   const [showResignDialog, setShowResignDialog] = useState(false);
   const [isSectionDialogOpen, setIsSectionDialogOpen] = useState(false);
   const [activeSectionIndex, setActiveSectionIndex] = useState<number | null>(null);
-  const [activeItemKey, setActiveItemKey] = useState<string | null>(null);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [panelPosition, setPanelPosition] = useState<{ top: number; left: number } | null>(
@@ -193,25 +192,8 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
     ) {
       setActiveSectionIndex(null);
       setIsSectionDialogOpen(false);
-      setActiveItemKey(null);
     }
   }, [menuSections, activeSectionIndex]);
-
-  useEffect(() => {
-    if (activeSectionIndex === null) return;
-
-    const section = menuSections[activeSectionIndex];
-    if (!section) return;
-
-    if (section.items.length === 0) {
-      setActiveItemKey(null);
-      return;
-    }
-
-    if (!section.items.some((item) => item.title === activeItemKey)) {
-      setActiveItemKey(section.items[0]?.title ?? null);
-    }
-  }, [menuSections, activeSectionIndex, activeItemKey]);
 
   const updatePanelPosition = (index: number) => {
     const targetButton = buttonRefs.current[index];
@@ -219,7 +201,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
     const rect = targetButton.getBoundingClientRect();
     setPanelPosition({
       top: rect.top + rect.height / 2 + window.scrollY,
-      left: rect.right + 12 + window.scrollX,
+      left: rect.right + 6 + window.scrollX,
     });
   };
 
@@ -252,7 +234,6 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
       if (!isClickOnButton) {
         setIsSectionDialogOpen(false);
         setActiveSectionIndex(null);
-        setActiveItemKey(null);
       }
     };
 
@@ -262,7 +243,6 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
       if (event.key === "Escape") {
         setIsSectionDialogOpen(false);
         setActiveSectionIndex(null);
-        setActiveItemKey(null);
       }
     };
 
@@ -303,12 +283,10 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
                     if (isSectionDialogOpen && activeSectionIndex === index) {
                       setIsSectionDialogOpen(false);
                       setActiveSectionIndex(null);
-                      setActiveItemKey(null);
                       return;
                     }
 
                     setActiveSectionIndex(index);
-                    setActiveItemKey(menuSections[index]?.items[0]?.title ?? null);
                     setIsSectionDialogOpen(true);
                     updatePanelPosition(index);
                   }}
@@ -348,105 +326,80 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
       {isSectionDialogOpen && activeSection ? (
         <div
           ref={panelRef}
-          className="fixed z-50 w-[420px] max-w-[calc(100vw-6rem)] -translate-y-1/2 transform rounded-3xl border border-white/20 bg-white/95 text-foreground shadow-xl backdrop-blur"
+          className="fixed z-50 w-[320px] max-w-[calc(100vw-5rem)] -translate-y-1/2 transform text-[#00313F]"
           style={{
             top: panelPosition?.top ?? 0,
             left: panelPosition?.left ?? 0,
           }}
         >
-          <div className="flex">
-            <div className="flex w-40 flex-col gap-1 rounded-l-3xl bg-[#00313F]/5 p-4">
-              <p className="px-2 text-xs font-semibold uppercase tracking-[0.28em] text-[#00313F]/70">
+          <div className="relative overflow-hidden rounded-lg border border-white/40 bg-white/95 shadow-lg backdrop-blur">
+            <span className="absolute inset-y-0 left-0 w-1.5 bg-[#00313F]" aria-hidden="true" />
+            <div className="space-y-3 px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#00313F]/70">
                 {getSectionTitle(activeSection)}
               </p>
-              {activeSection.items.map((item) => {
-                const isActive = activeItemKey === item.title;
-                return (
-                  <button
-                    key={item.title}
-                    type="button"
-                    onClick={() => setActiveItemKey(item.title)}
-                    className={`flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-medium transition ${
-                      isActive
-                        ? "bg-white text-[#00313F] shadow-sm"
-                        : "text-[#00313F]/80 hover:bg-white/60 hover:text-[#00313F]"
-                    }`}
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 text-[#00313F]">
-                      <item.icon className="h-4 w-4" />
-                    </span>
-                    <span className="text-sm leading-tight">{item.title}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex-1 space-y-4 p-5">
               {activeSection.items.length === 0 ? (
-                <div className="text-sm text-muted-foreground">
+                <p className="text-sm text-[#00313F]/70">
                   Aucun contenu disponible pour cette rubrique.
-                </div>
-              ) : null}
-              {activeSection.items.map((item) => {
-                const isActive = activeItemKey === item.title;
-                if (!isActive) return null;
-
-                const isCurrentLocation = item.url ? location === item.url : false;
-
-                return (
-                  <div key={item.title} className="space-y-4">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#00313F]/10 text-[#00313F]">
-                        <item.icon className="h-5 w-5" />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <p className="text-base font-semibold text-foreground">{item.title}</p>
-                        {item.description && (
-                          <p className="text-sm text-muted-foreground">{item.description}</p>
-                        )}
-                      </div>
-                    </div>
-                    {item.url ? (
-                      <Button
-                        asChild
-                        className="w-full justify-start gap-2"
-                        variant={isCurrentLocation ? "default" : "secondary"}
-                      >
+                </p>
+              ) : (
+                <nav className="flex flex-col gap-1">
+                  {activeSection.items.map((item) => {
+                    if (item.url) {
+                      const isCurrentLocation = location === item.url;
+                      return (
                         <Link
+                          key={item.title}
                           href={item.url}
                           data-testid={`link-${item.url.slice(1) || "home"}`}
                           onClick={() => setIsSectionDialogOpen(false)}
+                          className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                            isCurrentLocation
+                              ? "bg-[#00313F]/10 text-[#00313F]"
+                              : "text-[#00313F]/85 hover:bg-[#00313F]/5 hover:text-[#00313F]"
+                          }`}
                         >
-                          <item.icon className="h-4 w-4" />
-                          <span>Ouvrir</span>
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00313F]/8 text-[#00313F]">
+                            <item.icon className="h-4 w-4" />
+                          </span>
+                          <span>{item.title}</span>
                         </Link>
-                      </Button>
-                    ) : null}
-                    {item.action === "becomeInstructor" && (
-                      <Button
-                        onClick={() => becomeInstructorMutation.mutate()}
-                        disabled={becomeInstructorMutation.isPending}
-                        className="w-full justify-center gap-2"
-                        variant="default"
-                        data-testid="button-become-instructor"
-                      >
-                        <Plus className="h-4 w-4" />
-                        {becomeInstructorMutation.isPending ? "Activation..." : "Activer le rôle"}
-                      </Button>
-                    )}
-                    {item.action === "resignInstructor" && (
-                      <Button
-                        onClick={() => setShowResignDialog(true)}
-                        className="w-full justify-center gap-2"
-                        variant="destructive"
-                        data-testid="button-resign-instructor"
-                      >
-                        <Minus className="h-4 w-4" />
-                        Ne plus être formateur
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
+                      );
+                    }
+
+                    if (item.action === "becomeInstructor") {
+                      return (
+                        <Button
+                          key={item.title}
+                          onClick={() => becomeInstructorMutation.mutate()}
+                          disabled={becomeInstructorMutation.isPending}
+                          className="flex w-full items-center justify-center gap-2 rounded-md bg-[#00313F] px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#00313F]/90"
+                          data-testid="button-become-instructor"
+                        >
+                          <Plus className="h-4 w-4" />
+                          {becomeInstructorMutation.isPending ? "Activation..." : item.title}
+                        </Button>
+                      );
+                    }
+
+                    if (item.action === "resignInstructor") {
+                      return (
+                        <Button
+                          key={item.title}
+                          onClick={() => setShowResignDialog(true)}
+                          className="flex w-full items-center justify-center gap-2 rounded-md bg-destructive px-3 py-2 text-sm font-semibold text-destructive-foreground shadow-sm hover:bg-destructive/90"
+                          data-testid="button-resign-instructor"
+                        >
+                          <Minus className="h-4 w-4" />
+                          {item.title}
+                        </Button>
+                      );
+                    }
+
+                    return null;
+                  })}
+                </nav>
+              )}
             </div>
           </div>
         </div>
