@@ -6,7 +6,6 @@ import { pool } from "./db";
 import { storage } from "./storage";
 import { requireAuth, optionalAuth, type AuthRequest } from "./auth";
 import { insertUserSchema, insertFormationSchema, insertSessionSchema, insertFormationInterestSchema, insertRegistrationSchema } from "@shared/schema";
-import { INSTRUCTOR_ROLES, InstructorRole, USER_ROLES, isInstructor } from "@shared/roles";
 import { z } from "zod";
 
 const PgSession = connectPgSimple(session);
