@@ -28,28 +28,23 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
   const [deleteInterestId, setDeleteInterestId] = useState<string | null>(null);
   const [deleteRegistrationId, setDeleteRegistrationId] = useState<string | null>(null);
 
-  // Fetch current user (to get updated quotas)
   const { data: userData } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
   });
   const currentUser = userData?.user || _currentUser;
 
-  // Fetch formation interests
   const { data: interests = [], isLoading: isLoadingInterests } = useQuery<FormationInterest[]>({
     queryKey: ["/api/interests"],
   });
 
-  // Fetch user's registrations
   const { data: registrations = [], isLoading: isLoadingRegistrations } = useQuery<Registration[]>({
     queryKey: ["/api/registrations"],
   });
 
-  // Fetch all formations to display titles
   const { data: formations = [] } = useQuery<Formation[]>({
     queryKey: ["/api/formations"],
   });
 
-  // Fetch all sessions to display dates
   const { data: sessions = [] } = useQuery<Session[]>({
     queryKey: ["/api/sessions"],
     queryFn: async () => {
@@ -59,7 +54,6 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
     },
   });
 
-  // Delete interest mutation
   const deleteInterestMutation = useMutation({
     mutationFn: async (interestId: string) => {
       await apiRequest(`/api/interests/${interestId}`, "DELETE");
@@ -82,7 +76,6 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
     },
   });
 
-  // Delete registration mutation
   const deleteRegistrationMutation = useMutation({
     mutationFn: async (registrationId: string) => {
       await apiRequest(`/api/registrations/${registrationId}`, "DELETE");
@@ -106,11 +99,11 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
     },
   });
 
-  if (isLoadingRegistrations) {
+  if (isLoadingRegistrations || isLoadingInterests) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="space-y-4 text-center">
+          <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
           <p className="text-muted-foreground">Chargement de votre tableau de bord...</p>
         </div>
       </div>
@@ -127,16 +120,16 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
   const cancelledTrainings = registrations.filter((r) => r.status === "cancelled");
 
   const getFormationTitle = (formationId: string) => {
-    return formations.find(f => f.id === formationId)?.title || "Formation inconnue";
+    return formations.find((f) => f.id === formationId)?.title || "Formation inconnue";
   };
 
   const getSessionDate = (sessionId: string) => {
-    const session = sessions.find(s => s.id === sessionId);
+    const session = sessions.find((s) => s.id === sessionId);
     return session ? new Date(session.startDate) : new Date();
   };
 
   const getSessionLocation = (sessionId: string) => {
-    return sessions.find(s => s.id === sessionId)?.location || "";
+    return sessions.find((s) => s.id === sessionId)?.location || "";
   };
 
   const firstName = currentUser.name.split(" ")[0] || currentUser.name;
@@ -146,56 +139,50 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
 
   return (
     <div className="space-y-12">
-      {/* Hero Section */}
-      <section className="glass-panel relative overflow-hidden rounded-[2.5rem] border-white/40 px-10 py-12 shadow-[0_45px_120px_-70px_rgba(15,28,34,0.6)]">
-        <div className="pointer-events-none absolute -right-24 top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-gradient-to-br from-accent/40 via-accent/20 to-transparent blur-3xl" />
-        <div className="relative z-10 flex flex-col gap-10 md:flex-row md:items-center md:justify-between">
-          <div className="max-w-2xl space-y-5">
-            <p className="section-subtle-title text-primary/70">Tableau de bord</p>
-            <h1 className="text-4xl font-semibold tracking-tight text-primary md:text-5xl">
-              Bienvenue, <span className="luxury-gradient-text">{firstName}</span>
-            </h1>
-            <p className="text-base leading-relaxed text-muted-foreground/90">
-              Suivez vos parcours d'apprentissage, confirmez vos intentions prioritaires et visualisez vos prochaines sessions en un coup d'œil.
+      <section className="surface-elevated relative overflow-hidden rounded-[2.5rem] px-12 py-14">
+        <div className="pointer-events-none absolute inset-y-6 right-10 hidden w-64 rounded-[28px] bg-[radial-gradient(circle_at_top,rgba(10,132,255,0.16),transparent_60%)] md:block" />
+        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-6">
+            <p className="eyebrow text-muted-foreground">Tableau de bord</p>
+            <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Bonjour {firstName}</h1>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              Visualisez vos priorités et vos prochaines sessions de formation dans un espace clair et élégant.
             </p>
             <div className="flex flex-wrap items-center gap-4 pt-2">
               <Link href="/catalog">
                 <Button
                   size="lg"
-                  className="group gap-2 rounded-full border-0 bg-gradient-to-r from-primary to-accent px-6 py-3 text-sm font-semibold shadow-[0_20px_40px_-22px_rgba(0,49,63,0.6)] transition-all hover:shadow-[0_26px_60px_-28px_rgba(0,49,63,0.65)]"
+                  className="group gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-[0_24px_40px_-28px_rgba(10,132,255,0.65)] transition hover:bg-primary/90"
                   data-testid="button-browse-catalog"
                 >
                   <Plus className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
                   Parcourir le catalogue
                 </Button>
               </Link>
-              <span className="text-sm text-muted-foreground/80">
-                Plus de 120 programmes premium disponibles cette saison.
-              </span>
+              <span className="text-sm text-muted-foreground">Plus de 120 programmes disponibles cette saison.</span>
             </div>
           </div>
-          <div className="grid w-full max-w-sm grid-cols-2 gap-3 rounded-3xl border border-white/40 bg-white/40 p-6 text-center text-primary shadow-[0_35px_80px_-60px_rgba(0,49,63,0.5)]">
-            <div className="rounded-2xl border border-white/50 bg-white/60 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.25em] text-primary/60">P1 restant</p>
-              <p className="mt-2 text-2xl font-semibold">{remainingP1}</p>
+          <div className="grid w-full max-w-sm grid-cols-2 gap-4 text-center text-foreground">
+            <div className="rounded-3xl border border-black/5 bg-white px-5 py-4 shadow-sm">
+              <p className="eyebrow text-muted-foreground">P1 restant</p>
+              <p className="mt-3 text-2xl font-semibold">{remainingP1}</p>
             </div>
-            <div className="rounded-2xl border border-white/50 bg-white/60 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.25em] text-primary/60">P2 restante</p>
-              <p className="mt-2 text-2xl font-semibold">{remainingP2}</p>
+            <div className="rounded-3xl border border-black/5 bg-white px-5 py-4 shadow-sm">
+              <p className="eyebrow text-muted-foreground">P2 restante</p>
+              <p className="mt-3 text-2xl font-semibold">{remainingP2}</p>
             </div>
-            <div className="rounded-2xl border border-white/30 bg-white/50 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.25em] text-primary/60">Sessions validées</p>
-              <p className="mt-2 text-2xl font-semibold">{upcomingTrainings.length}</p>
+            <div className="rounded-3xl border border-black/5 bg-secondary px-5 py-4 shadow-sm">
+              <p className="eyebrow text-muted-foreground">Sessions validées</p>
+              <p className="mt-3 text-2xl font-semibold">{upcomingTrainings.length}</p>
             </div>
-            <div className="rounded-2xl border border-white/30 bg-white/50 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.25em] text-primary/60">Priorités dispo.</p>
-              <p className="mt-2 text-2xl font-semibold">{totalPriorityRemaining}</p>
+            <div className="rounded-3xl border border-black/5 bg-secondary px-5 py-4 shadow-sm">
+              <p className="eyebrow text-muted-foreground">Priorités dispo.</p>
+              <p className="mt-3 text-2xl font-semibold">{totalPriorityRemaining}</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Stats Cards */}
       <DashboardStats
         upcomingCount={upcomingTrainings.length}
         completedCount={completedTrainings.length}
@@ -203,27 +190,26 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
         p2Used={currentUser.p2Used || 0}
       />
 
-      {/* Formation Interests Section */}
       {interests.length > 0 && (
         <section className="space-y-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="rounded-2xl border border-primary/20 bg-primary/15 p-3 text-primary shadow-[0_20px_45px_-25px_rgba(0,49,63,0.45)]">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <Heart className="h-5 w-5" />
               </div>
               <div>
-                <p className="section-subtle-title text-primary/60">Intentions prioritaires</p>
-                <h2 className="text-2xl font-semibold text-primary">Mes intentions de formation</h2>
+                <p className="eyebrow text-muted-foreground">Intentions prioritaires</p>
+                <h2 className="text-2xl font-semibold text-foreground">Mes intentions de formation</h2>
               </div>
             </div>
-            <p className="max-w-sm text-sm text-muted-foreground/80">
+            <p className="max-w-sm text-sm text-muted-foreground">
               Priorisez vos envies pour que les équipes formation puissent planifier les sessions adaptées.
             </p>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {interests.map((interest) => {
-              const formation = formations.find(f => f.id === interest.formationId);
+              const formation = formations.find((f) => f.id === interest.formationId);
               if (!formation) return null;
 
               const isRejected = interest.status === "rejected";
@@ -231,11 +217,11 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
               return (
                 <Card
                   key={interest.id}
-                  className={`glass-panel relative overflow-hidden rounded-2xl border-white/40 p-6 transition-transform duration-300 ${isRejected ? 'opacity-60 bg-white/60' : 'hover:-translate-y-1 hover:bg-white/85'}`}
+                  className={`surface-soft h-full p-6 transition-transform duration-300 ${isRejected ? 'opacity-70' : 'hover:-translate-y-1'}`}
                 >
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className="flex items-start justify-between gap-3">
-                      <h3 className={`flex-1 font-semibold tracking-tight line-clamp-2 ${isRejected ? 'text-muted-foreground' : 'text-primary'}`}>
+                      <h3 className={`flex-1 text-base font-semibold tracking-tight ${isRejected ? 'text-muted-foreground' : 'text-foreground'}`}>
                         {formation.title}
                       </h3>
                       <Badge variant={interest.priority === "P1" ? "destructive" : interest.priority === "P2" ? "default" : "secondary"}>
@@ -243,26 +229,26 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
                       </Badge>
                     </div>
 
-                    <p className="text-sm leading-relaxed text-muted-foreground/90 line-clamp-3">
+                    <p className="text-sm leading-relaxed text-muted-foreground line-clamp-3">
                       {formation.description}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="mt-4 flex items-center gap-2 text-sm">
                     {interest.status === "pending" && (
                       <>
-                        <AlertCircle className="w-4 h-4 text-yellow-600" />
-                        <span className="text-yellow-600">En attente d'organisation</span>
+                        <AlertCircle className="h-4 w-4 text-amber-500" />
+                        <span className="text-amber-600">En attente d'organisation</span>
                       </>
                     )}
                     {interest.status === "approved" && (() => {
-                      const availableSessions = sessions.filter(s => s.formationId === interest.formationId);
+                      const availableSessions = sessions.filter((s) => s.formationId === interest.formationId);
                       const hasAvailableSessions = availableSessions.length > 0;
-                      
+
                       return (
                         <>
-                          <CheckCircle className="w-4 h-4 text-accent" />
-                          <span className="text-accent">
+                          <CheckCircle className="h-4 w-4 text-primary" />
+                          <span className="text-primary">
                             {hasAvailableSessions ? "Inscrivez-vous" : "Sessions en cours d'organisation"}
                           </span>
                         </>
@@ -270,25 +256,25 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
                     })()}
                     {interest.status === "converted" && (
                       <>
-                        <CheckCircle className="w-4 h-4 text-accent" />
-                        <span className="text-accent">Inscrit à une session</span>
+                        <CheckCircle className="h-4 w-4 text-primary" />
+                        <span className="text-primary">Inscrit à une session</span>
                       </>
                     )}
                     {interest.status === "rejected" && (
                       <>
-                        <XCircle className="w-4 h-4 text-destructive" />
-                        <span className="text-destructive font-medium">La demande a été rejetée</span>
+                        <XCircle className="h-4 w-4 text-destructive" />
+                        <span className="font-medium text-destructive">La demande a été rejetée</span>
                       </>
                     )}
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="mt-5 flex gap-2">
                     {!isRejected && (
                       <Link href={`/training/${formation.id}`} className="flex-1">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="w-full border-white/40 bg-white/20 text-primary hover:border-white/60 hover:bg-white/40"
+                          className="w-full rounded-full border border-black/10 bg-white text-sm font-medium text-foreground hover:border-primary/20 hover:text-primary"
                           data-testid={`button-view-interest-${interest.id}`}
                         >
                           Voir les détails
@@ -296,14 +282,14 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
                       </Link>
                     )}
                     {interest.status !== "converted" && (
-                      <Button 
-                        variant="destructive" 
-                        size="sm" 
+                      <Button
+                        variant="destructive"
+                        size="sm"
                         onClick={() => setDeleteInterestId(interest.id)}
                         data-testid={`button-cancel-interest-${interest.id}`}
-                        className={isRejected ? 'w-full' : ''}
+                        className={`${isRejected ? 'w-full' : 'rounded-full'}`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="h-4 w-4" />
                         {isRejected && <span className="ml-2">Supprimer</span>}
                       </Button>
                     )}
@@ -315,21 +301,20 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
         </section>
       )}
 
-      {/* Upcoming Trainings */}
       <section className="space-y-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="rounded-2xl border border-accent/30 bg-accent/15 p-3 text-accent shadow-[0_18px_40px_-25px_rgba(0,158,203,0.55)]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary text-foreground">
               <Calendar className="h-5 w-5" />
             </div>
             <div>
-              <p className="section-subtle-title text-accent/60">Sessions validées</p>
-              <h2 className="text-2xl font-semibold text-primary">Formations à venir</h2>
+              <p className="eyebrow text-muted-foreground">Sessions validées</p>
+              <h2 className="text-2xl font-semibold text-foreground">Formations à venir</h2>
             </div>
           </div>
           {upcomingTrainings.length > 0 && (
-            <p className="text-sm text-muted-foreground/80">
-              {upcomingTrainings.length} session{upcomingTrainings.length > 1 ? 's' : ''} planifiée{upcomingTrainings.length > 1 ? 's' : ''} sur votre calendrier.
+            <p className="text-sm text-muted-foreground">
+              {upcomingTrainings.length} session{upcomingTrainings.length > 1 ? "s" : ""} planifiée{upcomingTrainings.length > 1 ? "s" : ""} sur votre calendrier.
             </p>
           )}
         </div>
@@ -337,18 +322,18 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
         {upcomingTrainings.length > 0 ? (
           <div className="grid gap-5 md:grid-cols-2">
             {upcomingTrainings.map((reg) => (
-              <Card key={reg.id} className="glass-panel rounded-2xl border-white/40 p-5 transition-transform duration-300 hover:-translate-y-1">
+              <Card key={reg.id} className="surface-soft p-6 transition-transform duration-300 hover:-translate-y-1">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 space-y-3">
-                    <h3 className="text-lg font-semibold tracking-tight text-primary">{getFormationTitle(reg.formationId)}</h3>
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground/90">
+                    <h3 className="text-lg font-semibold tracking-tight text-foreground">{getFormationTitle(reg.formationId)}</h3>
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
-                        <span>{new Date(getSessionDate(reg.sessionId)).toLocaleDateString('fr-FR')}</span>
+                        <span>{new Date(getSessionDate(reg.sessionId)).toLocaleDateString("fr-FR")}</span>
                       </div>
                       {getSessionLocation(reg.sessionId) && (
                         <div className="flex items-center gap-2">
-                          <span className="inline-flex h-2 w-2 rounded-full bg-accent" />
+                          <span className="inline-flex h-2 w-2 rounded-full bg-primary" />
                           <span>{getSessionLocation(reg.sessionId)}</span>
                         </div>
                       )}
@@ -371,14 +356,14 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
             ))}
           </div>
         ) : (
-          <Card className="glass-panel rounded-[1.75rem] border-white/40 p-12 text-center">
+          <Card className="surface-tonal rounded-[1.75rem] p-12 text-center">
             <div className="flex flex-col items-center gap-4">
-              <div className="rounded-full border border-white/50 bg-white/60 p-5 text-muted-foreground">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm">
                 <Calendar className="h-8 w-8" />
               </div>
               <div className="space-y-2">
-                <p className="font-medium text-primary">Aucune formation à venir</p>
-                <p className="text-sm text-muted-foreground/90">
+                <p className="font-medium text-foreground">Aucune formation à venir</p>
+                <p className="text-sm text-muted-foreground">
                   Explorez notre catalogue pour découvrir de nouvelles opportunités.
                 </p>
               </div>
@@ -387,20 +372,19 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
         )}
       </section>
 
-      {/* Cancelled Trainings (if any) */}
       {cancelledTrainings.length > 0 && (
         <section className="space-y-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="rounded-2xl border border-destructive/30 bg-destructive/15 p-3 text-destructive shadow-[0_18px_35px_-25px_rgba(255,130,0,0.45)]">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
                 <XCircle className="h-5 w-5" />
               </div>
               <div>
-                <p className="section-subtle-title text-destructive/70">Suivi des refus</p>
-                <h2 className="text-2xl font-semibold text-primary">Inscriptions refusées</h2>
+                <p className="eyebrow text-muted-foreground">Suivi des refus</p>
+                <h2 className="text-2xl font-semibold text-foreground">Inscriptions refusées</h2>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground/80">
+            <p className="text-sm text-muted-foreground">
               Identifiez les parcours à reprogrammer ou à re-soumettre à votre manager.
             </p>
           </div>
@@ -421,18 +405,17 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
         </section>
       )}
 
-      {/* Delete Interest Confirmation Dialog */}
       <Dialog open={deleteInterestId !== null} onOpenChange={() => setDeleteInterestId(null)}>
-        <DialogContent className="glass-panel rounded-3xl border-white/40 bg-white/80" data-testid="dialog-confirm-delete-interest">
+        <DialogContent className="surface-soft rounded-3xl border-black/5 bg-white" data-testid="dialog-confirm-delete-interest">
           <DialogHeader>
             <DialogTitle className="text-destructive">Annuler votre intention de formation ?</DialogTitle>
-            <DialogDescription className="text-base pt-2">
-              Êtes-vous sûr de vouloir annuler cette intention de formation ? 
+            <DialogDescription className="pt-2 text-base">
+              Êtes-vous sûr de vouloir annuler cette intention de formation ?
               {deleteInterestId && (() => {
-                const interest = interests.find(i => i.id === deleteInterestId);
+                const interest = interests.find((i) => i.id === deleteInterestId);
                 if (interest && (interest.priority === "P1" || interest.priority === "P2")) {
                   return (
-                    <strong className="block mt-2">
+                    <strong className="mt-2 block">
                       Votre quota {interest.priority} vous sera remboursé.
                     </strong>
                   );
@@ -442,23 +425,23 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setDeleteInterestId(null)}
               disabled={deleteInterestMutation.isPending}
               data-testid="button-cancel-delete-interest"
             >
               Non, garder
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={() => deleteInterestId && deleteInterestMutation.mutate(deleteInterestId)}
               disabled={deleteInterestMutation.isPending}
               data-testid="button-confirm-delete-interest"
             >
               {deleteInterestMutation.isPending ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Annulation...
                 </>
               ) : (
@@ -469,33 +452,32 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
         </DialogContent>
       </Dialog>
 
-      {/* Delete Registration Confirmation Dialog */}
       <Dialog open={deleteRegistrationId !== null} onOpenChange={() => setDeleteRegistrationId(null)}>
-        <DialogContent className="glass-panel rounded-3xl border-white/40 bg-white/80" data-testid="dialog-confirm-delete-registration">
+        <DialogContent className="surface-soft rounded-3xl border-black/5 bg-white" data-testid="dialog-confirm-delete-registration">
           <DialogHeader>
             <DialogTitle className="text-destructive">Annuler votre inscription ?</DialogTitle>
-            <DialogDescription className="text-base pt-2">
+            <DialogDescription className="pt-2 text-base">
               Êtes-vous sûr de vouloir annuler votre inscription à cette session ? Cette action est irréversible.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setDeleteRegistrationId(null)}
               disabled={deleteRegistrationMutation.isPending}
               data-testid="button-cancel-delete-registration"
             >
               Non, garder
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={() => deleteRegistrationId && deleteRegistrationMutation.mutate(deleteRegistrationId)}
               disabled={deleteRegistrationMutation.isPending}
               data-testid="button-confirm-delete-registration"
             >
               {deleteRegistrationMutation.isPending ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Annulation...
                 </>
               ) : (

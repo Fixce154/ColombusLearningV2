@@ -144,23 +144,23 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
   const menuSections = getMenuSections();
 
   return (
-    <Sidebar className="border-r-0 bg-gradient-to-b from-[#031824] via-[#042a3a] to-[#021018] text-white/90 shadow-[0_20px_60px_-35px_rgba(3,24,36,0.9)]">
-      <SidebarHeader className="border-b border-white/10 px-6 py-8">
+    <Sidebar className="border-r border-black/5 bg-white/85 text-foreground backdrop-blur-sm">
+      <SidebarHeader className="border-b border-black/5 px-6 py-8">
         <div className="flex items-center gap-4">
-          <div className="rounded-2xl bg-gradient-to-br from-accent/30 via-accent to-accent/60 p-3 shadow-[0_15px_35px_-20px_rgba(0,158,203,0.75)]">
-            <GraduationCap className="h-7 w-7 text-white" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <GraduationCap className="h-6 w-6" />
           </div>
           <div>
-            <div className="text-sm uppercase tracking-[0.4em] text-white/60">Colombus</div>
-            <div className="text-xl font-semibold text-white">Learning Suite</div>
+            <p className="eyebrow text-muted-foreground">Colombus</p>
+            <p className="text-lg font-semibold tracking-tight">Learning Suite</p>
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent className="px-4 py-8">
+      <SidebarContent className="px-5 py-8">
         {menuSections.map((section, index) => (
           <SidebarGroup key={index} className={index > 0 ? "mt-8" : ""}>
             {section.label && (
-              <SidebarGroupLabel className="mb-3 px-4 text-[0.7rem] uppercase tracking-[0.35em] text-white/50">
+              <SidebarGroupLabel className="eyebrow mb-3 px-3 text-muted-foreground">
                 {section.label}
               </SidebarGroupLabel>
             )}
@@ -173,11 +173,11 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
                       <SidebarMenuButton
                         asChild
                         isActive={isActive}
-                        className="h-12 px-4 rounded-2xl border border-white/5 bg-white/0 text-white/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/10 hover:text-white data-[active=true]:border-white/25 data-[active=true]:bg-white/15 data-[active=true]:text-white"
+                        className="h-12 rounded-2xl border border-transparent px-4 text-sm font-medium text-muted-foreground transition data-[active=true]:border-primary/10 data-[active=true]:bg-primary/10 data-[active=true]:text-primary hover:border-primary/10 hover:bg-primary/5 hover:text-primary"
                       >
                         <Link href={item.url} data-testid={`link-${item.url.slice(1) || "home"}`}>
                           <item.icon className="h-5 w-5" />
-                          <span className="font-medium">{item.title}</span>
+                          <span>{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -190,7 +190,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
         
         {!isInstructor(currentUser.roles) && (
           <SidebarGroup className="mt-8">
-            <SidebarGroupLabel className="mb-3 px-4 text-[0.7rem] uppercase tracking-[0.35em] text-white/50">
+            <SidebarGroupLabel className="eyebrow mb-3 px-3 text-muted-foreground">
               Devenir formateur
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -199,7 +199,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
                   <SidebarMenuButton
                     onClick={() => becomeInstructorMutation.mutate()}
                     disabled={becomeInstructorMutation.isPending}
-                    className="h-12 px-4 rounded-2xl border border-white/10 bg-white/5 text-white hover:-translate-y-0.5 hover:border-white/20 hover:bg-accent/20 hover:text-white"
+                    className="h-12 rounded-2xl border border-primary/10 bg-primary/5 px-4 text-sm font-medium text-primary transition hover:bg-primary/10"
                     data-testid="button-become-instructor"
                   >
                     <Plus className="w-5 h-5" />
@@ -215,7 +215,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
 
         {isInstructor(currentUser.roles) && (
           <SidebarGroup className="mt-8">
-            <SidebarGroupLabel className="mb-3 px-4 text-[0.7rem] uppercase tracking-[0.35em] text-white/50">
+            <SidebarGroupLabel className="eyebrow mb-3 px-3 text-muted-foreground">
               Gérer mon rôle
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -223,7 +223,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => setShowResignDialog(true)}
-                    className="h-12 px-4 rounded-2xl border border-white/10 bg-white/5 text-white hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/15 hover:text-white"
+                    className="h-12 rounded-2xl border border-black/5 bg-white px-4 text-sm font-medium text-muted-foreground transition hover:border-primary/10 hover:bg-primary/5 hover:text-primary"
                     data-testid="button-resign-instructor"
                   >
                     <Minus className="w-5 h-5" />
@@ -235,14 +235,14 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
           </SidebarGroup>
         )}
       </SidebarContent>
-      <SidebarFooter className="border-t border-white/10 px-6 py-8">
-        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-accent/40 text-white font-semibold text-sm">
+      <SidebarFooter className="border-t border-black/5 px-6 py-8">
+        <div className="flex items-center gap-3 rounded-2xl border border-black/5 bg-white px-4 py-3 shadow-sm">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary font-semibold text-sm">
             {currentUser.name.split(' ').map(n => n[0]).join('')}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="truncate text-sm font-semibold text-white">{currentUser.name}</div>
-            <div className="truncate text-xs text-white/70">
+            <div className="truncate text-sm font-semibold text-foreground">{currentUser.name}</div>
+            <div className="truncate text-xs text-muted-foreground">
               {formatRoles(currentUser.roles)}
             </div>
           </div>
@@ -250,7 +250,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
       </SidebarFooter>
 
       <AlertDialog open={showResignDialog} onOpenChange={setShowResignDialog}>
-        <AlertDialogContent className="glass-panel border-white/30 bg-[#041522]/90 text-foreground">
+        <AlertDialogContent className="surface-soft border-black/5 bg-white text-foreground">
           <AlertDialogHeader>
             <AlertDialogTitle>Ne plus être formateur</AlertDialogTitle>
             <AlertDialogDescription>

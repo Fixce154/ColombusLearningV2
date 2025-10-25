@@ -66,30 +66,29 @@ function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
-      <div className="relative flex h-screen w-full overflow-hidden">
-        <div className="pointer-events-none absolute -top-[30%] right-0 h-[70%] w-[65%] rounded-full bg-gradient-to-br from-accent/25 via-transparent to-transparent blur-3xl" />
+      <div className="flex h-screen w-full overflow-hidden">
         <AppSidebar currentUser={user} />
-        <div className="relative flex flex-col flex-1 min-w-0">
-          <header className="px-8 pt-8">
-            <div className="glass-panel relative z-10 flex items-center justify-between gap-6 rounded-3xl px-6 py-5">
-              <div className="flex items-center gap-4">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="px-10 pt-12">
+            <div className="surface-elevated flex items-center justify-between gap-8 px-8 py-6">
+              <div className="flex items-center gap-5">
                 <SidebarTrigger
                   data-testid="button-sidebar-toggle"
-                  className="h-11 w-11 rounded-full border border-white/60 bg-white/80 text-primary shadow-[0_12px_30px_-12px_rgba(0,49,63,0.45)] hover:bg-white"
+                  className="h-11 w-11 rounded-full border border-black/10 bg-white/80 text-foreground shadow-sm transition hover:bg-white"
                 />
                 <div>
-                  <p className="section-subtle-title mb-1">Espace membre</p>
-                  <h1 className="text-lg font-semibold text-primary">Colombus Learning</h1>
+                  <p className="eyebrow mb-1 text-muted-foreground">Espace membre</p>
+                  <h1 className="text-xl font-semibold text-foreground">Colombus Learning</h1>
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <div className="hidden text-right sm:block">
-                  <p className="text-sm font-semibold text-foreground/90">{user.name}</p>
-                  <p className="text-xs text-muted-foreground/80">{formatRoles(user.roles)}</p>
+                  <p className="text-sm font-semibold text-foreground">{user.name}</p>
+                  <p className="text-xs text-muted-foreground">{formatRoles(user.roles)}</p>
                 </div>
                 <button
                   onClick={onLogout}
-                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(0,49,63,0.55)] transition-all hover:shadow-[0_18px_40px_-20px_rgba(0,49,63,0.6)]"
+                  className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-[0_24px_40px_-28px_rgba(10,132,255,0.65)] transition hover:bg-primary/90"
                   data-testid="button-logout"
                 >
                   <LogOut className="h-4 w-4" />
@@ -98,8 +97,8 @@ function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void
               </div>
             </div>
           </header>
-          <main className="relative z-10 flex-1 overflow-auto px-8 pb-12">
-            <div className="mx-auto max-w-7xl space-y-10 pt-10">
+          <main className="flex-1 overflow-auto px-10 pb-14">
+            <div className="mx-auto max-w-7xl space-y-12 pt-12">
               <Router currentUser={user} />
             </div>
           </main>

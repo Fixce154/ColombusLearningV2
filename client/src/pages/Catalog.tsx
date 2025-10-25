@@ -14,12 +14,10 @@ export default function Catalog() {
   const [selectedModalities, setSelectedModalities] = useState<string[]>([]);
   const [selectedSeniority, setSelectedSeniority] = useState<string[]>([]);
 
-  // Fetch formations from API
   const { data: formations = [], isLoading: isLoadingFormations } = useQuery<Formation[]>({
     queryKey: ["/api/formations"],
   });
 
-  // Fetch upcoming sessions from API
   const { data: sessions = [], isLoading: isLoadingSessions } = useQuery<Session[]>({
     queryKey: ["/api/sessions"],
     queryFn: async () => {
@@ -74,9 +72,9 @@ export default function Catalog() {
 
   if (isLoadingFormations || isLoadingSessions) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="space-y-4 text-center">
+          <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
           <p className="text-muted-foreground">Chargement du catalogue...</p>
         </div>
       </div>
@@ -88,41 +86,35 @@ export default function Catalog() {
 
   return (
     <div className="space-y-12">
-      {/* Hero Section */}
-      <section className="glass-panel relative overflow-hidden rounded-[2rem] border-white/40 px-10 py-12 shadow-[0_45px_120px_-70px_rgba(15,28,34,0.55)]">
-        <div className="pointer-events-none absolute -top-20 right-0 h-64 w-64 rounded-full bg-gradient-to-br from-accent/35 via-accent/15 to-transparent blur-3xl" />
-        <div className="relative z-10 flex flex-col gap-10 md:flex-row md:items-center md:justify-between">
-          <div className="max-w-2xl space-y-4">
-            <span className="section-subtle-title text-primary/60">Explorer les programmes</span>
-            <h1 className="text-4xl font-semibold tracking-tight text-primary md:text-5xl">
-              Catalogue des formations
-            </h1>
-            <p className="text-base leading-relaxed text-muted-foreground/90">
+      <section className="surface-elevated relative overflow-hidden rounded-[2rem] px-12 py-14">
+        <div className="pointer-events-none absolute inset-y-8 right-0 hidden w-72 rounded-l-[32px] bg-[radial-gradient(circle_at_center,rgba(10,132,255,0.12),transparent_60%)] md:block" />
+        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-5">
+            <p className="eyebrow text-muted-foreground">Explorer les programmes</p>
+            <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Catalogue des formations</h1>
+            <p className="text-base leading-relaxed text-muted-foreground">
               Trouvez la formation qui répond à vos objectifs et accédez à des parcours conçus par les experts Colombus.
             </p>
           </div>
-          <div className="grid w-full max-w-sm grid-cols-2 gap-3 text-center text-primary">
-            <div className="rounded-2xl border border-white/50 bg-white/60 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-primary/60">Formations actives</p>
-              <p className="mt-2 text-2xl font-semibold">{activeFormations}</p>
+          <div className="grid w-full max-w-sm grid-cols-2 gap-4 text-center text-foreground">
+            <div className="rounded-3xl border border-black/5 bg-white px-5 py-4 shadow-sm">
+              <p className="eyebrow text-muted-foreground">Formations actives</p>
+              <p className="mt-3 text-2xl font-semibold">{activeFormations}</p>
             </div>
-            <div className="rounded-2xl border border-white/50 bg-white/60 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-primary/60">Sessions ouvertes</p>
-              <p className="mt-2 text-2xl font-semibold">{openSessionsCount}</p>
+            <div className="rounded-3xl border border-black/5 bg-white px-5 py-4 shadow-sm">
+              <p className="eyebrow text-muted-foreground">Sessions ouvertes</p>
+              <p className="mt-3 text-2xl font-semibold">{openSessionsCount}</p>
             </div>
-            <div className="col-span-2 rounded-2xl border border-white/40 bg-white/50 px-4 py-4 text-sm text-muted-foreground/80">
+            <div className="col-span-2 rounded-3xl border border-black/5 bg-secondary px-5 py-4 text-sm text-muted-foreground">
               Des modalités présentielles, distancielles et hybrides pour répondre à toutes vos réalités terrain.
             </div>
           </div>
         </div>
       </section>
 
-      {/* Search Bar */}
       <SearchBar value={searchQuery} onChange={setSearchQuery} />
 
-      {/* Main Content Grid */}
-      <div className="grid lg:grid-cols-4 gap-8">
-        {/* Filters Sidebar */}
+      <div className="grid gap-8 lg:grid-cols-4">
         <div className="lg:col-span-1">
           <div className="sticky top-6">
             <FilterPanel
@@ -137,20 +129,18 @@ export default function Catalog() {
           </div>
         </div>
 
-        {/* Training Grid */}
         <div className="lg:col-span-3 space-y-6">
           {filteredFormations.length > 0 ? (
             <>
               <div className="flex items-baseline gap-3">
-                <p className="text-sm font-semibold text-primary">
-                  {filteredFormations.length} formation{filteredFormations.length > 1 ? "s" : ""} trouvée
-                  {filteredFormations.length > 1 ? "s" : ""}
+                <p className="text-sm font-semibold text-foreground">
+                  {filteredFormations.length} formation{filteredFormations.length > 1 ? "s" : ""} trouvée{filteredFormations.length > 1 ? "s" : ""}
                 </p>
                 {(searchQuery || selectedThemes.length > 0 || selectedModalities.length > 0 || selectedSeniority.length > 0) && (
-                  <p className="text-sm text-muted-foreground">sur {formations.filter(f => f.active).length} au total</p>
+                  <p className="text-sm text-muted-foreground">sur {formations.filter((f) => f.active).length} au total</p>
                 )}
               </div>
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid gap-6 md:grid-cols-2">
                 {filteredFormations.map((formation) => (
                   <TrainingCard
                     key={formation.id}
@@ -162,13 +152,13 @@ export default function Catalog() {
               </div>
             </>
           ) : (
-            <div className="text-center py-20">
-              <div className="bg-muted/50 p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-                <BookOpen className="w-12 h-12 text-muted-foreground" />
+            <div className="surface-tonal rounded-[1.75rem] p-16 text-center">
+              <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm">
+                <BookOpen className="h-10 w-10" />
               </div>
-              <h3 className="text-xl font-semibold text-primary mb-2">Aucune formation trouvée</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Essayez de modifier vos filtres ou votre recherche pour découvrir d'autres formations
+              <h3 className="text-xl font-semibold text-foreground mb-2">Aucune formation trouvée</h3>
+              <p className="mx-auto max-w-md text-sm text-muted-foreground">
+                Essayez de modifier vos filtres ou votre recherche pour découvrir d'autres formations.
               </p>
             </div>
           )}
