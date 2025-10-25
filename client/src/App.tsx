@@ -17,6 +17,7 @@ import InstructorAvailability from "@/pages/InstructorAvailability";
 import InstructorSessions from "@/pages/InstructorSessions";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/not-found";
+import DataVisualization from "@/pages/DataVisualization";
 import type { User } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
@@ -47,6 +48,7 @@ function Router({ currentUser }: { currentUser: User }) {
       <Route path="/consultants" component={ConsultantManagement} />
       <Route path="/formations" component={FormationManagement} />
       <Route path="/sessions" component={SessionManagement} />
+      <Route path="/data-visualisation" component={DataVisualization} />
       <Route path="/instructor-formations" component={InstructorFormations} />
       <Route path="/instructor-availability" component={InstructorAvailability} />
       <Route path="/instructor-sessions" component={InstructorSessions} />

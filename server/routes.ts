@@ -1047,13 +1047,285 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
-      
+
       if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
       const registrations = await storage.listAllRegistrations();
       res.json(registrations);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/analytics", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const [usersList, registrations, sessionsList, formationsList, interestsList] = await Promise.all([
+        storage.listUsers(false),
+        storage.listAllRegistrations(),
+        storage.listSessions(),
+        storage.listFormations(false),
+        storage.listFormationInterests(),
+      ]);
+
+      const activeConsultants = usersList.filter((u) => !u.archived && u.roles.includes("consultant"));
+      const sessionMap = new Map(sessionsList.map((session) => [session.id, session]));
+      const formationMap = new Map(formationsList.map((formation) => [formation.id, formation]));
+      const userMap = new Map(usersList.map((item) => [item.id, item]));
+
+      const createEmptyStatusCounts = () => ({
+        pending: 0,
+        validated: 0,
+        completed: 0,
+        cancelled: 0,
+        refused: 0,
+      });
+
+      type StatusCounts = ReturnType<typeof createEmptyStatusCounts>;
+
+      const byConsultant = activeConsultants.map((consultant) => {
+        const consultantRegistrations = registrations.filter((registration) => registration.userId === consultant.id);
+        const consultantRefusedInterests = interestsList.filter(
+          (interest) => interest.userId === consultant.id && interest.status === "rejected",
+        );
+
+        const statusCounts: StatusCounts = createEmptyStatusCounts();
+        consultantRegistrations.forEach((registration) => {
+          if (registration.status in statusCounts) {
+            statusCounts[registration.status as keyof StatusCounts] += 1;
+          }
+        });
+        statusCounts.refused = consultantRefusedInterests.length;
+
+        const completedRegistrations = consultantRegistrations.filter((registration) => registration.status === "completed");
+        const attendedCompleted = completedRegistrations.filter((registration) => registration.attended);
+        const absentCompleted = completedRegistrations.filter((registration) => registration.attended === false);
+
+        let trainingHours = 0;
+        let trainingDays = 0;
+        attendedCompleted.forEach((registration) => {
+          const session = sessionMap.get(registration.sessionId);
+          if (!session) return;
+          const durationMs = Math.max(0, session.endDate.getTime() - session.startDate.getTime());
+          const hours = durationMs / (1000 * 60 * 60);
+          const days = durationMs / (1000 * 60 * 60 * 24);
+          trainingHours += hours;
+          trainingDays += days;
+        });
+
+        const totalForPercentages =
+          statusCounts.completed + statusCounts.cancelled + statusCounts.validated + statusCounts.refused;
+        const statusPercentages = {
+          pending: (() => {
+            const total = totalForPercentages + statusCounts.pending;
+            return total ? Number(((statusCounts.pending / total) * 100).toFixed(2)) : 0;
+          })(),
+          validated: totalForPercentages
+            ? Number(((statusCounts.validated / totalForPercentages) * 100).toFixed(2))
+            : 0,
+          completed: totalForPercentages
+            ? Number(((statusCounts.completed / totalForPercentages) * 100).toFixed(2))
+            : 0,
+          cancelled: totalForPercentages
+            ? Number(((statusCounts.cancelled / totalForPercentages) * 100).toFixed(2))
+            : 0,
+          refused: totalForPercentages
+            ? Number(((statusCounts.refused / totalForPercentages) * 100).toFixed(2))
+            : 0,
+        } satisfies Record<keyof StatusCounts, number>;
+
+        return {
+          userId: consultant.id,
+          name: consultant.name,
+          email: consultant.email,
+          seniority: consultant.seniority || null,
+          businessUnit: consultant.businessUnit || null,
+          statusCounts,
+          statusPercentages,
+          absenteeismRate: completedRegistrations.length
+            ? Number(((absentCompleted.length / completedRegistrations.length) * 100).toFixed(2))
+            : 0,
+          evaluationRate: completedRegistrations.length
+            ? Number(((attendedCompleted.length / completedRegistrations.length) * 100).toFixed(2))
+            : 0,
+          totalTrainingHours: Number(trainingHours.toFixed(2)),
+          totalTrainingDays: Number(trainingDays.toFixed(2)),
+          refusedDetails: consultantRefusedInterests.map((interest) => ({
+            interestId: interest.id,
+            formationId: interest.formationId,
+            formationTitle: formationMap.get(interest.formationId)?.title || "Formation inconnue",
+            expressedAt: interest.expressedAt ? interest.expressedAt.toISOString() : null,
+          })),
+        };
+      });
+
+      const summaryStatusCounts = byConsultant.reduce<StatusCounts>((acc, consultant) => {
+        acc.pending += consultant.statusCounts.pending;
+        acc.validated += consultant.statusCounts.validated;
+        acc.completed += consultant.statusCounts.completed;
+        acc.cancelled += consultant.statusCounts.cancelled;
+        acc.refused += consultant.statusCounts.refused;
+        return acc;
+      }, createEmptyStatusCounts());
+
+      const completedRegistrationsGlobal = registrations.filter((registration) => registration.status === "completed");
+      const globalAttended = completedRegistrationsGlobal.filter((registration) => registration.attended).length;
+      const globalAbsent = completedRegistrationsGlobal.filter((registration) => registration.attended === false).length;
+      const globalCompleted = completedRegistrationsGlobal.length;
+      const globalTrainingHours = byConsultant.reduce((total, consultant) => total + consultant.totalTrainingHours, 0);
+      const globalTrainingDays = byConsultant.reduce((total, consultant) => total + consultant.totalTrainingDays, 0);
+
+      const totalForPercentages =
+        summaryStatusCounts.completed +
+        summaryStatusCounts.cancelled +
+        summaryStatusCounts.validated +
+        summaryStatusCounts.refused;
+
+      const summaryPercentages = {
+        pending: (() => {
+          const total = totalForPercentages + summaryStatusCounts.pending;
+          return total ? Number(((summaryStatusCounts.pending / total) * 100).toFixed(2)) : 0;
+        })(),
+        validated: totalForPercentages
+          ? Number(((summaryStatusCounts.validated / totalForPercentages) * 100).toFixed(2))
+          : 0,
+        completed: totalForPercentages
+          ? Number(((summaryStatusCounts.completed / totalForPercentages) * 100).toFixed(2))
+          : 0,
+        cancelled: totalForPercentages
+          ? Number(((summaryStatusCounts.cancelled / totalForPercentages) * 100).toFixed(2))
+          : 0,
+        refused: totalForPercentages
+          ? Number(((summaryStatusCounts.refused / totalForPercentages) * 100).toFixed(2))
+          : 0,
+      } satisfies Record<keyof StatusCounts, number>;
+
+      const timeline = registrations.map((registration) => {
+        const session = sessionMap.get(registration.sessionId);
+        const formation = formationMap.get(registration.formationId);
+        const consultant = userMap.get(registration.userId);
+        const durationMs = session ? Math.max(0, session.endDate.getTime() - session.startDate.getTime()) : 0;
+
+        return {
+          recordType: "registration" as const,
+          id: registration.id,
+          consultantId: registration.userId,
+          consultantName: consultant?.name || "Consultant inconnu",
+          formationId: registration.formationId,
+          formationTitle: formation?.title || "Formation inconnue",
+          sessionId: registration.sessionId,
+          sessionStartDate: session ? session.startDate.toISOString() : null,
+          sessionEndDate: session ? session.endDate.toISOString() : null,
+          status: registration.status,
+          attended: registration.attended,
+          priority: registration.priority,
+          durationHours: Number((durationMs / (1000 * 60 * 60)).toFixed(2)),
+          durationDays: Number((durationMs / (1000 * 60 * 60 * 24)).toFixed(2)),
+          seniority: consultant?.seniority || null,
+          businessUnit: consultant?.businessUnit || null,
+        };
+      });
+
+      const refusedTimelineEntries = interestsList
+        .filter((interest) => interest.status === "rejected")
+        .map((interest) => {
+          const consultant = userMap.get(interest.userId);
+          const formation = formationMap.get(interest.formationId);
+          return {
+            recordType: "interest" as const,
+            id: interest.id,
+            consultantId: interest.userId,
+            consultantName: consultant?.name || "Consultant inconnu",
+            formationId: interest.formationId,
+            formationTitle: formation?.title || "Formation inconnue",
+            sessionId: null,
+            sessionStartDate: interest.expressedAt ? interest.expressedAt.toISOString() : null,
+            sessionEndDate: null,
+            status: "refused" as const,
+            attended: null,
+            priority: interest.priority,
+            durationHours: 0,
+            durationDays: 0,
+            seniority: consultant?.seniority || null,
+            businessUnit: consultant?.businessUnit || null,
+          };
+        });
+
+      const seniorityAggregates = new Map<
+        string,
+        {
+          seniority: string;
+          totalRegistrations: number;
+          completedCount: number;
+          refusedCount: number;
+          totalTrainingHours: number;
+          totalTrainingDays: number;
+          consultantIds: Set<string>;
+        }
+      >();
+
+      byConsultant.forEach((consultant) => {
+        const key = consultant.seniority || "Non renseignée";
+        if (!seniorityAggregates.has(key)) {
+          seniorityAggregates.set(key, {
+            seniority: key,
+            totalRegistrations: 0,
+            completedCount: 0,
+            refusedCount: 0,
+            totalTrainingHours: 0,
+            totalTrainingDays: 0,
+            consultantIds: new Set<string>(),
+          });
+        }
+        const aggregate = seniorityAggregates.get(key)!;
+        aggregate.consultantIds.add(consultant.userId);
+        aggregate.totalRegistrations +=
+          consultant.statusCounts.pending +
+          consultant.statusCounts.validated +
+          consultant.statusCounts.completed +
+          consultant.statusCounts.cancelled;
+        aggregate.completedCount += consultant.statusCounts.completed;
+        aggregate.refusedCount += consultant.statusCounts.refused;
+        aggregate.totalTrainingHours += consultant.totalTrainingHours;
+        aggregate.totalTrainingDays += consultant.totalTrainingDays;
+      });
+
+      res.json({
+        summary: {
+          totalConsultants: activeConsultants.length,
+          totalRegistrations: registrations.length,
+          statusCounts: summaryStatusCounts,
+          statusPercentages: summaryPercentages,
+          absenteeismRate: globalCompleted
+            ? Number(((globalAbsent / globalCompleted) * 100).toFixed(2))
+            : 0,
+          evaluationRate: globalCompleted
+            ? Number(((globalAttended / globalCompleted) * 100).toFixed(2))
+            : 0,
+          totalTrainingHours: Number(globalTrainingHours.toFixed(2)),
+          totalTrainingDays: Number(globalTrainingDays.toFixed(2)),
+          lastUpdated: new Date().toISOString(),
+        },
+        byConsultant,
+        bySeniority: Array.from(seniorityAggregates.values()).map((aggregate) => ({
+          seniority: aggregate.seniority,
+          totalRegistrations: aggregate.totalRegistrations,
+          completedCount: aggregate.completedCount,
+          refusedCount: aggregate.refusedCount,
+          totalTrainingHours: Number(aggregate.totalTrainingHours.toFixed(2)),
+          totalTrainingDays: Number(aggregate.totalTrainingDays.toFixed(2)),
+          uniqueConsultants: aggregate.consultantIds.size,
+        })),
+        timeline: [...timeline, ...refusedTimelineEntries],
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
