@@ -651,6 +651,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get a managed user details with assigned formations (RH only)
+  app.get("/api/admin/users/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Get assigned formations for this instructor
+      const formationIds = await storage.getInstructorFormations(req.params.id);
+
+      const { password, ...userWithoutPassword } = targetUser;
+      res.json({ user: { ...userWithoutPassword, formationIds } });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update a managed user (RH only)
+  app.patch("/api/admin/users/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Extract formationIds if present (for external instructors)
+      const { formationIds, ...updateData } = req.body;
+
+      // Update user basic info
+      const updatedUser = await storage.updateUser(req.params.id, updateData);
+
+      if (!updatedUser) {
+        return res.status(500).json({ message: "Failed to update user" });
+      }
+
+      // If formationIds is provided, update instructor formations
+      if (formationIds !== undefined && Array.isArray(formationIds)) {
+        await storage.replaceInstructorFormations(req.params.id, formationIds);
+      }
+
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json({ user: userWithoutPassword });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Données invalides", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Formation Routes
   app.get("/api/formations", optionalAuth, async (req, res) => {
     try {

@@ -104,7 +104,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     { email: "marie.dupont@colombus.fr", role: "Consultant", password: "password" },
     { email: "sophie.martin@colombus.fr", role: "RH", password: "password" },
     { email: "pierre.bernard@colombus.fr", role: "Formateur interne", password: "password" },
-    { email: "claire.leroux@colombus.fr", role: "Formateur externe", password: "password" },
+    { email: "formateur.externe@formateur.com", role: "Formateur externe", password: "Formator" },
     { email: "jean.dubois@colombus.fr", role: "Manager", password: "password" },
   ];
 
