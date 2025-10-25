@@ -122,6 +122,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
           { title: "Sessions", url: "/sessions", icon: Calendar },
           { title: "Intentions", url: "/interests", icon: Heart },
           { title: "Consultants", url: "/consultants", icon: Users },
+          { title: "Data visualisation", url: "/data-visualisation", icon: BarChart },
         ],
       });
     }
