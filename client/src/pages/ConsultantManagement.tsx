@@ -37,6 +37,7 @@ import PriorityBadge from "@/components/PriorityBadge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import CreateExternalInstructorDialog from "@/components/CreateExternalInstructorDialog";
+import EditExternalInstructorDialog from "@/components/EditExternalInstructorDialog";
 
 export default function ConsultantManagement() {
   const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
@@ -622,6 +623,14 @@ export default function ConsultantManagement() {
         <CreateExternalInstructorDialog
           open={showCreateExternalInstructor}
           onOpenChange={setShowCreateExternalInstructor}
+        />
+
+        <EditExternalInstructorDialog
+          userId={editExternalInstructorId}
+          open={editExternalInstructorId !== null}
+          onOpenChange={(open) => {
+            if (!open) setEditExternalInstructorId(null);
+          }}
         />
 
         {/* Delete Confirmation Dialog */}
