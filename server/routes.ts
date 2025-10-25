@@ -496,22 +496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .nonempty("Au moins un rôle est requis"),
     businessUnit: z.string().optional(),
     seniority: z.string().optional(),
-    formationIds: z.array(z.string().min(1)).optional(),
   });
-
-  const updateManagedUserSchema = z
-    .object({
-      name: z.string().min(1, "Le nom est requis").optional(),
-      email: z.string().email("Email invalide").optional(),
-      password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères").optional(),
-      roles: z.array(z.enum(USER_ROLES)).nonempty("Au moins un rôle est requis").optional(),
-      businessUnit: z.string().optional().nullable(),
-      seniority: z.string().optional().nullable(),
-      formationIds: z.array(z.string().min(1)).optional(),
-    })
-    .refine((data) => Object.keys(data).length > 0, {
-      message: "Aucune donnée fournie pour la mise à jour",
-    });
 
   // Get all users (RH only)
   app.get("/api/users", requireAuth, async (req, res) => {
@@ -546,16 +531,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const parsed = createManagedUserSchema.parse(req.body);
 
-      const { formationIds = [], ...userInput } = parsed;
-
-      const existingUser = await storage.getUserByEmail(userInput.email);
+      const existingUser = await storage.getUserByEmail(parsed.email);
       if (existingUser) {
         return res.status(409).json({ message: "Un utilisateur avec cet email existe déjà" });
       }
 
       const normalizedRoles = Array.from(
         new Set(
-          userInput.roles.flatMap((role) => {
+          parsed.roles.flatMap((role) => {
             if (role === "rh" || role === "manager") {
               return [role, "consultant"] as const;
             }
@@ -564,199 +547,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
       );
 
-      const hasInstructorRole = normalizedRoles.some((role) =>
-        INSTRUCTOR_ROLES.includes(role as InstructorRole)
-      );
-
-      if (!hasInstructorRole && formationIds.length > 0) {
-        return res.status(400).json({
-          message: "Seuls les formateurs peuvent avoir des formations assignées",
-        });
-      }
-
-      if (
-        normalizedRoles.includes("formateur_externe") &&
-        formationIds.length === 0
-      ) {
-        return res.status(400).json({
-          message: "Veuillez sélectionner au moins une formation pour le formateur externe",
-        });
-      }
-
-      if (formationIds.length > 0) {
-        const formations = await Promise.all(
-          formationIds.map((id) => storage.getFormation(id))
-        );
-        if (formations.some((formation) => !formation)) {
-          return res.status(400).json({ message: "Certaines formations sont introuvables" });
-        }
-      }
-
       const createdUser = await storage.createUser({
-        name: userInput.name,
-        email: userInput.email,
-        password: userInput.password,
+        name: parsed.name,
+        email: parsed.email,
+        password: parsed.password,
         roles: normalizedRoles,
-        businessUnit: userInput.businessUnit,
-        seniority: userInput.seniority,
+        businessUnit: parsed.businessUnit,
+        seniority: parsed.seniority,
         archived: false,
         p1Used: 0,
         p2Used: 0,
       });
 
-      if (hasInstructorRole && formationIds.length > 0) {
-        await storage.replaceInstructorFormations(createdUser.id, formationIds);
-      }
-
       const { password: _, ...userWithoutPassword } = createdUser;
       res.status(201).json({ user: userWithoutPassword });
-    } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Données invalides", errors: error.errors });
-      }
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Retrieve a managed user (RH only)
-  app.get("/api/admin/users/:id", requireAuth, async (req, res) => {
-    try {
-      const requesterId = (req as AuthRequest).userId!;
-      const requester = await storage.getUser(requesterId);
-
-      if (!requester || !requester.roles.includes("rh")) {
-        return res.status(403).json({ message: "Unauthorized" });
-      }
-
-      const targetUser = await storage.getUser(req.params.id);
-      if (!targetUser) {
-        return res.status(404).json({ message: "Utilisateur introuvable" });
-      }
-
-      const instructorFormations = isInstructor(targetUser.roles)
-        ? await storage.getInstructorFormations(targetUser.id)
-        : [];
-
-      const { password: _, ...userWithoutPassword } = targetUser;
-      res.json({ user: { ...userWithoutPassword, formationIds: instructorFormations } });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Update a managed user (RH only)
-  app.patch("/api/admin/users/:id", requireAuth, async (req, res) => {
-    try {
-      const requesterId = (req as AuthRequest).userId!;
-      const requester = await storage.getUser(requesterId);
-
-      if (!requester || !requester.roles.includes("rh")) {
-        return res.status(403).json({ message: "Unauthorized" });
-      }
-
-      const targetUser = await storage.getUser(req.params.id);
-      if (!targetUser) {
-        return res.status(404).json({ message: "Utilisateur introuvable" });
-      }
-
-      const parsed = updateManagedUserSchema.parse(req.body);
-
-      const { formationIds, roles, ...updates } = parsed;
-
-      if (updates.email && updates.email !== targetUser.email) {
-        const existingByEmail = await storage.getUserByEmail(updates.email);
-        if (existingByEmail && existingByEmail.id !== targetUser.id) {
-          return res.status(409).json({ message: "Un utilisateur avec cet email existe déjà" });
-        }
-      }
-
-      const rolesToApply = roles ? roles : targetUser.roles;
-      const normalizedRoles = Array.from(
-        new Set(
-          rolesToApply.flatMap((role) => {
-            if (role === "rh" || role === "manager") {
-              return [role, "consultant"] as const;
-            }
-            return [role];
-          })
-        )
-      );
-
-      const desiredFormationIds =
-        formationIds !== undefined ? Array.from(new Set(formationIds)) : undefined;
-
-      const currentAssignments = isInstructor(targetUser.roles)
-        ? await storage.getInstructorFormations(targetUser.id)
-        : [];
-
-      const futureAssignments =
-        desiredFormationIds !== undefined ? desiredFormationIds : currentAssignments;
-
-      const hasInstructorRole = normalizedRoles.some((role) =>
-        INSTRUCTOR_ROLES.includes(role as InstructorRole)
-      );
-
-      if (!hasInstructorRole && desiredFormationIds && desiredFormationIds.length > 0) {
-        return res.status(400).json({
-          message: "Seuls les formateurs peuvent avoir des formations assignées",
-        });
-      }
-
-      if (
-        desiredFormationIds &&
-        desiredFormationIds.length > 0
-      ) {
-        const formations = await Promise.all(
-          desiredFormationIds.map((id) => storage.getFormation(id))
-        );
-        if (formations.some((formation) => !formation)) {
-          return res.status(400).json({ message: "Certaines formations sont introuvables" });
-        }
-      }
-
-      if (normalizedRoles.includes("formateur_externe")) {
-        if (futureAssignments.length === 0 && (!desiredFormationIds || desiredFormationIds.length === 0)) {
-          return res.status(400).json({
-            message: "Un formateur externe doit animer au moins une formation",
-          });
-        }
-      }
-
-      const updatePayload: Partial<InsertUser> = {};
-
-      if (updates.name !== undefined) updatePayload.name = updates.name;
-      if (updates.email !== undefined) updatePayload.email = updates.email;
-      if (updates.password !== undefined) updatePayload.password = updates.password;
-      if (updates.businessUnit !== undefined) {
-        updatePayload.businessUnit = updates.businessUnit ?? null;
-      }
-      if (updates.seniority !== undefined) {
-        updatePayload.seniority = updates.seniority ?? null;
-      }
-      if (roles) {
-        updatePayload.roles = normalizedRoles;
-      }
-
-      const updatedUser = await storage.updateUser(targetUser.id, updatePayload);
-      if (!updatedUser) {
-        return res.status(500).json({ message: "Impossible de mettre à jour l'utilisateur" });
-      }
-
-      const shouldUpdateFormations = desiredFormationIds !== undefined || !hasInstructorRole;
-
-      if (shouldUpdateFormations) {
-        const formationIdsToApply = hasInstructorRole
-          ? desiredFormationIds ?? futureAssignments
-          : [];
-        await storage.replaceInstructorFormations(targetUser.id, formationIdsToApply);
-      }
-
-      const { password: _, ...userWithoutPassword } = updatedUser;
-      const responseFormationIds = hasInstructorRole
-        ? await storage.getInstructorFormations(targetUser.id)
-        : [];
-
-      res.json({ user: { ...userWithoutPassword, formationIds: responseFormationIds } });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Données invalides", errors: error.errors });

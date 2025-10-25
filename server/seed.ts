@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, formations, sessions, registrations, instructorFormations } from "@shared/schema";
+import { users, formations, sessions, registrations } from "@shared/schema";
 import { isInstructor } from "@shared/roles";
 import { sql } from "drizzle-orm";
 

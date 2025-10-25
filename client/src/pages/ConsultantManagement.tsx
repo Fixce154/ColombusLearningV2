@@ -30,14 +30,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Loader2, ChevronDown, ChevronRight, Heart, UserCheck, Calendar, Award, Archive, Trash2, UserPlus } from "lucide-react";
-import type { User, FormationInterest, Registration, Formation, Session, InstructorFormation } from "@shared/schema";
+import type { User, FormationInterest, Registration, Formation, Session } from "@shared/schema";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PriorityBadge from "@/components/PriorityBadge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import CreateExternalInstructorDialog from "@/components/CreateExternalInstructorDialog";
-import EditExternalInstructorDialog from "@/components/EditExternalInstructorDialog";
 
 export default function ConsultantManagement() {
   const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
@@ -46,7 +45,6 @@ export default function ConsultantManagement() {
   const [archiveDialogUser, setArchiveDialogUser] = useState<User | null>(null);
   const [deleteDialogUser, setDeleteDialogUser] = useState<User | null>(null);
   const [showCreateExternalInstructor, setShowCreateExternalInstructor] = useState(false);
-  const [editExternalInstructorId, setEditExternalInstructorId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: activeUsers = [], isLoading: isLoadingActiveUsers } = useQuery<User[]>({
@@ -623,16 +621,6 @@ export default function ConsultantManagement() {
         <CreateExternalInstructorDialog
           open={showCreateExternalInstructor}
           onOpenChange={setShowCreateExternalInstructor}
-        />
-
-        <EditExternalInstructorDialog
-          userId={editExternalInstructorId}
-          open={!!editExternalInstructorId}
-          onOpenChange={(open) => {
-            if (!open) {
-              setEditExternalInstructorId(null);
-            }
-          }}
         />
 
         {/* Delete Confirmation Dialog */}
