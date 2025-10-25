@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { users, formations, sessions, registrations } from "@shared/schema";
+import { isInstructor } from "@shared/roles";
 import { sql } from "drizzle-orm";
 
 async function seed() {
@@ -43,6 +44,16 @@ async function seed() {
         roles: ["formateur"],
         seniority: "expert",
         businessUnit: "Formation",
+        p1Used: 0,
+        p2Used: 0,
+      },
+      {
+        email: "claire.leroux@colombus.fr",
+        password: "password",
+        name: "Claire Leroux",
+        roles: ["formateur_externe"],
+        seniority: "senior",
+        businessUnit: "Partenaire externe",
         p1Used: 0,
         p2Used: 0,
       },
@@ -178,7 +189,7 @@ async function seed() {
             ? "Visio Teams"
             : `Salle ${String.fromCharCode(65 + i)}`,
         capacity: Math.floor(Math.random() * 5) + 10, // 10-15 participants
-        instructorId: createdUsers.find((u) => u.roles.includes("formateur"))?.id,
+        instructorId: createdUsers.find((u) => isInstructor(u.roles))?.id,
         status: "open",
       });
     }

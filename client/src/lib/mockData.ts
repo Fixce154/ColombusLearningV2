@@ -12,6 +12,7 @@ export const mockUsers: User[] = [
     businessUnit: "Digital",
     p1Used: 0,
     p2Used: 1,
+    archived: false,
   },
   {
     id: "2",
@@ -23,6 +24,7 @@ export const mockUsers: User[] = [
     businessUnit: "RH",
     p1Used: 0,
     p2Used: 0,
+    archived: false,
   },
   {
     id: "3",
@@ -34,6 +36,19 @@ export const mockUsers: User[] = [
     businessUnit: "Tech",
     p1Used: 0,
     p2Used: 0,
+    archived: false,
+  },
+  {
+    id: "5",
+    email: "claire.leroux@colombus.com",
+    password: "demo",
+    name: "Claire Leroux",
+    roles: ["formateur_externe"],
+    seniority: "senior",
+    businessUnit: "Partenaire externe",
+    p1Used: 0,
+    p2Used: 0,
+    archived: false,
   },
   {
     id: "4",
@@ -45,6 +60,7 @@ export const mockUsers: User[] = [
     businessUnit: "Consulting",
     p1Used: 0,
     p2Used: 0,
+    archived: false,
   },
 ];
 

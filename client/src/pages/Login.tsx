@@ -103,7 +103,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const demoAccounts = [
     { email: "marie.dupont@colombus.fr", role: "Consultant", password: "password" },
     { email: "sophie.martin@colombus.fr", role: "RH", password: "password" },
-    { email: "pierre.bernard@colombus.fr", role: "Formateur", password: "password" },
+    { email: "pierre.bernard@colombus.fr", role: "Formateur interne", password: "password" },
+    { email: "claire.leroux@colombus.fr", role: "Formateur externe", password: "password" },
     { email: "jean.dubois@colombus.fr", role: "Manager", password: "password" },
   ];
 
@@ -297,9 +298,9 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="consultant">Consultant</SelectItem>
-                            <SelectItem value="rh">Ressources Humaines</SelectItem>
-                            <SelectItem value="formateur">Formateur</SelectItem>
-                            <SelectItem value="manager">Manager</SelectItem>
+                              <SelectItem value="rh">Ressources Humaines</SelectItem>
+                              <SelectItem value="formateur">Formateur interne</SelectItem>
+                              <SelectItem value="manager">Manager</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
