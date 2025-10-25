@@ -1,5 +1,6 @@
 import { db } from "./db";
-import { users, formations, sessions, registrations } from "@shared/schema";
+import { users, formations, sessions, registrations, instructorFormations } from "@shared/schema";
+import { isInstructor } from "@shared/roles";
 import { sql } from "drizzle-orm";
 
 async function seed() {
@@ -47,6 +48,16 @@ async function seed() {
         p2Used: 0,
       },
       {
+        email: "claire.leroux@colombus.fr",
+        password: "password",
+        name: "Claire Leroux",
+        roles: ["formateur_externe"],
+        seniority: "senior",
+        businessUnit: "Partenaire externe",
+        p1Used: 0,
+        p2Used: 0,
+      },
+      {
         email: "jean.dubois@colombus.fr",
         password: "password",
         name: "Jean Dubois",
@@ -59,6 +70,9 @@ async function seed() {
     ])
     .returning();
   console.log(`✓ Created ${createdUsers.length} users`);
+
+  const pierreBernard = createdUsers.find((user) => user.email === "pierre.bernard@colombus.fr");
+  const claireLeroux = createdUsers.find((user) => user.email === "claire.leroux@colombus.fr");
 
   // Create formations
   const createdFormations = await db
@@ -152,6 +166,31 @@ async function seed() {
     .returning();
   console.log(`✓ Created ${createdFormations.length} formations`);
 
+  if (pierreBernard || claireLeroux) {
+    const assignments = [] as { instructorId: string; formationId: string }[];
+    if (pierreBernard) {
+      assignments.push(
+        ...createdFormations.slice(0, 3).map((formation) => ({
+          instructorId: pierreBernard.id,
+          formationId: formation.id,
+        }))
+      );
+    }
+    if (claireLeroux) {
+      assignments.push(
+        ...createdFormations.slice(2, 5).map((formation) => ({
+          instructorId: claireLeroux.id,
+          formationId: formation.id,
+        }))
+      );
+    }
+
+    if (assignments.length > 0) {
+      await db.insert(instructorFormations).values(assignments).onConflictDoNothing();
+      console.log(`✓ Assigned ${assignments.length} instructor formations`);
+    }
+  }
+
   // Create sessions
   const now = new Date();
   const in2Weeks = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
@@ -178,7 +217,7 @@ async function seed() {
             ? "Visio Teams"
             : `Salle ${String.fromCharCode(65 + i)}`,
         capacity: Math.floor(Math.random() * 5) + 10, // 10-15 participants
-        instructorId: createdUsers.find((u) => u.roles.includes("formateur"))?.id,
+        instructorId: createdUsers.find((u) => isInstructor(u.roles))?.id,
         status: "open",
       });
     }

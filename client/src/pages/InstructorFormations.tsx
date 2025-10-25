@@ -1,14 +1,19 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import type { Formation } from "@shared/schema";
+import type { Formation, User } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BookOpen, Clock, MapPin, Plus, X } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function InstructorFormations() {
   const { toast } = useToast();
+
+  const { data: currentUserData, isLoading: isLoadingCurrentUser } = useQuery<{ user: User }>({
+    queryKey: ["/api/auth/me"],
+  });
 
   // Fetch all formations
   const { data: allFormations = [], isLoading: isLoadingFormations } = useQuery<Formation[]>({
@@ -62,7 +67,7 @@ export default function InstructorFormations() {
     },
   });
 
-  const isLoading = isLoadingFormations || isLoadingMyFormations;
+  const isLoading = isLoadingFormations || isLoadingMyFormations || isLoadingCurrentUser;
 
   if (isLoading) {
     return (
@@ -72,10 +77,15 @@ export default function InstructorFormations() {
     );
   }
 
+  const isExternalInstructor = currentUserData?.user.roles.includes("formateur_externe") ?? false;
+  const allowSelfManagement = currentUserData ? !isExternalInstructor : false;
+
   // Filter formations into two lists
   const validMyFormationIds = Array.isArray(myFormationIds) ? myFormationIds : [];
   const myFormations = allFormations.filter(f => validMyFormationIds.includes(f.id));
-  const availableFormations = allFormations.filter(f => !validMyFormationIds.includes(f.id));
+  const availableFormations = allowSelfManagement
+    ? allFormations.filter(f => !validMyFormationIds.includes(f.id))
+    : [];
 
   const FormationCard = ({ 
     formation, 
@@ -169,7 +179,9 @@ export default function InstructorFormations() {
                 Vous n'animez aucune formation pour le moment.
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Sélectionnez des formations dans le catalogue ci-dessous.
+                {allowSelfManagement
+                  ? "Sélectionnez des formations dans le catalogue ci-dessous."
+                  : "Contactez l'équipe RH pour mettre à jour vos formations animées."}
               </p>
             </CardContent>
           </Card>
@@ -180,7 +192,7 @@ export default function InstructorFormations() {
                 key={formation.id}
                 formation={formation}
                 isSelected={true}
-                onRemove={(id) => removeFormationMutation.mutate(id)}
+                onRemove={allowSelfManagement ? (id) => removeFormationMutation.mutate(id) : undefined}
               />
             ))}
           </div>
@@ -192,16 +204,27 @@ export default function InstructorFormations() {
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-foreground mb-2">Catalogue des formations</h2>
           <p className="text-muted-foreground">
-            Sélectionnez les formations que vous souhaitez animer
+            {allowSelfManagement
+              ? "Sélectionnez les formations que vous souhaitez animer"
+              : "Les formations animées sont assignées par l'équipe RH."}
           </p>
         </div>
 
-        {availableFormations.length === 0 ? (
+        {!allowSelfManagement ? (
+          <Alert>
+            <AlertDescription>
+              Les formateurs externes ne peuvent pas modifier leur catalogue. Veuillez contacter l'équipe RH pour toute
+              évolution.
+            </AlertDescription>
+          </Alert>
+        ) : availableFormations.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">
               <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
               <p className="text-muted-foreground">
-                Toutes les formations disponibles ont été ajoutées à votre liste.
+                {myFormations.length === allFormations.length
+                  ? "Vous animez déjà toutes les formations disponibles."
+                  : "Aucune formation supplémentaire disponible pour le moment."}
               </p>
             </CardContent>
           </Card>

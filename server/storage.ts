@@ -23,7 +23,7 @@ import {
   type InsertInstructorAvailability,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, sql, desc, asc, ne } from "drizzle-orm";
+import { eq, and, sql, desc, asc, ne, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -71,6 +71,7 @@ export interface IStorage {
   addInstructorFormation(instructorId: string, formationId: string): Promise<InstructorFormation>;
   removeInstructorFormation(instructorId: string, formationId: string): Promise<boolean>;
   getAllInstructorFormations(): Promise<InstructorFormation[]>;
+  replaceInstructorFormations(instructorId: string, formationIds: string[]): Promise<string[]>;
 
   // Instructor Availability methods
   getInstructorAvailability(instructorId: string, formationId: string): Promise<InstructorAvailability | undefined>;
@@ -374,6 +375,56 @@ export class DatabaseStorage implements IStorage {
 
   async getAllInstructorFormations(): Promise<InstructorFormation[]> {
     return await db.select().from(instructorFormations);
+  }
+
+  async replaceInstructorFormations(
+    instructorId: string,
+    formationIds: string[]
+  ): Promise<string[]> {
+    const uniqueFormationIds = Array.from(new Set(formationIds));
+    const existingFormationIds = await this.getInstructorFormations(instructorId);
+
+    const formationsToRemove = existingFormationIds.filter(
+      (id) => !uniqueFormationIds.includes(id)
+    );
+
+    if (formationsToRemove.length > 0) {
+      await db
+        .delete(instructorFormations)
+        .where(
+          and(
+            eq(instructorFormations.instructorId, instructorId),
+            inArray(instructorFormations.formationId, formationsToRemove)
+          )
+        );
+
+      await db
+        .delete(instructorAvailabilities)
+        .where(
+          and(
+            eq(instructorAvailabilities.instructorId, instructorId),
+            inArray(instructorAvailabilities.formationId, formationsToRemove)
+          )
+        );
+    }
+
+    const formationsToAdd = uniqueFormationIds.filter(
+      (id) => !existingFormationIds.includes(id)
+    );
+
+    if (formationsToAdd.length > 0) {
+      await db
+        .insert(instructorFormations)
+        .values(
+          formationsToAdd.map((formationId) => ({
+            instructorId,
+            formationId,
+          }))
+        )
+        .onConflictDoNothing();
+    }
+
+    return uniqueFormationIds;
   }
 
   // Instructor Availability methods

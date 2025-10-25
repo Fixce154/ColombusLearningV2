@@ -1,4 +1,4 @@
-import { useState, Fragment } from "react";
+import { useState, Fragment, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,13 +29,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Loader2, ChevronDown, ChevronRight, Heart, UserCheck, Calendar, Award, Archive, Trash2 } from "lucide-react";
-import type { User, FormationInterest, Registration, Formation, Session } from "@shared/schema";
+import { Users, Loader2, ChevronDown, ChevronRight, Heart, UserCheck, Calendar, Award, Archive, Trash2, UserPlus } from "lucide-react";
+import type { User, FormationInterest, Registration, Formation, Session, InstructorFormation } from "@shared/schema";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PriorityBadge from "@/components/PriorityBadge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import CreateExternalInstructorDialog from "@/components/CreateExternalInstructorDialog";
+import EditExternalInstructorDialog from "@/components/EditExternalInstructorDialog";
 
 export default function ConsultantManagement() {
   const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
@@ -43,6 +45,8 @@ export default function ConsultantManagement() {
   const [selectedConsultant, setSelectedConsultant] = useState<User | null>(null);
   const [archiveDialogUser, setArchiveDialogUser] = useState<User | null>(null);
   const [deleteDialogUser, setDeleteDialogUser] = useState<User | null>(null);
+  const [showCreateExternalInstructor, setShowCreateExternalInstructor] = useState(false);
+  const [editExternalInstructorId, setEditExternalInstructorId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: activeUsers = [], isLoading: isLoadingActiveUsers } = useQuery<User[]>({
@@ -90,6 +94,15 @@ export default function ConsultantManagement() {
     queryKey: ["/api/sessions"],
   });
 
+  const { data: instructorFormations = [], isLoading: isLoadingAssignments } = useQuery<InstructorFormation[]>({
+    queryKey: ["/api/admin/instructor-formations"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/instructor-formations", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch instructor formations");
+      return res.json();
+    },
+  });
+
   const archiveMutation = useMutation({
     mutationFn: async (userId: string) => {
       return apiRequest(`/api/users/${userId}/archive`, "PATCH");
@@ -135,8 +148,31 @@ export default function ConsultantManagement() {
   const users = activeTab === "active" ? activeUsers : archivedUsers;
   const consultants = users.filter(u => u.roles.includes("consultant"));
   const isLoadingUsers = activeTab === "active" ? isLoadingActiveUsers : isLoadingArchivedUsers;
-  
+
   const currentYear = new Date().getFullYear();
+
+  const activeExternalInstructors = (activeUsers || []).filter(
+    (user) => user.roles.includes("formateur_externe") && !user.archived
+  );
+
+  const assignmentsByInstructor = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    (Array.isArray(instructorFormations) ? instructorFormations : []).forEach((assignment) => {
+      if (!map[assignment.instructorId]) {
+        map[assignment.instructorId] = [];
+      }
+      map[assignment.instructorId].push(assignment.formationId);
+    });
+    return map;
+  }, [instructorFormations]);
+
+  const getAssignedFormationTitles = (instructorId: string) => {
+    const formationIds = assignmentsByInstructor[instructorId] || [];
+    const titles = formationIds
+      .map((id) => formations.find((f) => f.id === id)?.title)
+      .filter((title): title is string => Boolean(title));
+    return titles;
+  };
 
   const getConsultantStats = (userId: string) => {
     const userInterests = Array.isArray(allInterests) ? allInterests.filter(i => {
@@ -200,16 +236,28 @@ export default function ConsultantManagement() {
     <div className="h-full overflow-y-auto">
       <div className="container mx-auto p-8 space-y-8">
         {/* Header */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/10 p-3 rounded-xl">
-              <Users className="w-7 h-7 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-primary">Gestion des Consultants</h1>
-              <p className="text-muted-foreground">Vue d'ensemble et historique des formations par consultant</p>
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-3 rounded-xl">
+                <Users className="w-7 h-7 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-primary">Gestion des Consultants</h1>
+                <p className="text-muted-foreground">Vue d'ensemble et historique des formations par consultant</p>
+              </div>
             </div>
           </div>
+
+          <Button
+            variant="outline"
+            className="h-11"
+            onClick={() => setShowCreateExternalInstructor(true)}
+            data-testid="button-create-external-instructor"
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Créer un formateur externe
+          </Button>
         </div>
 
         {/* Statistics Cards */}
@@ -257,6 +305,87 @@ export default function ConsultantManagement() {
             </div>
           </Card>
         </div>
+
+        <Card className="shadow-md">
+          <div className="flex flex-col gap-2 p-6 border-b border-border/60 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Formateurs externes</h2>
+              <p className="text-sm text-muted-foreground">
+                Comptes pilotés par l'équipe RH. Attribuez les formations animées et mettez à jour leurs accès.
+              </p>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {isLoadingAssignments
+                ? "Chargement des affectations..."
+                : `${activeExternalInstructors.length} formateur${activeExternalInstructors.length > 1 ? "s" : ""} externe${activeExternalInstructors.length > 1 ? "s" : ""}`}
+            </div>
+          </div>
+          {activeExternalInstructors.length === 0 ? (
+            <div className="p-6 text-center text-muted-foreground">
+              Aucun formateur externe actif pour le moment. Créez-en un via le bouton ci-dessus.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Organisation</TableHead>
+                    <TableHead>Formations animées</TableHead>
+                    <TableHead className="w-[120px] text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activeExternalInstructors.map((instructor) => {
+                    const formationsTitles = getAssignedFormationTitles(instructor.id);
+                    return (
+                      <TableRow key={instructor.id}>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-semibold">{instructor.name}</div>
+                            <div className="text-xs text-muted-foreground">Formateur externe</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">{instructor.email}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm text-muted-foreground">
+                            {instructor.businessUnit ? instructor.businessUnit : "Non renseigné"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-2">
+                            {formationsTitles.length > 0 ? (
+                              formationsTitles.map((title) => (
+                                <Badge key={title} variant="outline" className="whitespace-nowrap">
+                                  {title}
+                                </Badge>
+                              ))
+                            ) : (
+                              <Badge variant="outline">Aucune formation assignée</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditExternalInstructorId(instructor.id)}
+                            data-testid={`button-edit-external-instructor-${instructor.id}`}
+                          >
+                            Modifier
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </Card>
 
         {/* Consultants Table */}
         <Card className="p-6 shadow-md">
@@ -490,6 +619,21 @@ export default function ConsultantManagement() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <CreateExternalInstructorDialog
+          open={showCreateExternalInstructor}
+          onOpenChange={setShowCreateExternalInstructor}
+        />
+
+        <EditExternalInstructorDialog
+          userId={editExternalInstructorId}
+          open={!!editExternalInstructorId}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditExternalInstructorId(null);
+            }
+          }}
+        />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={!!deleteDialogUser} onOpenChange={() => setDeleteDialogUser(null)}>
