@@ -14,33 +14,33 @@ interface TrainingCardProps {
 
 export default function TrainingCard({ formation, nextSessionDate, onViewDetails }: TrainingCardProps) {
   return (
-    <Card 
-      className="p-6 shadow-md hover:shadow-xl transition-all duration-200 cursor-pointer border-border hover:border-accent/50" 
-      onClick={onViewDetails} 
+    <Card
+      className="glass-panel group flex h-full cursor-pointer flex-col justify-between rounded-2xl border-white/40 p-6 transition-transform duration-300 hover:-translate-y-1 hover:bg-white/85"
+      onClick={onViewDetails}
       data-testid={`card-training-${formation.id}`}
     >
       <div className="space-y-6">
-        <div className="flex items-start gap-2 flex-wrap">
+        <div className="flex flex-wrap items-start gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
           {formation.seniorityRequired && <SeniorityBadge seniority={formation.seniorityRequired} />}
           <ModalityBadge modality={formation.modality as "presentiel" | "distanciel" | "hybride"} />
         </div>
 
         <div className="space-y-3">
-          <h3 className="text-xl font-semibold text-primary leading-tight" data-testid={`text-training-title-${formation.id}`}>
+          <h3 className="text-xl font-semibold tracking-tight text-primary" data-testid={`text-training-title-${formation.id}`}>
             {formation.title}
           </h3>
-          <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">{formation.description}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground/90 line-clamp-3">{formation.description}</p>
         </div>
 
-        <div className="flex items-center gap-6 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            <span className="font-medium">{formation.duration}</span>
+        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground/90">
+          <div className="flex items-center gap-2 font-medium">
+            <Clock className="h-4 w-4" />
+            <span>{formation.duration}</span>
           </div>
           {nextSessionDate && (
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              <span className="font-medium">
+            <div className="flex items-center gap-2 font-medium">
+              <Calendar className="h-4 w-4" />
+              <span>
                 {nextSessionDate.toLocaleDateString("fr-FR", {
                   day: "numeric",
                   month: "short",
@@ -53,7 +53,7 @@ export default function TrainingCard({ formation, nextSessionDate, onViewDetails
         {formation.tags && formation.tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {formation.tags.slice(0, 3).map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs font-normal">
+              <Badge key={tag} variant="outline" className="border-white/40 bg-white/20 text-xs font-normal text-muted-foreground/90">
                 {tag}
               </Badge>
             ))}
@@ -62,7 +62,7 @@ export default function TrainingCard({ formation, nextSessionDate, onViewDetails
 
         <Button
           variant="default"
-          className="w-full group shadow-sm"
+          className="group w-full rounded-full border-0 bg-gradient-to-r from-primary to-accent py-5 text-sm font-semibold shadow-[0_20px_40px_-22px_rgba(0,49,63,0.6)] transition-all hover:shadow-[0_26px_60px_-28px_rgba(0,49,63,0.65)]"
           onClick={(e) => {
             e.stopPropagation();
             onViewDetails();
@@ -70,7 +70,7 @@ export default function TrainingCard({ formation, nextSessionDate, onViewDetails
           data-testid={`button-view-details-${formation.id}`}
         >
           <span>Voir les détails</span>
-          <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+          <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
         </Button>
       </div>
     </Card>
