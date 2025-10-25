@@ -207,19 +207,16 @@ export default function DataVisualization() {
   const [statusFilter, setStatusFilter] = useState<TimelineStatus | "all">("all");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: currentUser, isLoading: isCurrentUserLoading } = useQuery<CurrentUserResponse | null>({
+  const { data: currentUser } = useQuery<CurrentUserResponse | null>({
     queryKey: ["/api/auth/me"],
   });
 
-  const isRh = currentUser?.user?.roles.includes("rh") ?? false;
-
   const {
     data: analytics,
-    isLoading: isAnalyticsLoading,
+    isLoading,
     isError,
   } = useQuery<AnalyticsResponse>({
     queryKey: ["/api/admin/analytics"],
-    enabled: isRh,
     queryFn: async () => {
       const res = await fetch("/api/admin/analytics", { credentials: "include" });
       if (!res.ok) {
@@ -228,6 +225,8 @@ export default function DataVisualization() {
       return res.json();
     },
   });
+
+  const isRh = currentUser?.user?.roles.includes("rh");
 
   const consultantOptions = useMemo(() => {
     if (!analytics) return [];
@@ -366,7 +365,7 @@ export default function DataVisualization() {
     URL.revokeObjectURL(url);
   };
 
-  if (isCurrentUserLoading || (isRh && isAnalyticsLoading)) {
+  if (isLoading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-muted-foreground">
@@ -377,18 +376,7 @@ export default function DataVisualization() {
     );
   }
 
-  if (!isCurrentUserLoading && !isRh) {
-    return (
-      <Alert>
-        <AlertTitle>Accès restreint</AlertTitle>
-        <AlertDescription>
-          Cette section est réservée aux responsables RH. Contactez un administrateur pour obtenir les droits nécessaires.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  if (isError) {
+  if (isError || !analytics) {
     return (
       <Alert variant="destructive">
         <AlertTriangle className="h-4 w-4" />
@@ -400,8 +388,15 @@ export default function DataVisualization() {
     );
   }
 
-  if (!analytics) {
-    return null;
+  if (!isRh) {
+    return (
+      <Alert>
+        <AlertTitle>Accès restreint</AlertTitle>
+        <AlertDescription>
+          Cette section est réservée aux responsables RH. Contactez un administrateur pour obtenir les droits nécessaires.
+        </AlertDescription>
+      </Alert>
+    );
   }
 
   const { summary } = analytics;
