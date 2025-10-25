@@ -71,6 +71,9 @@ async function seed() {
     .returning();
   console.log(`✓ Created ${createdUsers.length} users`);
 
+  const pierreBernard = createdUsers.find((user) => user.email === "pierre.bernard@colombus.fr");
+  const claireLeroux = createdUsers.find((user) => user.email === "claire.leroux@colombus.fr");
+
   // Create formations
   const createdFormations = await db
     .insert(formations)
@@ -162,6 +165,31 @@ async function seed() {
     ])
     .returning();
   console.log(`✓ Created ${createdFormations.length} formations`);
+
+  if (pierreBernard || claireLeroux) {
+    const assignments = [] as { instructorId: string; formationId: string }[];
+    if (pierreBernard) {
+      assignments.push(
+        ...createdFormations.slice(0, 3).map((formation) => ({
+          instructorId: pierreBernard.id,
+          formationId: formation.id,
+        }))
+      );
+    }
+    if (claireLeroux) {
+      assignments.push(
+        ...createdFormations.slice(2, 5).map((formation) => ({
+          instructorId: claireLeroux.id,
+          formationId: formation.id,
+        }))
+      );
+    }
+
+    if (assignments.length > 0) {
+      await db.insert(instructorFormations).values(assignments).onConflictDoNothing();
+      console.log(`✓ Assigned ${assignments.length} instructor formations`);
+    }
+  }
 
   // Create sessions
   const now = new Date();

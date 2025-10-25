@@ -5,7 +5,15 @@ import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
 import { storage } from "./storage";
 import { requireAuth, optionalAuth, type AuthRequest } from "./auth";
-import { insertUserSchema, insertFormationSchema, insertSessionSchema, insertFormationInterestSchema, insertRegistrationSchema } from "@shared/schema";
+import {
+  insertUserSchema,
+  insertFormationSchema,
+  insertSessionSchema,
+  insertFormationInterestSchema,
+  insertRegistrationSchema,
+  type InsertUser,
+} from "@shared/schema";
+import { INSTRUCTOR_ROLES, InstructorRole, USER_ROLES, isInstructor } from "@shared/roles";
 import { z } from "zod";
 
 const PgSession = connectPgSimple(session);
@@ -248,8 +256,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized - instructor role required" });
       }
 
+      if (user.roles.includes("formateur_externe")) {
+        return res.status(403).json({
+          message: "Les formateurs externes ne peuvent pas modifier leurs formations assignées",
+        });
+      }
+
       const { formationId } = req.params;
-      
+
       // Check if formation exists
       const formation = await storage.getFormation(formationId);
       if (!formation) {
@@ -275,6 +289,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!user || !isInstructor(user.roles)) {
         return res.status(403).json({ message: "Unauthorized - instructor role required" });
+      }
+
+      if (user.roles.includes("formateur_externe")) {
+        return res.status(403).json({
+          message: "Les formateurs externes ne peuvent pas modifier leurs formations assignées",
+        });
       }
 
       const { formationId } = req.params;
