@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Loader2, ChevronDown, ChevronRight, Heart, UserCheck, Calendar, Award, Archive, Trash2, UserPlus } from "lucide-react";
-import type { User, FormationInterest, Registration, Formation, Session } from "@shared/schema";
+import type { User, FormationInterest, Registration, Formation, Session, InstructorFormation } from "@shared/schema";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PriorityBadge from "@/components/PriorityBadge";
@@ -45,6 +45,7 @@ export default function ConsultantManagement() {
   const [archiveDialogUser, setArchiveDialogUser] = useState<User | null>(null);
   const [deleteDialogUser, setDeleteDialogUser] = useState<User | null>(null);
   const [showCreateExternalInstructor, setShowCreateExternalInstructor] = useState(false);
+  const [editExternalInstructorId, setEditExternalInstructorId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: activeUsers = [], isLoading: isLoadingActiveUsers } = useQuery<User[]>({
