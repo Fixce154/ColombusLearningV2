@@ -10,7 +10,7 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Home, BookOpen, Calendar, Users, BarChart, GraduationCap, Heart, Settings, Plus, Minus } from "lucide-react";
+import { Home, BookOpen, Calendar, Users, BarChart, GraduationCap, Heart, Plus, Minus } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { User } from "@shared/schema";
 import { useMutation } from "@tanstack/react-query";
@@ -144,35 +144,39 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
   const menuSections = getMenuSections();
 
   return (
-    <Sidebar className="border-r-0">
-      <SidebarHeader className="border-b border-sidebar-border px-6 py-6">
-        <div className="flex items-center gap-3">
-          <div className="bg-accent p-2.5 rounded-xl">
-            <GraduationCap className="w-6 h-6 text-accent-foreground" />
+    <Sidebar className="border-r-0 bg-gradient-to-b from-[#031824] via-[#042a3a] to-[#021018] text-white/90 shadow-[0_20px_60px_-35px_rgba(3,24,36,0.9)]">
+      <SidebarHeader className="border-b border-white/10 px-6 py-8">
+        <div className="flex items-center gap-4">
+          <div className="rounded-2xl bg-gradient-to-br from-accent/30 via-accent to-accent/60 p-3 shadow-[0_15px_35px_-20px_rgba(0,158,203,0.75)]">
+            <GraduationCap className="h-7 w-7 text-white" />
           </div>
           <div>
-            <div className="font-bold text-lg text-sidebar-foreground">Colombus</div>
-            <div className="text-xs text-sidebar-foreground/70">Learning Platform</div>
+            <div className="text-sm uppercase tracking-[0.4em] text-white/60">Colombus</div>
+            <div className="text-xl font-semibold text-white">Learning Suite</div>
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent className="px-4 py-6">
+      <SidebarContent className="px-4 py-8">
         {menuSections.map((section, index) => (
-          <SidebarGroup key={index} className={index > 0 ? "mt-6" : ""}>
+          <SidebarGroup key={index} className={index > 0 ? "mt-8" : ""}>
             {section.label && (
-              <SidebarGroupLabel className="text-sidebar-foreground/70 uppercase tracking-wider text-xs mb-2 px-3">
+              <SidebarGroupLabel className="mb-3 px-4 text-[0.7rem] uppercase tracking-[0.35em] text-white/50">
                 {section.label}
               </SidebarGroupLabel>
             )}
             <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
+              <SidebarMenu className="space-y-2">
                 {section.items.map((item) => {
                   const isActive = location === item.url;
                   return (
                     <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild isActive={isActive} className="h-12 px-4">
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        className="h-12 px-4 rounded-2xl border border-white/5 bg-white/0 text-white/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/10 hover:text-white data-[active=true]:border-white/25 data-[active=true]:bg-white/15 data-[active=true]:text-white"
+                      >
                         <Link href={item.url} data-testid={`link-${item.url.slice(1) || "home"}`}>
-                          <item.icon className="w-5 h-5" />
+                          <item.icon className="h-5 w-5" />
                           <span className="font-medium">{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
@@ -185,8 +189,8 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
         ))}
         
         {!isInstructor(currentUser.roles) && (
-          <SidebarGroup className="mt-6">
-            <SidebarGroupLabel className="text-sidebar-foreground/70 uppercase tracking-wider text-xs mb-2 px-3">
+          <SidebarGroup className="mt-8">
+            <SidebarGroupLabel className="mb-3 px-4 text-[0.7rem] uppercase tracking-[0.35em] text-white/50">
               Devenir formateur
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -195,7 +199,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
                   <SidebarMenuButton
                     onClick={() => becomeInstructorMutation.mutate()}
                     disabled={becomeInstructorMutation.isPending}
-                    className="h-12 px-4"
+                    className="h-12 px-4 rounded-2xl border border-white/10 bg-white/5 text-white hover:-translate-y-0.5 hover:border-white/20 hover:bg-accent/20 hover:text-white"
                     data-testid="button-become-instructor"
                   >
                     <Plus className="w-5 h-5" />
@@ -210,8 +214,8 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
         )}
 
         {isInstructor(currentUser.roles) && (
-          <SidebarGroup className="mt-6">
-            <SidebarGroupLabel className="text-sidebar-foreground/70 uppercase tracking-wider text-xs mb-2 px-3">
+          <SidebarGroup className="mt-8">
+            <SidebarGroupLabel className="mb-3 px-4 text-[0.7rem] uppercase tracking-[0.35em] text-white/50">
               Gérer mon rôle
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -219,7 +223,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => setShowResignDialog(true)}
-                    className="h-12 px-4"
+                    className="h-12 px-4 rounded-2xl border border-white/10 bg-white/5 text-white hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/15 hover:text-white"
                     data-testid="button-resign-instructor"
                   >
                     <Minus className="w-5 h-5" />
@@ -231,14 +235,14 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
           </SidebarGroup>
         )}
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border p-6">
-        <div className="flex items-center gap-3">
-          <div className="bg-accent text-accent-foreground w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
+      <SidebarFooter className="border-t border-white/10 px-6 py-8">
+        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-accent/40 text-white font-semibold text-sm">
             {currentUser.name.split(' ').map(n => n[0]).join('')}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-medium text-sm text-sidebar-foreground truncate">{currentUser.name}</div>
-            <div className="text-xs text-sidebar-foreground/70 truncate">
+            <div className="truncate text-sm font-semibold text-white">{currentUser.name}</div>
+            <div className="truncate text-xs text-white/70">
               {formatRoles(currentUser.roles)}
             </div>
           </div>
@@ -246,7 +250,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
       </SidebarFooter>
 
       <AlertDialog open={showResignDialog} onOpenChange={setShowResignDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="glass-panel border-white/30 bg-[#041522]/90 text-foreground">
           <AlertDialogHeader>
             <AlertDialogTitle>Ne plus être formateur</AlertDialogTitle>
             <AlertDialogDescription>

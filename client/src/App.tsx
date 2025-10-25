@@ -19,8 +19,9 @@ import Login from "@/pages/Login";
 import NotFound from "@/pages/not-found";
 import DataVisualization from "@/pages/DataVisualization";
 import type { User } from "@shared/schema";
-import { Loader2 } from "lucide-react";
+import { Loader2, LogOut } from "lucide-react";
 import { useEffect } from "react";
+import { formatRoles } from "@shared/roles";
 
 function Router({ currentUser }: { currentUser: User }) {
   const [location] = useLocation();
@@ -65,21 +66,40 @@ function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full bg-background">
+      <div className="relative flex h-screen w-full overflow-hidden">
+        <div className="pointer-events-none absolute -top-[30%] right-0 h-[70%] w-[65%] rounded-full bg-gradient-to-br from-accent/25 via-transparent to-transparent blur-3xl" />
         <AppSidebar currentUser={user} />
-        <div className="flex flex-col flex-1 min-w-0">
-          <header className="flex items-center justify-between gap-6 px-6 py-5 border-b bg-card shadow-sm">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <button
-              onClick={onLogout}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              data-testid="button-logout"
-            >
-              Se déconnecter
-            </button>
+        <div className="relative flex flex-col flex-1 min-w-0">
+          <header className="px-8 pt-8">
+            <div className="glass-panel relative z-10 flex items-center justify-between gap-6 rounded-3xl px-6 py-5">
+              <div className="flex items-center gap-4">
+                <SidebarTrigger
+                  data-testid="button-sidebar-toggle"
+                  className="h-11 w-11 rounded-full border border-white/60 bg-white/80 text-primary shadow-[0_12px_30px_-12px_rgba(0,49,63,0.45)] hover:bg-white"
+                />
+                <div>
+                  <p className="section-subtle-title mb-1">Espace membre</p>
+                  <h1 className="text-lg font-semibold text-primary">Colombus Learning</h1>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="hidden text-right sm:block">
+                  <p className="text-sm font-semibold text-foreground/90">{user.name}</p>
+                  <p className="text-xs text-muted-foreground/80">{formatRoles(user.roles)}</p>
+                </div>
+                <button
+                  onClick={onLogout}
+                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(0,49,63,0.55)] transition-all hover:shadow-[0_18px_40px_-20px_rgba(0,49,63,0.6)]"
+                  data-testid="button-logout"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Se déconnecter</span>
+                </button>
+              </div>
+            </div>
           </header>
-          <main className="flex-1 overflow-auto">
-            <div className="container max-w-7xl mx-auto px-6 py-8">
+          <main className="relative z-10 flex-1 overflow-auto px-8 pb-12">
+            <div className="mx-auto max-w-7xl space-y-10 pt-10">
               <Router currentUser={user} />
             </div>
           </main>

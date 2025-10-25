@@ -109,29 +109,33 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-6">
-      <Card className="w-full max-w-md shadow-2xl">
-        <div className="p-8 space-y-6">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-6 py-12">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,158,203,0.18),transparent_55%),radial-gradient(circle_at_bottom,rgba(0,49,63,0.15),transparent_55%)] opacity-60" />
+      <Card className="glass-panel relative w-full max-w-xl space-y-6 overflow-hidden rounded-[2rem] border-white/40 px-10 py-12">
+        <div className="relative z-10 space-y-10">
           {/* Header */}
-          <div className="text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="bg-accent p-4 rounded-2xl">
-                <GraduationCap className="w-12 h-12 text-accent-foreground" />
-              </div>
+          <div className="space-y-6 text-center">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-accent/30 bg-gradient-to-br from-accent/40 via-accent to-accent/70 shadow-[0_30px_80px_-40px_rgba(0,158,203,0.75)]">
+              <GraduationCap className="h-10 w-10 text-white" />
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-primary">Colombus Learning</h1>
-              <p className="text-muted-foreground mt-2">
-                Votre plateforme de formation professionnelle
+            <div className="space-y-2">
+              <p className="section-subtle-title text-primary/60">Portail sécurisé</p>
+              <h1 className="text-3xl font-semibold tracking-tight text-primary">Colombus Learning</h1>
+              <p className="text-sm text-muted-foreground/80">
+                Accédez à votre espace de formation personnalisée et gérez vos parcours en toute simplicité.
               </p>
             </div>
           </div>
 
           {/* Tabs */}
           <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 h-12">
-              <TabsTrigger value="login" data-testid="tab-login">Connexion</TabsTrigger>
-              <TabsTrigger value="register" data-testid="tab-register">Inscription</TabsTrigger>
+            <TabsList className="grid h-14 w-full grid-cols-2 rounded-full bg-white/40 p-1">
+              <TabsTrigger value="login" data-testid="tab-login" className="rounded-full text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-primary">
+                Connexion
+              </TabsTrigger>
+              <TabsTrigger value="register" data-testid="tab-register" className="rounded-full text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-primary">
+                Inscription
+              </TabsTrigger>
             </TabsList>
 
             {/* Login Tab */}
@@ -187,7 +191,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
                   <Button
                     type="submit"
-                    className="w-full shadow-md"
+                    className="w-full rounded-full bg-gradient-to-r from-primary to-accent py-5 text-sm font-semibold shadow-[0_20px_40px_-22px_rgba(0,49,63,0.6)] hover:shadow-[0_26px_60px_-28px_rgba(0,49,63,0.65)]"
                     disabled={isLoading}
                     data-testid="button-login"
                   >
@@ -197,8 +201,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               </Form>
 
               {/* Demo Accounts */}
-              <div className="pt-4 border-t">
-                <p className="text-sm text-muted-foreground mb-3 text-center">
+              <div className="rounded-2xl border border-white/40 bg-white/40 p-5">
+                <p className="mb-3 text-sm text-muted-foreground/80 text-center">
                   Comptes de démonstration
                 </p>
                 <div className="grid grid-cols-2 gap-2">
@@ -212,7 +216,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                         loginForm.setValue("password", account.password);
                       }}
                       data-testid={`button-demo-${account.role.toLowerCase()}`}
-                      className="text-xs"
+                      className="rounded-full border-white/50 bg-white/60 text-xs font-medium text-primary hover:border-white/70 hover:bg-white"
                     >
                       {account.role}
                     </Button>
@@ -360,7 +364,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
                   <Button
                     type="submit"
-                    className="w-full shadow-md"
+                    className="w-full rounded-full bg-gradient-to-r from-primary to-accent py-5 text-sm font-semibold shadow-[0_20px_40px_-22px_rgba(0,49,63,0.6)] hover:shadow-[0_26px_60px_-28px_rgba(0,49,63,0.65)]"
                     disabled={isLoading}
                     data-testid="button-register"
                   >

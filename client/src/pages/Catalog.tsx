@@ -83,22 +83,39 @@ export default function Catalog() {
     );
   }
 
+  const activeFormations = formations.filter((f) => f.active).length;
+  const openSessionsCount = sessions.filter((s) => s.status === "open").length;
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-12">
       {/* Hero Section */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary/10 p-3 rounded-xl">
-            <BookOpen className="w-7 h-7 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-4xl font-bold text-primary tracking-tight">Catalogue des formations</h1>
-            <p className="text-lg text-muted-foreground mt-1">
-              Explorez notre catalogue et développez vos compétences
+      <section className="glass-panel relative overflow-hidden rounded-[2rem] border-white/40 px-10 py-12 shadow-[0_45px_120px_-70px_rgba(15,28,34,0.55)]">
+        <div className="pointer-events-none absolute -top-20 right-0 h-64 w-64 rounded-full bg-gradient-to-br from-accent/35 via-accent/15 to-transparent blur-3xl" />
+        <div className="relative z-10 flex flex-col gap-10 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-4">
+            <span className="section-subtle-title text-primary/60">Explorer les programmes</span>
+            <h1 className="text-4xl font-semibold tracking-tight text-primary md:text-5xl">
+              Catalogue des formations
+            </h1>
+            <p className="text-base leading-relaxed text-muted-foreground/90">
+              Trouvez la formation qui répond à vos objectifs et accédez à des parcours conçus par les experts Colombus.
             </p>
           </div>
+          <div className="grid w-full max-w-sm grid-cols-2 gap-3 text-center text-primary">
+            <div className="rounded-2xl border border-white/50 bg-white/60 px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-primary/60">Formations actives</p>
+              <p className="mt-2 text-2xl font-semibold">{activeFormations}</p>
+            </div>
+            <div className="rounded-2xl border border-white/50 bg-white/60 px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-primary/60">Sessions ouvertes</p>
+              <p className="mt-2 text-2xl font-semibold">{openSessionsCount}</p>
+            </div>
+            <div className="col-span-2 rounded-2xl border border-white/40 bg-white/50 px-4 py-4 text-sm text-muted-foreground/80">
+              Des modalités présentielles, distancielles et hybrides pour répondre à toutes vos réalités terrain.
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* Search Bar */}
       <SearchBar value={searchQuery} onChange={setSearchQuery} />
