@@ -856,7 +856,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         coacheeId: data.coacheeId,
       });
 
-      res.status(201).json({ assignment });
+      res.json(assignment);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Données invalides", errors: error.errors });
