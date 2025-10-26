@@ -6,6 +6,8 @@ import {
   registrations,
   instructorFormations,
   notifications,
+  coachAssignments,
+  appSettings,
 } from "@shared/schema";
 import { isInstructor } from "@shared/roles";
 import { ensureNotificationsTable } from "./storage";
@@ -18,9 +20,11 @@ async function seed() {
   // Clear existing data
   await db.delete(notifications);
   await db.delete(registrations);
+  await db.delete(coachAssignments);
   await db.delete(sessions);
   await db.delete(formations);
   await db.delete(users);
+  await db.delete(appSettings);
   console.log("✓ Cleared existing data");
 
   // Create users
@@ -71,7 +75,7 @@ async function seed() {
         email: "jean.dubois@colombus.fr",
         password: "password",
         name: "Jean Dubois",
-        roles: ["consultant", "manager"], // Un manager est aussi consultant
+        roles: ["consultant", "manager", "coach"], // Un manager est aussi consultant et peut être coach
         seniority: "senior",
         businessUnit: "Digital",
         p1Used: 0,
@@ -83,6 +87,8 @@ async function seed() {
 
   const pierreBernard = createdUsers.find((user) => user.email === "pierre.bernard@colombus.fr");
   const claireLeroux = createdUsers.find((user) => user.email === "claire.leroux@colombus.fr");
+  const jeanDubois = createdUsers.find((user) => user.email === "jean.dubois@colombus.fr");
+  const marieDupont = createdUsers.find((user) => user.email === "marie.dupont@colombus.fr");
 
   // Create formations
   const createdFormations = await db
@@ -200,6 +206,23 @@ async function seed() {
       console.log(`✓ Assigned ${assignments.length} instructor formations`);
     }
   }
+
+  if (jeanDubois && marieDupont) {
+    await db
+      .insert(coachAssignments)
+      .values({ coachId: jeanDubois.id, coacheeId: marieDupont.id })
+      .onConflictDoNothing();
+    console.log("✓ Created initial coach assignment");
+  }
+
+  await db
+    .insert(appSettings)
+    .values({ key: "coach_validation_only", value: false })
+    .onConflictDoUpdate({
+      target: appSettings.key,
+      set: { value: false },
+    });
+  console.log("✓ Seeded coach validation setting");
 
   // Create sessions
   const now = new Date();

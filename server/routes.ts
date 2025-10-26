@@ -13,11 +13,14 @@ import {
   insertRegistrationSchema,
   type InsertUser,
   type InsertNotification,
+  type FormationInterest,
 } from "@shared/schema";
 import { INSTRUCTOR_ROLES, InstructorRole, USER_ROLES, isInstructor } from "@shared/roles";
 import { z } from "zod";
 
 const PgSession = connectPgSimple(session);
+
+const COACH_VALIDATION_SETTING_KEY = "coach_validation_only";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Session configuration
@@ -553,6 +556,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     seniority: z.string().optional(),
   });
 
+  const coachAssignmentSchema = z
+    .object({
+      coachId: z.string().min(1, "Le coach est requis"),
+      coacheeId: z.string().min(1, "Le coaché est requis"),
+    })
+    .refine((data) => data.coachId !== data.coacheeId, {
+      message: "Un coach ne peut pas être son propre coaché",
+      path: ["coacheeId"],
+    });
+
+  const coachValidationSettingSchema = z.object({
+    coachValidationOnly: z.boolean(),
+  });
+
   // Get all users (RH only)
   app.get("/api/users", requireAuth, async (req, res) => {
     try {
@@ -749,6 +766,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract formationIds if present (for external instructors)
       const { formationIds, ...updateData } = req.body;
 
+      if (Array.isArray(updateData.roles)) {
+        const hadCoachRole = targetUser.roles.includes("coach");
+        let normalizedRoles = Array.from(new Set(updateData.roles as string[]));
+
+        if (normalizedRoles.includes("rh") || normalizedRoles.includes("manager")) {
+          if (!normalizedRoles.includes("consultant")) {
+            normalizedRoles.push("consultant");
+          }
+        }
+
+        if (normalizedRoles.includes("coach") && !normalizedRoles.includes("consultant")) {
+          normalizedRoles.push("consultant");
+        }
+
+        updateData.roles = normalizedRoles;
+
+        const wantsCoachRole = normalizedRoles.includes("coach");
+        if (hadCoachRole && !wantsCoachRole) {
+          await storage.deleteCoachAssignmentsForCoach(targetUser.id);
+        }
+      }
+
       // Update user basic info
       const updatedUser = await storage.updateUser(req.params.id, updateData);
 
@@ -770,6 +809,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message });
     }
   });
+
+  app.get("/api/admin/coach-assignments", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const assignments = await storage.listCoachAssignments();
+      res.json(assignments);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/coach-assignments", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const data = coachAssignmentSchema.parse(req.body);
+
+      const coach = await storage.getUser(data.coachId);
+      if (!coach || !coach.roles.includes("coach")) {
+        return res.status(400).json({ message: "L'utilisateur sélectionné n'est pas coach" });
+      }
+
+      const coachee = await storage.getUser(data.coacheeId);
+      if (!coachee || !coachee.roles.includes("consultant")) {
+        return res.status(400).json({ message: "Le coaché doit être un consultant actif" });
+      }
+
+      if (coachee.archived) {
+        return res.status(400).json({ message: "Impossible d'assigner un coach à un consultant archivé" });
+      }
+
+      const assignment = await storage.createCoachAssignment({
+        coachId: data.coachId,
+        coacheeId: data.coacheeId,
+      });
+
+      res.status(201).json({ assignment });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Données invalides", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/coach-assignments/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const assignment = await storage.getCoachAssignment(req.params.id);
+      if (!assignment) {
+        return res.status(404).json({ message: "Assignment not found" });
+      }
+
+      await storage.deleteCoachAssignment(req.params.id);
+      res.json({ message: "Assignment deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get(
+    "/api/admin/settings/coach-validation",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const userId = (req as AuthRequest).userId!;
+        const user = await storage.getUser(userId);
+
+        if (!user || !user.roles.includes("rh")) {
+          return res.status(403).json({ message: "Unauthorized" });
+        }
+
+        const value = await storage.getSetting<boolean>(COACH_VALIDATION_SETTING_KEY);
+        res.json({ coachValidationOnly: Boolean(value) });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  app.patch(
+    "/api/admin/settings/coach-validation",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const userId = (req as AuthRequest).userId!;
+        const user = await storage.getUser(userId);
+
+        if (!user || !user.roles.includes("rh")) {
+          return res.status(403).json({ message: "Unauthorized" });
+        }
+
+        const data = coachValidationSettingSchema.parse(req.body);
+        await storage.setSetting(COACH_VALIDATION_SETTING_KEY, data.coachValidationOnly);
+
+        res.json({ coachValidationOnly: data.coachValidationOnly });
+      } catch (error: any) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({ message: "Données invalides", errors: error.errors });
+        }
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
 
   // Formation Routes
   app.get("/api/formations", optionalAuth, async (req, res) => {
@@ -1047,6 +1207,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Failed to notify RH about new interest", notificationError);
       }
 
+      try {
+        const coachAssignments = await storage.listCoachAssignmentsForCoachee(userId);
+        if (coachAssignments.length > 0) {
+          const coachIds = coachAssignments.map((assignment) => assignment.coachId);
+          const coaches = await storage.listUsersByIds(coachIds);
+          const message = `${user.name} a exprimé une intention pour ${formation.title}.`;
+          await Promise.all(
+            coaches
+              .filter((coachUser) => coachUser.roles.includes("coach"))
+              .map((coachUser) =>
+                createNotification({
+                  userId: coachUser.id,
+                  route: "/coach",
+                  title: "Nouvelle intention à valider",
+                  message,
+                })
+              )
+          );
+        }
+      } catch (coachNotificationError) {
+        console.error("Failed to notify coaches about new interest", coachNotificationError);
+      }
+
       res.status(201).json(interest);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -1079,8 +1262,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
+      const coachValidationOnly = Boolean(
+        await storage.getSetting<boolean>(COACH_VALIDATION_SETTING_KEY)
+      );
+
+      const updates: Partial<FormationInterest> = { ...req.body };
+
+      if (updates.status === "approved" && !coachValidationOnly) {
+        if (interest.coachStatus !== "approved") {
+          return res.status(400).json({
+            message: "L'intention doit être validée par le coach avant la validation RH",
+          });
+        }
+      }
+
+      if (updates.status === "approved" && interest.coachStatus !== "approved") {
+        updates.coachStatus = "approved";
+      }
+
       // Refund quota if interest is being rejected
-      if (req.body.status === "rejected" && (interest.status === "pending" || interest.status === "approved")) {
+      if (
+        updates.status === "rejected" &&
+        (interest.status === "pending" || interest.status === "approved")
+      ) {
         const interestOwner = await storage.getUser(interest.userId);
         if (interestOwner) {
           if (interest.priority === "P1" && (interestOwner.p1Used || 0) > 0) {
@@ -1089,9 +1293,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.updateUser(interest.userId, { p2Used: (interestOwner.p2Used || 0) - 1 });
           }
         }
+        updates.coachStatus = "rejected";
       }
 
-      const updated = await storage.updateFormationInterest(req.params.id, req.body);
+      const updated = await storage.updateFormationInterest(req.params.id, updates);
 
       if (updated && req.body.status && req.body.status !== interest.status) {
         const formation = await storage.getFormation(updated.formationId);
@@ -1130,7 +1335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as AuthRequest).userId!;
       const interest = await storage.getFormationInterest(req.params.id);
-      
+
       if (!interest) {
         return res.status(404).json({ message: "Interest not found" });
       }
@@ -1154,6 +1359,208 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deleteFormationInterest(req.params.id);
       res.json({ message: "Interest deleted successfully" });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/coach/overview", requireAuth, async (req, res) => {
+    try {
+      const coachId = (req as AuthRequest).userId!;
+      const coach = await storage.getUser(coachId);
+
+      if (!coach || !coach.roles.includes("coach")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const assignments = await storage.listCoachAssignmentsForCoach(coachId);
+      const coacheeIds = assignments.map((assignment) => assignment.coacheeId);
+
+      const coachees = await storage.listUsersByIds(coacheeIds);
+      const coacheesWithoutPasswords = coachees.map(({ password, ...rest }) => rest);
+
+      const interests = coacheeIds.length
+        ? (
+            await Promise.all(
+              coacheeIds.map((coacheeId) =>
+                storage.listFormationInterests({ userId: coacheeId })
+              )
+            )
+          ).flat()
+        : [];
+
+      const registrations = await storage.listRegistrationsForUsers(coacheeIds);
+      const coachValidationOnly = Boolean(
+        await storage.getSetting<boolean>(COACH_VALIDATION_SETTING_KEY)
+      );
+
+      res.json({
+        assignments,
+        coachees: coacheesWithoutPasswords,
+        interests,
+        registrations,
+        settings: { coachValidationOnly },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/coach/interests/:id/approve", requireAuth, async (req, res) => {
+    try {
+      const coachId = (req as AuthRequest).userId!;
+      const coach = await storage.getUser(coachId);
+
+      if (!coach || !coach.roles.includes("coach")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const interest = await storage.getFormationInterest(req.params.id);
+      if (!interest) {
+        return res.status(404).json({ message: "Interest not found" });
+      }
+
+      const assignments = await storage.listCoachAssignmentsForCoachee(interest.userId);
+      const isAssignedCoach = assignments.some((assignment) => assignment.coachId === coachId);
+      if (!isAssignedCoach) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      if (interest.status === "rejected" || interest.status === "withdrawn") {
+        return res.status(400).json({ message: "Cette intention n'est plus active" });
+      }
+
+      const coachValidationOnly = Boolean(
+        await storage.getSetting<boolean>(COACH_VALIDATION_SETTING_KEY)
+      );
+
+      const updates: Partial<FormationInterest> = {
+        coachStatus: "approved",
+        coachId,
+        coachValidatedAt: new Date(),
+      };
+
+      if (coachValidationOnly && interest.status !== "approved") {
+        updates.status = "approved";
+      }
+
+      const updated = await storage.updateFormationInterest(interest.id, updates);
+
+      if (!updated) {
+        return res.status(500).json({ message: "Failed to update interest" });
+      }
+
+      const formation = await storage.getFormation(updated.formationId);
+      const coachee = await storage.getUser(updated.userId);
+      const formationTitle = formation?.title ?? "votre formation";
+
+      if (coachValidationOnly) {
+        await createNotification({
+          userId: updated.userId,
+          route: "/",
+          title: "Intention validée",
+          message: `Votre coach ${coach.name} a validé votre intention pour ${formationTitle}.`,
+        });
+      } else {
+        await createNotification({
+          userId: updated.userId,
+          route: "/interests",
+          title: "Validation coach en attente RH",
+          message: `Votre coach ${coach.name} a validé votre intention pour ${formationTitle}. Elle reste en attente de validation RH.`,
+        });
+
+        try {
+          const rhUsers = (await storage.listUsers(false)).filter((candidate) =>
+            candidate.roles.includes("rh")
+          );
+          const coacheeName = coachee?.name ?? "Un consultant";
+          const rhMessage = `${coacheeName} a une intention validée par ${coach.name} pour ${formationTitle}.`;
+          await Promise.all(
+            rhUsers.map((rhUser) =>
+              createNotification({
+                userId: rhUser.id,
+                route: "/interests",
+                title: "Validation coach reçue",
+                message: rhMessage,
+              })
+            )
+          );
+        } catch (notificationError) {
+          console.error("Failed to notify RH about coach approval", notificationError);
+        }
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/coach/interests/:id/reject", requireAuth, async (req, res) => {
+    try {
+      const coachId = (req as AuthRequest).userId!;
+      const coach = await storage.getUser(coachId);
+
+      if (!coach || !coach.roles.includes("coach")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const interest = await storage.getFormationInterest(req.params.id);
+      if (!interest) {
+        return res.status(404).json({ message: "Interest not found" });
+      }
+
+      const assignments = await storage.listCoachAssignmentsForCoachee(interest.userId);
+      const isAssignedCoach = assignments.some((assignment) => assignment.coachId === coachId);
+      if (!isAssignedCoach) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      if (interest.status === "converted") {
+        return res.status(400).json({ message: "Impossible de refuser une intention déjà convertie" });
+      }
+
+      if (interest.status === "rejected") {
+        return res.status(400).json({ message: "Cette intention est déjà refusée" });
+      }
+
+      const coachee = await storage.getUser(interest.userId);
+      if (coachee) {
+        if (interest.priority === "P1" && (coachee.p1Used || 0) > 0) {
+          await storage.updateUser(coachee.id, { p1Used: (coachee.p1Used || 0) - 1 });
+        } else if (interest.priority === "P2" && (coachee.p2Used || 0) > 0) {
+          await storage.updateUser(coachee.id, { p2Used: (coachee.p2Used || 0) - 1 });
+        }
+      }
+
+      const updated = await storage.updateFormationInterest(interest.id, {
+        status: "rejected",
+        coachStatus: "rejected",
+        coachId,
+        coachValidatedAt: new Date(),
+      });
+
+      if (!updated) {
+        return res.status(500).json({ message: "Failed to update interest" });
+      }
+
+      const formation = await storage.getFormation(updated.formationId);
+      const formationTitle = formation?.title ?? "votre formation";
+
+      await createNotification({
+        userId: updated.userId,
+        route: "/interests",
+        title: "Intention refusée",
+        message: `Votre coach ${coach.name} a refusé votre intention pour ${formationTitle}.`,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
       res.status(500).json({ message: error.message });
     }
   });
@@ -1643,6 +2050,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         p1Count: number;
         p2Count: number;
         p3Count: number;
+        coachPending: number;
+        coachApproved: number;
+        coachRejected: number;
       }>();
 
       for (const interest of interests) {
@@ -1656,16 +2066,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             p1Count: 0,
             p2Count: 0,
             p3Count: 0,
+            coachPending: 0,
+            coachApproved: 0,
+            coachRejected: 0,
           });
         }
 
         const stats = formationMap.get(interest.formationId)!;
-        
+
         // Count by status
         if (interest.status === "pending") stats.pending++;
         else if (interest.status === "approved") stats.approved++;
         else if (interest.status === "converted") stats.converted++;
         else if (interest.status === "withdrawn") stats.withdrawn++;
+
+        if (interest.coachStatus === "approved") stats.coachApproved++;
+        else if (interest.coachStatus === "rejected") stats.coachRejected++;
+        else stats.coachPending++;
 
         // Count by priority - only for active interests (exclude rejected and withdrawn)
         if (interest.status !== "rejected" && interest.status !== "withdrawn") {

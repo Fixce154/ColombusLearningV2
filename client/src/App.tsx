@@ -18,6 +18,7 @@ import InstructorSessions from "@/pages/InstructorSessions";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/not-found";
 import DataVisualization from "@/pages/DataVisualization";
+import CoachDashboard from "@/pages/CoachDashboard";
 import type { User } from "@shared/schema";
 import { Loader2, LogOut } from "lucide-react";
 import { useEffect } from "react";
@@ -54,6 +55,7 @@ function Router({ currentUser }: { currentUser: User }) {
       <Route path="/instructor-formations" component={InstructorFormations} />
       <Route path="/instructor-availability" component={InstructorAvailability} />
       <Route path="/instructor-sessions" component={InstructorSessions} />
+      <Route path="/coach" component={() => <CoachDashboard currentUser={currentUser} />} />
       <Route component={NotFound} />
     </Switch>
   );
