@@ -129,7 +129,7 @@ export default function RegistrationManagement() {
   }
 
   const RegistrationTable = ({ data, showActions = false }: { data: Registration[]; showActions?: boolean }) => (
-    <div className="border rounded-lg">
+    <div className="overflow-hidden rounded-2xl border border-border/60">
       <Table>
         <TableHeader>
           <TableRow>
@@ -212,87 +212,94 @@ export default function RegistrationManagement() {
   );
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary/10 p-3 rounded-xl">
-            <Users className="w-7 h-7 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-4xl font-bold text-primary tracking-tight">Gestion des inscriptions</h1>
-            <p className="text-lg text-muted-foreground mt-1">
-              Validez ou refusez les demandes d'inscription des consultants
+    <div className="space-y-12">
+      <section className="surface-elevated relative overflow-hidden rounded-[2rem] px-12 py-14">
+        <div className="pointer-events-none absolute inset-y-8 right-0 hidden w-72 rounded-l-[32px] bg-[radial-gradient(circle_at_center,rgba(10,132,255,0.12),transparent_60%)] md:block" />
+        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-5">
+            <p className="eyebrow text-muted-foreground">Administration RH</p>
+            <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Pilotage des inscriptions</h1>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              Validez les demandes des consultants, libérez des places et gardez une visibilité claire sur les sessions en cours.
             </p>
           </div>
+          <div className="flex w-full max-w-xs flex-col gap-4">
+            <div className="rounded-2xl border border-white/40 bg-white/80 p-5 text-[#00313F] shadow-sm backdrop-blur">
+              <p className="text-sm font-semibold">Inscriptions en attente</p>
+              <p className="text-3xl font-bold">{pendingRegistrations.length}</p>
+              <p className="text-xs text-[#00313F]/70">
+                {validatedRegistrations.length} validée{validatedRegistrations.length > 1 ? "s" : ""} • {cancelledRegistrations.length} refusée{cancelledRegistrations.length > 1 ? "s" : ""}
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Stats */}
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card className="p-6 shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
+      <section className="space-y-8">
+        <div className="grid gap-6 md:grid-cols-3">
+          <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
+            <div className="space-y-1">
               <p className="text-sm text-muted-foreground">En attente</p>
-              <p className="text-3xl font-bold text-primary">{pendingRegistrations.length}</p>
+              <p className="text-3xl font-semibold text-foreground">{pendingRegistrations.length}</p>
             </div>
-            <div className="bg-destructive/10 p-3 rounded-lg">
-              <Clock className="w-6 h-6 text-destructive" />
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+              <Clock className="h-6 w-6" />
             </div>
-          </div>
-        </Card>
+          </Card>
 
-        <Card className="p-6 shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
+          <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
+            <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Validées</p>
-              <p className="text-3xl font-bold text-primary">{validatedRegistrations.length}</p>
+              <p className="text-3xl font-semibold text-foreground">{validatedRegistrations.length}</p>
             </div>
-            <div className="bg-accent/10 p-3 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-accent" />
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+              <CheckCircle className="h-6 w-6" />
             </div>
-          </div>
-        </Card>
+          </Card>
 
-        <Card className="p-6 shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
+          <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
+            <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Refusées</p>
-              <p className="text-3xl font-bold text-primary">{cancelledRegistrations.length}</p>
+              <p className="text-3xl font-semibold text-foreground">{cancelledRegistrations.length}</p>
             </div>
-            <div className="bg-destructive/10 p-3 rounded-lg">
-              <XCircle className="w-6 h-6 text-destructive" />
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+              <XCircle className="h-6 w-6" />
             </div>
-          </div>
-        </Card>
-      </div>
+          </Card>
+        </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="pending" className="w-full">
-        <TabsList className="h-12 bg-muted p-1 shadow-sm">
-          <TabsTrigger value="pending" className="px-6 font-medium">
-            En attente ({pendingRegistrations.length})
-          </TabsTrigger>
-          <TabsTrigger value="validated" className="px-6 font-medium">
-            Validées ({validatedRegistrations.length})
-          </TabsTrigger>
-          <TabsTrigger value="cancelled" className="px-6 font-medium">
-            Refusées ({cancelledRegistrations.length})
-          </TabsTrigger>
-        </TabsList>
+        <Tabs defaultValue="pending" className="w-full space-y-6">
+          <TabsList className="h-12 rounded-full bg-muted p-1 shadow-sm">
+            <TabsTrigger value="pending" className="px-6 font-medium">
+              En attente ({pendingRegistrations.length})
+            </TabsTrigger>
+            <TabsTrigger value="validated" className="px-6 font-medium">
+              Validées ({validatedRegistrations.length})
+            </TabsTrigger>
+            <TabsTrigger value="cancelled" className="px-6 font-medium">
+              Refusées ({cancelledRegistrations.length})
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="pending" className="mt-6">
-          <RegistrationTable data={pendingRegistrations} showActions={true} />
-        </TabsContent>
+          <TabsContent value="pending">
+            <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
+              <RegistrationTable data={pendingRegistrations} showActions={true} />
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="validated" className="mt-6">
-          <RegistrationTable data={validatedRegistrations} />
-        </TabsContent>
+          <TabsContent value="validated">
+            <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
+              <RegistrationTable data={validatedRegistrations} />
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="cancelled" className="mt-6">
-          <RegistrationTable data={cancelledRegistrations} />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="cancelled">
+            <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
+              <RegistrationTable data={cancelledRegistrations} />
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </section>
 
       {/* Confirmation Dialog */}
       <AlertDialog open={!!selectedRegistration && !!actionType} onOpenChange={() => { setSelectedRegistration(null); setActionType(null); }}>
