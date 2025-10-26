@@ -264,8 +264,8 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
   };
 
   return (
-    <Sidebar className="border-none bg-transparent p-0 text-white">
-      <div className="flex h-full w-20 flex-col items-center bg-[#00313F] px-4 py-8">
+    <Sidebar className="border-none bg-transparent p-0 text-white !w-[7rem]">
+      <div className="flex h-full w-full flex-col items-center bg-[#00313F] px-4 py-8">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white">
           <GraduationCap className="h-6 w-6" />
         </div>

@@ -60,8 +60,8 @@ function Router({ currentUser }: { currentUser: User }) {
 
 function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void }) {
   const style = {
-    "--sidebar-width": "18rem",
-    "--sidebar-width-icon": "4rem",
+    "--sidebar-width": "7rem",
+    "--sidebar-width-icon": "7rem",
   };
 
   return (
