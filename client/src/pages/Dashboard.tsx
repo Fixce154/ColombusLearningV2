@@ -14,9 +14,10 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Calendar, XCircle, Loader2, Heart, AlertCircle, CheckCircle, Trash2 } from "lucide-react";
 import { Link } from "wouter";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useRouteNotifications, useMarkNotificationsRead } from "@/hooks/use-notifications";
 import type { User, Registration, Formation, Session, FormationInterest } from "@shared/schema";
 
 interface DashboardProps {
@@ -53,6 +54,27 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
       return res.json();
     },
   });
+
+  const dashboardNotificationsQuery = useRouteNotifications("/");
+  const dashboardNotifications = dashboardNotificationsQuery.notifications ?? [];
+  const dashboardUnread = dashboardNotificationsQuery.unreadCount ?? 0;
+  const unreadDashboardNotifications = useMemo(
+    () => dashboardNotifications.filter((notification) => !notification.read),
+    [dashboardNotifications]
+  );
+  const markDashboardNotificationsRead = useMarkNotificationsRead();
+  const notificationDateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("fr-FR", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    []
+  );
+  const formatNotificationDate = (isoDate: string) =>
+    notificationDateFormatter.format(new Date(isoDate));
 
   const deleteInterestMutation = useMutation({
     mutationFn: async (interestId: string) => {
@@ -140,7 +162,14 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
       <section className="surface-elevated rounded-3xl px-10 py-12">
         <div className="flex flex-col gap-10 md:flex-row md:items-center md:justify-between">
           <div className="max-w-2xl space-y-6">
-            <p className="eyebrow text-muted-foreground">Tableau de bord</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="eyebrow text-muted-foreground">Tableau de bord</p>
+              {dashboardUnread > 0 ? (
+                <Badge variant="destructive" className="rounded-full px-3 py-1 text-[0.7rem]">
+                  {dashboardUnread} nouveauté{dashboardUnread > 1 ? "s" : ""}
+                </Badge>
+              ) : null}
+            </div>
             <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Bonjour {firstName}</h1>
             <p className="text-base leading-relaxed text-muted-foreground">
               Visualisez vos priorités et vos prochaines sessions de formation dans un espace clair et élégant.
@@ -158,6 +187,43 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
               </Link>
               <span className="text-sm font-medium text-muted-foreground">{formationCountText}</span>
             </div>
+            {unreadDashboardNotifications.length > 0 ? (
+              <div className="mt-6 space-y-3 rounded-2xl border border-primary/10 bg-white/70 p-4 text-[#00313F] shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">Nouveautés pour vous</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-3 text-xs text-[#00313F]"
+                    onClick={() => markDashboardNotificationsRead.mutate({ route: "/" })}
+                    disabled={markDashboardNotificationsRead.isPending || dashboardUnread === 0}
+                  >
+                    {markDashboardNotificationsRead.isPending ? "Traitement..." : "Marquer comme lues"}
+                  </Button>
+                </div>
+                <ul className="space-y-2">
+                  {unreadDashboardNotifications.slice(0, 3).map((notification) => (
+                    <li key={notification.id} className="flex items-start gap-3 text-sm">
+                      <span className="mt-1 inline-flex h-2.5 w-2.5 flex-shrink-0 rounded-full bg-primary" />
+                      <div>
+                        <p className="font-medium text-[#00313F]">{notification.title}</p>
+                        {notification.message ? (
+                          <p className="text-sm text-[#00313F]/75">{notification.message}</p>
+                        ) : null}
+                        <p className="text-xs text-[#00313F]/60">
+                          {formatNotificationDate(notification.createdAt)}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {unreadDashboardNotifications.length > 3 ? (
+                  <p className="text-xs text-[#00313F]/60">
+                    {unreadDashboardNotifications.length - 3} notification(s) supplémentaires en attente.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
       </section>

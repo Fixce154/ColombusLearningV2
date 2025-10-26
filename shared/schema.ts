@@ -1,5 +1,14 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  varchar,
+  integer,
+  timestamp,
+  boolean,
+  uniqueIndex,
+  jsonb,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -72,6 +81,18 @@ export const instructorFormations = pgTable("instructor_formations", {
   instructorFormationUnique: uniqueIndex("instructor_formation_unique_idx").on(table.instructorId, table.formationId),
 }));
 
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  route: text("route").notNull(),
+  title: text("title").notNull(),
+  message: text("message"),
+  metadata: jsonb("metadata"),
+  read: boolean("read").default(false),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  readAt: timestamp("read_at"),
+});
+
 // Availability slot schema
 export const availabilitySlotSchema = z.object({
   date: z.string(), // ISO date string
@@ -102,6 +123,12 @@ export const insertInstructorFormationSchema = createInsertSchema(instructorForm
 export const insertInstructorAvailabilitySchema = createInsertSchema(instructorAvailabilities).omit({ id: true, createdAt: true }).extend({
   slots: z.array(availabilitySlotSchema),
 });
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+  read: true,
+  readAt: true,
+});
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -117,3 +144,5 @@ export type InsertInstructorFormation = z.infer<typeof insertInstructorFormation
 export type InstructorFormation = typeof instructorFormations.$inferSelect;
 export type InsertInstructorAvailability = z.infer<typeof insertInstructorAvailabilitySchema>;
 export type InstructorAvailability = typeof instructorAvailabilities.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;

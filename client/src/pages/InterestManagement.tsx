@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -29,6 +29,7 @@ import type { FormationInterest, Formation, User } from "@shared/schema";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PriorityBadge from "@/components/PriorityBadge";
+import { useRouteNotifications, useMarkNotificationsRead } from "@/hooks/use-notifications";
 
 interface AdminInterestsResponse {
   interests: FormationInterest[];
@@ -81,6 +82,27 @@ export default function InterestManagement() {
     },
     retry: false,
   });
+
+  const interestNotificationsQuery = useRouteNotifications("/interests");
+  const interestNotifications = interestNotificationsQuery.notifications ?? [];
+  const interestUnread = interestNotificationsQuery.unreadCount ?? 0;
+  const unreadInterestNotifications = useMemo(
+    () => interestNotifications.filter((notification) => !notification.read),
+    [interestNotifications]
+  );
+  const markInterestNotificationsRead = useMarkNotificationsRead();
+  const notificationDateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("fr-FR", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    []
+  );
+  const formatNotificationDate = (isoDate: string) =>
+    notificationDateFormatter.format(new Date(isoDate));
 
   // Update interest status mutation
   const updateStatusMutation = useMutation({
@@ -303,14 +325,21 @@ export default function InterestManagement() {
   return (
     <div className="container mx-auto p-8 space-y-8">
       {/* Header */}
-      <div className="space-y-2">
+      <div className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="bg-primary/10 p-3 rounded-xl">
               <Heart className="w-7 h-7 text-primary" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-primary">Gestion des intentions de formation</h1>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-bold text-primary">Gestion des intentions de formation</h1>
+                {interestUnread > 0 ? (
+                  <Badge variant="destructive" className="rounded-full px-3 py-1 text-[0.7rem]">
+                    {interestUnread} nouveauté{interestUnread > 1 ? "s" : ""}
+                  </Badge>
+                ) : null}
+              </div>
               <p className="text-muted-foreground">Approuvez ou refusez les demandes d'intérêt des consultants</p>
             </div>
           </div>
@@ -325,6 +354,45 @@ export default function InterestManagement() {
             Rafraîchir
           </Button>
         </div>
+        {unreadInterestNotifications.length > 0 ? (
+          <Card className="border border-primary/20 shadow-sm">
+            <div className="space-y-3 p-6 text-[#00313F]">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold">Nouveautés à traiter</h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-3 text-xs text-[#00313F]"
+                  onClick={() => markInterestNotificationsRead.mutate({ route: "/interests" })}
+                  disabled={markInterestNotificationsRead.isPending || interestUnread === 0}
+                >
+                  {markInterestNotificationsRead.isPending ? "Traitement..." : "Marquer comme lues"}
+                </Button>
+              </div>
+              <ul className="space-y-2">
+                {unreadInterestNotifications.slice(0, 5).map((notification) => (
+                  <li key={notification.id} className="flex items-start gap-3 text-sm">
+                    <span className="mt-1 inline-flex h-2.5 w-2.5 flex-shrink-0 rounded-full bg-primary" />
+                    <div>
+                      <p className="font-medium text-[#00313F]">{notification.title}</p>
+                      {notification.message ? (
+                        <p className="text-sm text-[#00313F]/75">{notification.message}</p>
+                      ) : null}
+                      <p className="text-xs text-[#00313F]/60">
+                        {formatNotificationDate(notification.createdAt)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {unreadInterestNotifications.length > 5 ? (
+                <p className="text-xs text-[#00313F]/60">
+                  {unreadInterestNotifications.length - 5} notification(s) supplémentaires en attente.
+                </p>
+              ) : null}
+            </div>
+          </Card>
+        ) : null}
       </div>
 
       {/* Statistics Cards */}
