@@ -23,7 +23,7 @@ export default function TrainingListItem({
 }: TrainingListItemProps) {
   return (
     <Card
-      className="surface-soft flex cursor-pointer items-center justify-between gap-6 rounded-3xl p-6 transition-transform duration-300 hover:-translate-y-1"
+      className="surface-soft flex cursor-pointer items-center justify-between gap-6 rounded-2xl p-6 transition-transform duration-300 hover:-translate-y-1"
       onClick={onViewDetails}
       data-testid="item-training-list"
     >
@@ -53,7 +53,7 @@ export default function TrainingListItem({
       <Button
         variant="ghost"
         size="icon"
-        className="flex-shrink-0 rounded-full border border-black/10 bg-white text-muted-foreground transition hover:border-primary/20 hover:text-primary"
+        className="flex-shrink-0 rounded-lg border border-black/10 bg-white text-muted-foreground transition hover:border-primary/20 hover:text-primary"
         onClick={(e) => {
           e.stopPropagation();
           onViewDetails();

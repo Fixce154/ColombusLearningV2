@@ -139,8 +139,8 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
 
   return (
     <div className="space-y-12">
-      <section className="surface-elevated relative overflow-hidden rounded-[2.5rem] px-12 py-14">
-        <div className="pointer-events-none absolute inset-y-6 right-10 hidden w-64 rounded-[28px] bg-[radial-gradient(circle_at_top,rgba(10,132,255,0.16),transparent_60%)] md:block" />
+      <section className="surface-elevated relative overflow-hidden rounded-3xl px-10 py-12">
+        <div className="pointer-events-none absolute inset-y-6 right-10 hidden w-64 rounded-3xl bg-[radial-gradient(circle_at_top,rgba(10,132,255,0.16),transparent_60%)] md:block" />
         <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
           <div className="max-w-2xl space-y-6">
             <p className="eyebrow text-muted-foreground">Tableau de bord</p>
@@ -152,7 +152,7 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
               <Link href="/catalog">
                 <Button
                   size="lg"
-                  className="group gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-[0_24px_40px_-28px_rgba(10,132,255,0.65)] transition hover:bg-primary/90"
+                  className="group gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_32px_-26px_rgba(10,132,255,0.55)] transition hover:bg-primary/90"
                   data-testid="button-browse-catalog"
                 >
                   <Plus className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
@@ -163,19 +163,19 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
             </div>
           </div>
           <div className="grid w-full max-w-sm grid-cols-2 gap-4 text-center text-foreground">
-            <div className="rounded-3xl border border-black/5 bg-white px-5 py-4 shadow-sm">
+            <div className="rounded-2xl border border-black/5 bg-white px-5 py-4 shadow-sm">
               <p className="eyebrow text-muted-foreground">P1 restant</p>
               <p className="mt-3 text-2xl font-semibold">{remainingP1}</p>
             </div>
-            <div className="rounded-3xl border border-black/5 bg-white px-5 py-4 shadow-sm">
+            <div className="rounded-2xl border border-black/5 bg-white px-5 py-4 shadow-sm">
               <p className="eyebrow text-muted-foreground">P2 restante</p>
               <p className="mt-3 text-2xl font-semibold">{remainingP2}</p>
             </div>
-            <div className="rounded-3xl border border-black/5 bg-secondary px-5 py-4 shadow-sm">
+            <div className="rounded-2xl border border-black/5 bg-secondary px-5 py-4 shadow-sm">
               <p className="eyebrow text-muted-foreground">Sessions validées</p>
               <p className="mt-3 text-2xl font-semibold">{upcomingTrainings.length}</p>
             </div>
-            <div className="rounded-3xl border border-black/5 bg-secondary px-5 py-4 shadow-sm">
+            <div className="rounded-2xl border border-black/5 bg-secondary px-5 py-4 shadow-sm">
               <p className="eyebrow text-muted-foreground">Priorités dispo.</p>
               <p className="mt-3 text-2xl font-semibold">{totalPriorityRemaining}</p>
             </div>
@@ -194,7 +194,7 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
         <section className="space-y-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <Heart className="h-5 w-5" />
               </div>
               <div>
@@ -217,7 +217,7 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
               return (
                 <Card
                   key={interest.id}
-                  className={`surface-soft h-full p-6 transition-transform duration-300 ${isRejected ? 'opacity-70' : 'hover:-translate-y-1'}`}
+                  className={`surface-soft h-full rounded-2xl p-6 transition-transform duration-300 ${isRejected ? 'opacity-70' : 'hover:-translate-y-1'}`}
                 >
                   <div className="space-y-4">
                     <div className="flex items-start justify-between gap-3">
@@ -274,7 +274,7 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
                         <Button
                           variant="outline"
                           size="sm"
-                          className="w-full rounded-full border border-black/10 bg-white text-sm font-medium text-foreground hover:border-primary/20 hover:text-primary"
+                          className="w-full rounded-lg border border-black/10 bg-white text-sm font-medium text-foreground hover:border-primary/20 hover:text-primary"
                           data-testid={`button-view-interest-${interest.id}`}
                         >
                           Voir les détails
@@ -287,7 +287,7 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
                         size="sm"
                         onClick={() => setDeleteInterestId(interest.id)}
                         data-testid={`button-cancel-interest-${interest.id}`}
-                        className={`${isRejected ? 'w-full' : 'rounded-full'}`}
+                        className={`rounded-lg${isRejected ? ' w-full' : ''}`}
                       >
                         <Trash2 className="h-4 w-4" />
                         {isRejected && <span className="ml-2">Supprimer</span>}
@@ -304,7 +304,7 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
       <section className="space-y-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary text-foreground">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-foreground">
               <Calendar className="h-5 w-5" />
             </div>
             <div>
@@ -322,7 +322,7 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
         {upcomingTrainings.length > 0 ? (
           <div className="grid gap-5 md:grid-cols-2">
             {upcomingTrainings.map((reg) => (
-              <Card key={reg.id} className="surface-soft p-6 transition-transform duration-300 hover:-translate-y-1">
+              <Card key={reg.id} className="surface-soft rounded-2xl p-6 transition-transform duration-300 hover:-translate-y-1">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 space-y-3">
                     <h3 className="text-lg font-semibold tracking-tight text-foreground">{getFormationTitle(reg.formationId)}</h3>
@@ -347,7 +347,7 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
                     size="sm"
                     onClick={() => setDeleteRegistrationId(reg.id)}
                     data-testid={`button-cancel-registration-${reg.id}`}
-                    className="rounded-full"
+                    className="rounded-lg"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -356,9 +356,9 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
             ))}
           </div>
         ) : (
-          <Card className="surface-tonal rounded-[1.75rem] p-12 text-center">
+          <Card className="surface-tonal rounded-2xl p-12 text-center">
             <div className="flex flex-col items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-muted-foreground shadow-sm">
                 <Calendar className="h-8 w-8" />
               </div>
               <div className="space-y-2">
@@ -376,7 +376,7 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
         <section className="space-y-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
                 <XCircle className="h-5 w-5" />
               </div>
               <div>
@@ -406,7 +406,7 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
       )}
 
       <Dialog open={deleteInterestId !== null} onOpenChange={() => setDeleteInterestId(null)}>
-        <DialogContent className="surface-soft rounded-3xl border-black/5 bg-white" data-testid="dialog-confirm-delete-interest">
+        <DialogContent className="surface-soft rounded-2xl border-black/5 bg-white" data-testid="dialog-confirm-delete-interest">
           <DialogHeader>
             <DialogTitle className="text-destructive">Annuler votre intention de formation ?</DialogTitle>
             <DialogDescription className="pt-2 text-base">
@@ -453,7 +453,7 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
       </Dialog>
 
       <Dialog open={deleteRegistrationId !== null} onOpenChange={() => setDeleteRegistrationId(null)}>
-        <DialogContent className="surface-soft rounded-3xl border-black/5 bg-white" data-testid="dialog-confirm-delete-registration">
+        <DialogContent className="surface-soft rounded-2xl border-black/5 bg-white" data-testid="dialog-confirm-delete-registration">
           <DialogHeader>
             <DialogTitle className="text-destructive">Annuler votre inscription ?</DialogTitle>
             <DialogDescription className="pt-2 text-base">
