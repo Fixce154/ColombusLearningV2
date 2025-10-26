@@ -10,6 +10,7 @@ import {
   Plus,
   Minus,
   Settings,
+  UserCheck,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -155,6 +156,16 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
         items: [
           { title: "Mon équipe", url: "/team", icon: Home },
           { title: "Suivi formations", url: "/team-trainings", icon: BarChart },
+        ],
+      });
+    }
+
+    if (roles.includes("coach")) {
+      sections.push({
+        label: "Coaching",
+        icon: UserCheck,
+        items: [
+          { title: "Mes coachés", url: "/coach", icon: Users },
         ],
       });
     }

@@ -4,6 +4,7 @@ export const USER_ROLES = [
   "formateur",
   "formateur_externe",
   "manager",
+  "coach",
 ] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
@@ -17,6 +18,7 @@ const ROLE_LABEL_MAP: Record<UserRole, string> = {
   formateur: "Formateur interne",
   formateur_externe: "Formateur externe",
   manager: "Manager",
+  coach: "Coach",
 };
 
 export function getRoleLabel(role: string): string {

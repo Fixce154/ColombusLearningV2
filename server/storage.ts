@@ -8,6 +8,8 @@ import {
   instructorFormations,
   instructorAvailabilities,
   notifications,
+  coachAssignments,
+  appSettings,
   type User,
   type InsertUser,
   type Formation,
@@ -24,6 +26,9 @@ import {
   type InsertInstructorAvailability,
   type Notification,
   type InsertNotification,
+  type CoachAssignment,
+  type InsertCoachAssignment,
+  type AppSetting,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, asc, ne, inArray } from "drizzle-orm";
@@ -77,6 +82,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined>;
   listUsers(archived?: boolean): Promise<User[]>;
+  listUsersByIds(ids: string[]): Promise<User[]>;
   deleteUser(id: string): Promise<boolean>;
 
   // Formation methods
@@ -106,6 +112,7 @@ export interface IStorage {
   getRegistration(id: string): Promise<Registration | undefined>;
   listRegistrations(userId?: string, sessionId?: string): Promise<Registration[]>;
   listAllRegistrations(): Promise<Registration[]>;
+  listRegistrationsForUsers(userIds: string[]): Promise<Registration[]>;
   createRegistration(registration: InsertRegistration & { status: string }): Promise<Registration>;
   updateRegistration(id: string, updates: Partial<InsertRegistration>): Promise<Registration | undefined>;
   deleteRegistration(id: string): Promise<boolean>;
@@ -134,6 +141,20 @@ export interface IStorage {
     filter?: { notificationIds?: string[]; route?: string }
   ): Promise<number>;
   getUnreadNotificationCounts(userId: string): Promise<Array<{ route: string; count: number }>>;
+
+  // Coach assignments
+  listCoachAssignments(): Promise<CoachAssignment[]>;
+  listCoachAssignmentsForCoach(coachId: string): Promise<CoachAssignment[]>;
+  listCoachAssignmentsForCoachee(coacheeId: string): Promise<CoachAssignment[]>;
+  getCoachAssignment(id: string): Promise<CoachAssignment | undefined>;
+  getCoachAssignmentForPair(coachId: string, coacheeId: string): Promise<CoachAssignment | undefined>;
+  createCoachAssignment(assignment: InsertCoachAssignment): Promise<CoachAssignment>;
+  deleteCoachAssignment(id: string): Promise<boolean>;
+  deleteCoachAssignmentsForCoach(coachId: string): Promise<number>;
+
+  // Settings
+  getSetting<T>(key: string): Promise<T | null>;
+  setSetting<T>(key: string, value: T): Promise<AppSetting>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -164,6 +185,11 @@ export class DatabaseStorage implements IStorage {
 
   async listUsers(archived: boolean = false): Promise<User[]> {
     return await db.select().from(users).where(eq(users.archived, archived));
+  }
+
+  async listUsersByIds(ids: string[]): Promise<User[]> {
+    if (ids.length === 0) return [];
+    return await db.select().from(users).where(inArray(users.id, ids));
   }
 
   async deleteUser(id: string): Promise<boolean> {
@@ -360,6 +386,15 @@ export class DatabaseStorage implements IStorage {
 
   async listAllRegistrations(): Promise<Registration[]> {
     return await db.select().from(registrations).orderBy(desc(registrations.registeredAt));
+  }
+
+  async listRegistrationsForUsers(userIds: string[]): Promise<Registration[]> {
+    if (userIds.length === 0) return [];
+    return await db
+      .select()
+      .from(registrations)
+      .where(inArray(registrations.userId, userIds))
+      .orderBy(desc(registrations.registeredAt));
   }
 
   async createRegistration(insertRegistration: InsertRegistration & { status: string }): Promise<Registration> {
@@ -597,6 +632,105 @@ export class DatabaseStorage implements IStorage {
       .from(notifications)
       .where(and(eq(notifications.userId, userId), eq(notifications.read, false)))
       .groupBy(notifications.route);
+  }
+
+  async listCoachAssignments(): Promise<CoachAssignment[]> {
+    return await db.select().from(coachAssignments).orderBy(desc(coachAssignments.createdAt));
+  }
+
+  async listCoachAssignmentsForCoach(coachId: string): Promise<CoachAssignment[]> {
+    return await db
+      .select()
+      .from(coachAssignments)
+      .where(eq(coachAssignments.coachId, coachId))
+      .orderBy(desc(coachAssignments.createdAt));
+  }
+
+  async listCoachAssignmentsForCoachee(coacheeId: string): Promise<CoachAssignment[]> {
+    return await db
+      .select()
+      .from(coachAssignments)
+      .where(eq(coachAssignments.coacheeId, coacheeId))
+      .orderBy(desc(coachAssignments.createdAt));
+  }
+
+  async getCoachAssignment(id: string): Promise<CoachAssignment | undefined> {
+    const [assignment] = await db
+      .select()
+      .from(coachAssignments)
+      .where(eq(coachAssignments.id, id));
+    return assignment || undefined;
+  }
+
+  async getCoachAssignmentForPair(
+    coachId: string,
+    coacheeId: string
+  ): Promise<CoachAssignment | undefined> {
+    const [assignment] = await db
+      .select()
+      .from(coachAssignments)
+      .where(
+        and(
+          eq(coachAssignments.coachId, coachId),
+          eq(coachAssignments.coacheeId, coacheeId)
+        )
+      );
+    return assignment || undefined;
+  }
+
+  async createCoachAssignment(assignment: InsertCoachAssignment): Promise<CoachAssignment> {
+    const [created] = await db
+      .insert(coachAssignments)
+      .values(assignment)
+      .onConflictDoNothing()
+      .returning();
+
+    if (created) {
+      return created;
+    }
+
+    const existing = await this.getCoachAssignmentForPair(
+      assignment.coachId,
+      assignment.coacheeId
+    );
+    if (!existing) {
+      throw new Error("Failed to create coach assignment");
+    }
+    return existing;
+  }
+
+  async deleteCoachAssignment(id: string): Promise<boolean> {
+    const result = await db
+      .delete(coachAssignments)
+      .where(eq(coachAssignments.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async deleteCoachAssignmentsForCoach(coachId: string): Promise<number> {
+    const result = await db
+      .delete(coachAssignments)
+      .where(eq(coachAssignments.coachId, coachId))
+      .returning({ id: coachAssignments.id });
+    return result.length;
+  }
+
+  async getSetting<T>(key: string): Promise<T | null> {
+    const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, key));
+    if (!setting) return null;
+    return setting.value as T;
+  }
+
+  async setSetting<T>(key: string, value: T): Promise<AppSetting> {
+    const [setting] = await db
+      .insert(appSettings)
+      .values({ key, value })
+      .onConflictDoUpdate({
+        target: appSettings.key,
+        set: { value, updatedAt: sql`now()` },
+      })
+      .returning();
+    return setting;
   }
 }
 
