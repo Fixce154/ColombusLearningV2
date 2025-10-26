@@ -28,6 +28,48 @@ import {
 import { db } from "./db";
 import { eq, and, sql, desc, asc, ne, inArray } from "drizzle-orm";
 
+export const ensureNotificationsTable = (() => {
+  let ensurePromise: Promise<void> | null = null;
+
+  return async () => {
+    if (!ensurePromise) {
+      ensurePromise = (async () => {
+        try {
+          await db.execute(sql`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+        } catch (extensionError) {
+          console.error("Failed to ensure pgcrypto extension", extensionError);
+        }
+
+        await db.execute(sql`
+          CREATE TABLE IF NOT EXISTS notifications (
+            id varchar(255) PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id varchar(255) NOT NULL,
+            route text NOT NULL,
+            title text NOT NULL,
+            message text,
+            metadata jsonb,
+            read boolean DEFAULT false,
+            created_at timestamp DEFAULT now(),
+            read_at timestamp
+          )
+        `);
+
+        await db.execute(sql`
+          CREATE INDEX IF NOT EXISTS notifications_user_read_idx
+          ON notifications (user_id, read)
+        `);
+
+        await db.execute(sql`
+          CREATE INDEX IF NOT EXISTS notifications_route_idx
+          ON notifications (route)
+        `);
+      })();
+    }
+
+    return ensurePromise;
+  };
+})();
+
 export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
@@ -510,6 +552,7 @@ export class DatabaseStorage implements IStorage {
 
   // Notification methods
   async listNotifications(userId: string): Promise<Notification[]> {
+    await ensureNotificationsTable();
     return await db
       .select()
       .from(notifications)
@@ -518,6 +561,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createNotification(notification: InsertNotification): Promise<Notification> {
+    await ensureNotificationsTable();
     const [created] = await db.insert(notifications).values(notification).returning();
     return created;
   }
@@ -526,6 +570,7 @@ export class DatabaseStorage implements IStorage {
     userId: string,
     filter?: { notificationIds?: string[]; route?: string }
   ): Promise<number> {
+    await ensureNotificationsTable();
     const conditions = [eq(notifications.userId, userId), eq(notifications.read, false)];
 
     if (filter?.notificationIds && filter.notificationIds.length > 0) {
@@ -546,6 +591,7 @@ export class DatabaseStorage implements IStorage {
   async getUnreadNotificationCounts(
     userId: string
   ): Promise<Array<{ route: string; count: number }>> {
+    await ensureNotificationsTable();
     return await db
       .select({ route: notifications.route, count: sql<number>`count(*)` })
       .from(notifications)
