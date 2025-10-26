@@ -60,8 +60,8 @@ function Router({ currentUser }: { currentUser: User }) {
 
 function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void }) {
   const style = {
-    "--sidebar-width": "18rem",
-    "--sidebar-width-icon": "4rem",
+    "--sidebar-width": "7rem",
+    "--sidebar-width-icon": "7rem",
   };
 
   return (
@@ -69,12 +69,12 @@ function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void
       <div className="flex h-screen w-full overflow-hidden">
         <AppSidebar currentUser={user} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="px-10 pt-12">
-            <div className="surface-elevated flex items-center justify-between gap-8 px-8 py-6">
-              <div className="flex items-center gap-5">
+          <header className="px-8 pt-10 pb-6">
+            <div className="flex items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
                 <SidebarTrigger
                   data-testid="button-sidebar-toggle"
-                  className="h-11 w-11 rounded-full border border-black/10 bg-white/80 text-foreground shadow-sm transition hover:bg-white"
+                  className="h-11 w-11 rounded-2xl border border-white/40 bg-white/80 text-foreground shadow-sm transition hover:bg-white"
                 />
                 <div>
                   <p className="eyebrow mb-1 text-muted-foreground">Espace membre</p>
@@ -97,8 +97,8 @@ function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void
               </div>
             </div>
           </header>
-          <main className="flex-1 overflow-auto px-10 pb-14">
-            <div className="mx-auto max-w-7xl space-y-12 pt-12">
+          <main className="flex-1 overflow-auto px-8 pb-12">
+            <div className="mx-auto max-w-6xl space-y-12 pt-6">
               <Router currentUser={user} />
             </div>
           </main>

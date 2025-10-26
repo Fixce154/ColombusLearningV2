@@ -1,16 +1,17 @@
+import { Sidebar } from "@/components/ui/sidebar";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarHeader,
-  SidebarFooter,
-} from "@/components/ui/sidebar";
-import { Home, BookOpen, Calendar, Users, BarChart, GraduationCap, Heart, Plus, Minus } from "lucide-react";
+  Home,
+  BookOpen,
+  Calendar,
+  Users,
+  BarChart,
+  GraduationCap,
+  Heart,
+  Plus,
+  Minus,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { User } from "@shared/schema";
 import { useMutation } from "@tanstack/react-query";
@@ -26,8 +27,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatRoles, isInstructor } from "@shared/roles";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 
 interface AppSidebarProps {
   currentUser: User;
@@ -35,13 +38,29 @@ interface AppSidebarProps {
 
 interface MenuSection {
   label?: string;
-  items: Array<{ title: string; url: string; icon: any }>;
+  icon: LucideIcon;
+  items: MenuItem[];
+}
+
+interface MenuItem {
+  title: string;
+  icon: LucideIcon;
+  url?: string;
+  description?: string;
+  action?: "becomeInstructor" | "resignInstructor";
 }
 
 export default function AppSidebar({ currentUser }: AppSidebarProps) {
   const [location] = useLocation();
   const { toast } = useToast();
   const [showResignDialog, setShowResignDialog] = useState(false);
+  const [isSectionDialogOpen, setIsSectionDialogOpen] = useState(false);
+  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null>(null);
+  const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [panelPosition, setPanelPosition] = useState<{ top: number; left: number } | null>(
+    null,
+  );
 
   const becomeInstructorMutation = useMutation({
     mutationFn: async () => {
@@ -89,11 +108,10 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
     const sections: MenuSection[] = [];
     const roles = currentUser.roles;
 
-    // Section "Mes formations" pour tous les consultants
-    // Un RH est forcément consultant, donc on affiche aussi pour les RH
     if (roles.includes("consultant") || roles.includes("rh")) {
       sections.push({
         label: roles.includes("rh") || isInstructor(roles) ? "Mes formations" : undefined,
+        icon: Home,
         items: [
           { title: "Tableau de bord", url: "/", icon: Home },
           { title: "Catalogue", url: "/catalog", icon: BookOpen },
@@ -101,10 +119,10 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
       });
     }
 
-    // Section "Formation" pour les formateurs
     if (isInstructor(roles)) {
       sections.push({
         label: "Formation",
+        icon: GraduationCap,
         items: [
           { title: "Mes formations", url: "/instructor-formations", icon: BookOpen },
           { title: "Mes disponibilités", url: "/instructor-availability", icon: Calendar },
@@ -113,10 +131,10 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
       });
     }
 
-    // Section "Administration RH" pour RH
     if (roles.includes("rh")) {
       sections.push({
         label: "Administration RH",
+        icon: Users,
         items: [
           { title: "Formations", url: "/formations", icon: BookOpen },
           { title: "Sessions", url: "/sessions", icon: Calendar },
@@ -127,10 +145,10 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
       });
     }
 
-    // Section manager
     if (roles.includes("manager")) {
       sections.push({
         label: "Management",
+        icon: BarChart,
         items: [
           { title: "Mon équipe", url: "/team", icon: Home },
           { title: "Suivi formations", url: "/team-trainings", icon: BarChart },
@@ -138,116 +156,254 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
       });
     }
 
+    sections.push({
+      label: "Gérer mon rôle",
+      icon: Settings,
+      items: isInstructor(roles)
+        ? [
+            {
+              title: "Ne plus être formateur",
+              icon: Minus,
+              action: "resignInstructor",
+              description: "Retirer l'accès formateur",
+            },
+          ]
+        : [
+            {
+              title: "Devenir formateur",
+              icon: Plus,
+              action: "becomeInstructor",
+              description: "Accéder aux fonctionnalités formateur",
+            },
+          ],
+    });
+
     return sections;
   };
 
-  const menuSections = getMenuSections();
+  const menuSections = useMemo(() => getMenuSections(), [
+    JSON.stringify(currentUser.roles ?? []),
+  ]);
+
+  useEffect(() => {
+    if (
+      activeSectionIndex !== null &&
+      (activeSectionIndex < 0 || activeSectionIndex >= menuSections.length)
+    ) {
+      setActiveSectionIndex(null);
+      setIsSectionDialogOpen(false);
+    }
+  }, [menuSections, activeSectionIndex]);
+
+  const updatePanelPosition = (index: number) => {
+    const targetButton = buttonRefs.current[index];
+    if (!targetButton) return;
+    const rect = targetButton.getBoundingClientRect();
+    setPanelPosition({
+      top: rect.top + rect.height / 2 + window.scrollY,
+      left: rect.right + 6 + window.scrollX,
+    });
+  };
+
+  useEffect(() => {
+    if (!isSectionDialogOpen || activeSectionIndex === null) return;
+
+    const handleReposition = () => updatePanelPosition(activeSectionIndex);
+    handleReposition();
+
+    window.addEventListener("resize", handleReposition);
+    window.addEventListener("scroll", handleReposition, true);
+
+    return () => {
+      window.removeEventListener("resize", handleReposition);
+      window.removeEventListener("scroll", handleReposition, true);
+    };
+  }, [isSectionDialogOpen, activeSectionIndex]);
+
+  useEffect(() => {
+    if (!isSectionDialogOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (panelRef.current?.contains(target)) return;
+
+      const isClickOnButton = buttonRefs.current.some((button) =>
+        button ? button.contains(target as Node) : false,
+      );
+
+      if (!isClickOnButton) {
+        setIsSectionDialogOpen(false);
+        setActiveSectionIndex(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsSectionDialogOpen(false);
+        setActiveSectionIndex(null);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isSectionDialogOpen]);
+
+  const activeSection =
+    activeSectionIndex !== null ? menuSections[activeSectionIndex] : undefined;
+
+  const getSectionTitle = (section?: MenuSection) => {
+    if (!section) return "Navigation";
+    if (section.label) return section.label;
+    return section.items[0]?.title ?? "Navigation";
+  };
 
   return (
-    <Sidebar className="border-r border-black/5 bg-white/85 text-foreground backdrop-blur-sm">
-      <SidebarHeader className="border-b border-black/5 px-6 py-8">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <GraduationCap className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="eyebrow text-muted-foreground">Colombus</p>
-            <p className="text-lg font-semibold tracking-tight">Learning Suite</p>
-          </div>
+    <Sidebar className="border-none bg-transparent p-0 text-white !w-[7rem]">
+      <div className="flex h-full w-full flex-col items-center bg-[#00313F] px-4 py-8">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white">
+          <GraduationCap className="h-6 w-6" />
         </div>
-      </SidebarHeader>
-      <SidebarContent className="px-5 py-8">
-        {menuSections.map((section, index) => (
-          <SidebarGroup key={index} className={index > 0 ? "mt-8" : ""}>
-            {section.label && (
-              <SidebarGroupLabel className="eyebrow mb-3 px-3 text-muted-foreground">
-                {section.label}
-              </SidebarGroupLabel>
-            )}
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-2">
-                {section.items.map((item) => {
-                  const isActive = location === item.url;
-                  return (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive}
-                        className="h-12 rounded-2xl border border-transparent px-4 text-sm font-medium text-muted-foreground transition data-[active=true]:border-primary/10 data-[active=true]:bg-primary/10 data-[active=true]:text-primary hover:border-primary/10 hover:bg-primary/5 hover:text-primary"
-                      >
-                        <Link href={item.url} data-testid={`link-${item.url.slice(1) || "home"}`}>
-                          <item.icon className="h-5 w-5" />
+
+        <div className="mt-12 flex flex-1 flex-col items-center gap-5">
+          {menuSections.map((section, index) => (
+            <Tooltip key={index} delayDuration={100}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  ref={(button) => {
+                    buttonRefs.current[index] = button;
+                  }}
+                  onClick={() => {
+                    if (isSectionDialogOpen && activeSectionIndex === index) {
+                      setIsSectionDialogOpen(false);
+                      setActiveSectionIndex(null);
+                      return;
+                    }
+
+                    setActiveSectionIndex(index);
+                    setIsSectionDialogOpen(true);
+                    updatePanelPosition(index);
+                  }}
+                  className={`flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
+                    activeSectionIndex === index && isSectionDialogOpen
+                      ? "bg-white text-[#00313F]"
+                      : "bg-white/10 text-white hover:bg-white/20"
+                  }`}
+                  aria-label={getSectionTitle(section)}
+                >
+                  <section.icon className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-sm font-medium">
+                {getSectionTitle(section)}
+              </TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
+
+        <Tooltip delayDuration={100}>
+          <TooltipTrigger asChild>
+            <div className="mt-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-sm font-semibold">
+              {currentUser.name
+                .split(" ")
+                .map((n) => n[0])
+                .join("")}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-xs text-sm">
+            <p className="font-semibold">{currentUser.name}</p>
+            <p className="text-xs text-muted-foreground opacity-80">{formatRoles(currentUser.roles)}</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+
+      {isSectionDialogOpen && activeSection ? (
+        <div
+          ref={panelRef}
+          className="fixed z-50 w-[320px] max-w-[calc(100vw-5rem)] -translate-y-1/2 transform text-[#00313F]"
+          style={{
+            top: panelPosition?.top ?? 0,
+            left: panelPosition?.left ?? 0,
+          }}
+        >
+          <div className="relative overflow-hidden rounded-lg border border-white/40 bg-white/95 shadow-lg backdrop-blur">
+            <span className="absolute inset-y-0 left-0 w-1.5 bg-[#00313F]" aria-hidden="true" />
+            <div className="space-y-3 px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#00313F]/70">
+                {getSectionTitle(activeSection)}
+              </p>
+              {activeSection.items.length === 0 ? (
+                <p className="text-sm text-[#00313F]/70">
+                  Aucun contenu disponible pour cette rubrique.
+                </p>
+              ) : (
+                <nav className="flex flex-col gap-1">
+                  {activeSection.items.map((item) => {
+                    if (item.url) {
+                      const isCurrentLocation = location === item.url;
+                      return (
+                        <Link
+                          key={item.title}
+                          href={item.url}
+                          data-testid={`link-${item.url.slice(1) || "home"}`}
+                          onClick={() => setIsSectionDialogOpen(false)}
+                          className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                            isCurrentLocation
+                              ? "bg-[#00313F]/10 text-[#00313F]"
+                              : "text-[#00313F]/85 hover:bg-[#00313F]/5 hover:text-[#00313F]"
+                          }`}
+                        >
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00313F]/8 text-[#00313F]">
+                            <item.icon className="h-4 w-4" />
+                          </span>
                           <span>{item.title}</span>
                         </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
-        
-        {!isInstructor(currentUser.roles) && (
-          <SidebarGroup className="mt-8">
-            <SidebarGroupLabel className="eyebrow mb-3 px-3 text-muted-foreground">
-              Devenir formateur
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => becomeInstructorMutation.mutate()}
-                    disabled={becomeInstructorMutation.isPending}
-                    className="h-12 rounded-2xl border border-primary/10 bg-primary/5 px-4 text-sm font-medium text-primary transition hover:bg-primary/10"
-                    data-testid="button-become-instructor"
-                  >
-                    <Plus className="w-5 h-5" />
-                    <span className="font-medium">
-                      {becomeInstructorMutation.isPending ? "Activation..." : "Activer"}
-                    </span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+                      );
+                    }
 
-        {isInstructor(currentUser.roles) && (
-          <SidebarGroup className="mt-8">
-            <SidebarGroupLabel className="eyebrow mb-3 px-3 text-muted-foreground">
-              Gérer mon rôle
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => setShowResignDialog(true)}
-                    className="h-12 rounded-2xl border border-black/5 bg-white px-4 text-sm font-medium text-muted-foreground transition hover:border-primary/10 hover:bg-primary/5 hover:text-primary"
-                    data-testid="button-resign-instructor"
-                  >
-                    <Minus className="w-5 h-5" />
-                    <span className="font-medium">Ne plus être formateur</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-      </SidebarContent>
-      <SidebarFooter className="border-t border-black/5 px-6 py-8">
-        <div className="flex items-center gap-3 rounded-2xl border border-black/5 bg-white px-4 py-3 shadow-sm">
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary font-semibold text-sm">
-            {currentUser.name.split(' ').map(n => n[0]).join('')}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="truncate text-sm font-semibold text-foreground">{currentUser.name}</div>
-            <div className="truncate text-xs text-muted-foreground">
-              {formatRoles(currentUser.roles)}
+                    if (item.action === "becomeInstructor") {
+                      return (
+                        <Button
+                          key={item.title}
+                          onClick={() => becomeInstructorMutation.mutate()}
+                          disabled={becomeInstructorMutation.isPending}
+                          className="flex w-full items-center justify-center gap-2 rounded-md bg-[#00313F] px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#00313F]/90"
+                          data-testid="button-become-instructor"
+                        >
+                          <Plus className="h-4 w-4" />
+                          {becomeInstructorMutation.isPending ? "Activation..." : item.title}
+                        </Button>
+                      );
+                    }
+
+                    if (item.action === "resignInstructor") {
+                      return (
+                        <Button
+                          key={item.title}
+                          onClick={() => setShowResignDialog(true)}
+                          className="flex w-full items-center justify-center gap-2 rounded-md bg-destructive px-3 py-2 text-sm font-semibold text-destructive-foreground shadow-sm hover:bg-destructive/90"
+                          data-testid="button-resign-instructor"
+                        >
+                          <Minus className="h-4 w-4" />
+                          {item.title}
+                        </Button>
+                      );
+                    }
+
+                    return null;
+                  })}
+                </nav>
+              )}
             </div>
           </div>
         </div>
-      </SidebarFooter>
+      ) : null}
 
       <AlertDialog open={showResignDialog} onOpenChange={setShowResignDialog}>
         <AlertDialogContent className="surface-soft border-black/5 bg-white text-foreground">
@@ -255,7 +411,8 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
             <AlertDialogTitle>Ne plus être formateur</AlertDialogTitle>
             <AlertDialogDescription>
               Êtes-vous sûr de vouloir retirer votre rôle de formateur ?
-              <br /><br />
+              <br />
+              <br />
               Cette action n'est possible que si aucune session ne vous est assignée.
               Si des sessions vous sont assignées, vous devrez d'abord les réassigner à un autre formateur.
             </AlertDialogDescription>
