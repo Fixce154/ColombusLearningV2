@@ -105,7 +105,7 @@ export default function Catalog() {
             <p className="eyebrow text-muted-foreground">Explorer les programmes</p>
             <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Catalogue des formations</h1>
             <p className="text-base leading-relaxed text-muted-foreground">
-              Trouvez la formation qui répond à vos objectifs et accédez à des parcours conçus par les experts Colombus.
+              Trouvez la formation qui répond à vos objectifs.
             </p>
           </div>
         </div>
