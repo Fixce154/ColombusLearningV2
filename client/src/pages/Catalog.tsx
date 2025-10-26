@@ -14,6 +14,7 @@ export default function Catalog() {
   const [selectedThemes, setSelectedThemes] = useState<string[]>([]);
   const [selectedModalities, setSelectedModalities] = useState<string[]>([]);
   const [selectedSeniority, setSelectedSeniority] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const { data: formations = [], isLoading: isLoadingFormations } = useQuery<Formation[]>({
     queryKey: ["/api/formations"],
@@ -74,6 +75,8 @@ export default function Catalog() {
     setSelectedModalities([]);
     setSelectedSeniority([]);
   };
+
+  const totalActiveFilters = selectedThemes.length + selectedModalities.length + selectedSeniority.length;
 
   if (isLoadingFormations || isLoadingSessions || isLoadingRegistrations) {
     return (
@@ -138,57 +141,60 @@ export default function Catalog() {
         </Card>
       </div>
 
-      <SearchBar value={searchQuery} onChange={setSearchQuery} />
+      <SearchBar
+        value={searchQuery}
+        onChange={setSearchQuery}
+        onToggleFilters={() => setFiltersOpen((prev) => !prev)}
+        filtersOpen={filtersOpen}
+        activeFiltersCount={totalActiveFilters}
+      />
 
-      <div className="grid gap-8 lg:grid-cols-4">
-        <div className="lg:col-span-1">
-          <div className="sticky top-6">
-            <FilterPanel
-              selectedThemes={selectedThemes}
-              selectedModalities={selectedModalities}
-              selectedSeniority={selectedSeniority}
-              onThemeChange={setSelectedThemes}
-              onModalityChange={setSelectedModalities}
-              onSeniorityChange={setSelectedSeniority}
-              onReset={handleReset}
-            />
-          </div>
-        </div>
+      {filtersOpen && (
+        <FilterPanel
+          selectedThemes={selectedThemes}
+          selectedModalities={selectedModalities}
+          selectedSeniority={selectedSeniority}
+          onThemeChange={setSelectedThemes}
+          onModalityChange={setSelectedModalities}
+          onSeniorityChange={setSelectedSeniority}
+          onReset={handleReset}
+          layout="inline"
+        />
+      )}
 
-        <div className="lg:col-span-3 space-y-6">
-          {filteredFormations.length > 0 ? (
-            <>
-              <div className="flex items-baseline gap-3">
-                <p className="text-sm font-semibold text-foreground">
-                  {filteredFormations.length} formation{filteredFormations.length > 1 ? "s" : ""} trouvée{filteredFormations.length > 1 ? "s" : ""}
-                </p>
-                {(searchQuery || selectedThemes.length > 0 || selectedModalities.length > 0 || selectedSeniority.length > 0) && (
-                  <p className="text-sm text-muted-foreground">sur {formations.filter((f) => f.active).length} au total</p>
-                )}
-              </div>
-              <div className="grid gap-6 md:grid-cols-2">
-                {filteredFormations.map((formation) => (
-                  <TrainingCard
-                    key={formation.id}
-                    formation={formation}
-                    nextSessionDate={getNextSession(formation.id)}
-                    onViewDetails={() => setLocation(`/training/${formation.id}`)}
-                  />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="surface-tonal rounded-[1.75rem] p-16 text-center">
-              <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm">
-                <BookOpen className="h-10 w-10" />
-              </div>
-              <h3 className="text-xl font-semibold text-foreground mb-2">Aucune formation trouvée</h3>
-              <p className="mx-auto max-w-md text-sm text-muted-foreground">
-                Essayez de modifier vos filtres ou votre recherche pour découvrir d'autres formations.
+      <div className="space-y-6">
+        {filteredFormations.length > 0 ? (
+          <>
+            <div className="flex items-baseline gap-3">
+              <p className="text-sm font-semibold text-foreground">
+                {filteredFormations.length} formation{filteredFormations.length > 1 ? "s" : ""} trouvée{filteredFormations.length > 1 ? "s" : ""}
               </p>
+              {(searchQuery || totalActiveFilters > 0) && (
+                <p className="text-sm text-muted-foreground">sur {formations.filter((f) => f.active).length} au total</p>
+              )}
             </div>
-          )}
-        </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              {filteredFormations.map((formation) => (
+                <TrainingCard
+                  key={formation.id}
+                  formation={formation}
+                  nextSessionDate={getNextSession(formation.id)}
+                  onViewDetails={() => setLocation(`/training/${formation.id}`)}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="surface-tonal rounded-[1.75rem] p-16 text-center">
+            <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm">
+              <BookOpen className="h-10 w-10" />
+            </div>
+            <h3 className="text-xl font-semibold text-foreground mb-2">Aucune formation trouvée</h3>
+            <p className="mx-auto max-w-md text-sm text-muted-foreground">
+              Essayez de modifier vos filtres ou votre recherche pour découvrir d'autres formations.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
