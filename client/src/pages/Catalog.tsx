@@ -3,9 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import SearchBar from "@/components/SearchBar";
 import FilterPanel from "@/components/FilterPanel";
 import TrainingCard from "@/components/TrainingCard";
-import { BookOpen, Loader2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { BookOpen, Calendar, CheckCircle, Layers, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
-import type { Formation, Session } from "@shared/schema";
+import type { Formation, Session, Registration } from "@shared/schema";
 
 export default function Catalog() {
   const [, setLocation] = useLocation();
@@ -25,6 +26,10 @@ export default function Catalog() {
       if (!res.ok) throw new Error("Failed to fetch sessions");
       return res.json();
     },
+  });
+
+  const { data: registrations = [], isLoading: isLoadingRegistrations } = useQuery<Registration[]>({
+    queryKey: ["/api/registrations"],
   });
 
   const filteredFormations = useMemo(() => {
@@ -70,7 +75,7 @@ export default function Catalog() {
     setSelectedSeniority([]);
   };
 
-  if (isLoadingFormations || isLoadingSessions) {
+  if (isLoadingFormations || isLoadingSessions || isLoadingRegistrations) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="space-y-4 text-center">
@@ -83,6 +88,10 @@ export default function Catalog() {
 
   const activeFormations = formations.filter((f) => f.active).length;
   const openSessionsCount = sessions.filter((s) => s.status === "open").length;
+  const completedFormationsCount = useMemo(() => {
+    const completedRegistrations = registrations.filter((registration) => registration.status === "completed");
+    return new Set(completedRegistrations.map((registration) => registration.formationId)).size;
+  }, [registrations]);
 
   return (
     <div className="space-y-12">
@@ -96,21 +105,38 @@ export default function Catalog() {
               Trouvez la formation qui répond à vos objectifs et accédez à des parcours conçus par les experts Colombus.
             </p>
           </div>
-          <div className="grid w-full max-w-sm grid-cols-2 gap-4 text-center text-foreground">
-            <div className="rounded-3xl border border-black/5 bg-white px-5 py-4 shadow-sm">
-              <p className="eyebrow text-muted-foreground">Formations actives</p>
-              <p className="mt-3 text-2xl font-semibold">{activeFormations}</p>
-            </div>
-            <div className="rounded-3xl border border-black/5 bg-white px-5 py-4 shadow-sm">
-              <p className="eyebrow text-muted-foreground">Sessions ouvertes</p>
-              <p className="mt-3 text-2xl font-semibold">{openSessionsCount}</p>
-            </div>
-            <div className="col-span-2 rounded-3xl border border-black/5 bg-secondary px-5 py-4 text-sm text-muted-foreground">
-              Des modalités présentielles, distancielles et hybrides pour répondre à toutes vos réalités terrain.
-            </div>
-          </div>
         </div>
       </section>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="surface-soft relative flex h-full items-center justify-between gap-6 rounded-2xl p-6 transition-transform duration-300 hover:-translate-y-1">
+          <div className="space-y-2">
+            <p className="eyebrow text-muted-foreground">Formations actives</p>
+            <p className="text-3xl font-semibold tracking-tight text-foreground">{activeFormations}</p>
+          </div>
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Layers className="h-5 w-5" />
+          </div>
+        </Card>
+        <Card className="surface-soft relative flex h-full items-center justify-between gap-6 rounded-2xl p-6 transition-transform duration-300 hover:-translate-y-1">
+          <div className="space-y-2">
+            <p className="eyebrow text-muted-foreground">Sessions ouvertes</p>
+            <p className="text-3xl font-semibold tracking-tight text-foreground">{openSessionsCount}</p>
+          </div>
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Calendar className="h-5 w-5" />
+          </div>
+        </Card>
+        <Card className="surface-soft relative flex h-full items-center justify-between gap-6 rounded-2xl p-6 transition-transform duration-300 hover:-translate-y-1">
+          <div className="space-y-2">
+            <p className="eyebrow text-muted-foreground">Formations réalisées</p>
+            <p className="text-3xl font-semibold tracking-tight text-foreground">{completedFormationsCount}</p>
+          </div>
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-secondary text-foreground">
+            <CheckCircle className="h-5 w-5" />
+          </div>
+        </Card>
+      </div>
 
       <SearchBar value={searchQuery} onChange={setSearchQuery} />
 
