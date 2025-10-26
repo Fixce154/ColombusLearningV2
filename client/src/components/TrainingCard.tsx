@@ -63,7 +63,7 @@ export default function TrainingCard({ formation, nextSessionDate, onViewDetails
 
       <Button
         variant="default"
-        className="group mt-6 w-full rounded-full bg-primary py-4 text-sm font-semibold text-white shadow-[0_24px_40px_-28px_rgba(10,132,255,0.65)] transition hover:bg-primary/90"
+        className="group mt-6 w-full rounded-xl bg-primary py-4 text-sm font-semibold text-white shadow-[0_24px_40px_-28px_rgba(10,132,255,0.65)] transition hover:bg-primary/90"
         onClick={(e) => {
           e.stopPropagation();
           onViewDetails();

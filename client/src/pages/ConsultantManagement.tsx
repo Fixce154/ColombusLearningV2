@@ -29,7 +29,19 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Loader2, ChevronDown, ChevronRight, Heart, UserCheck, Calendar, Award, Archive, Trash2, UserPlus } from "lucide-react";
+import {
+  Users,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  Heart,
+  UserCheck,
+  Calendar,
+  Award,
+  Archive,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
 import type { User, FormationInterest, Registration, Formation, Session, InstructorFormation } from "@shared/schema";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -233,80 +245,76 @@ export default function ConsultantManagement() {
   const selectedHistory = selectedConsultant ? getConsultantHistory(selectedConsultant.id) : null;
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="container mx-auto p-8 space-y-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-3 rounded-xl">
-                <Users className="w-7 h-7 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-primary">Gestion des Consultants</h1>
-                <p className="text-muted-foreground">Vue d'ensemble et historique des formations par consultant</p>
-              </div>
-            </div>
+    <div className="space-y-12">
+      <section className="surface-elevated relative overflow-hidden rounded-[2rem] px-12 py-14">
+        <div className="pointer-events-none absolute inset-y-8 right-0 hidden w-72 rounded-l-[32px] bg-[radial-gradient(circle_at_center,rgba(10,132,255,0.12),transparent_60%)] md:block" />
+        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-5">
+            <p className="eyebrow text-muted-foreground">Administration RH</p>
+            <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Gestion des consultants</h1>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              Pilotez les parcours de vos collaborateurs, suivez leurs intentions et assurez le lien avec les formateurs externes.
+            </p>
           </div>
+          <div className="flex w-full max-w-xs flex-col gap-4">
+            <div className="rounded-2xl border border-white/40 bg-white/80 p-5 text-[#00313F] shadow-sm backdrop-blur">
+              <p className="text-sm font-semibold">Formateurs externes actifs</p>
+              <p className="text-3xl font-bold">{activeExternalInstructors.length}</p>
+              <p className="text-xs text-[#00313F]/70">Gérés par l'équipe RH</p>
+            </div>
+            <Button
+              className="h-12 rounded-xl text-sm font-semibold"
+              onClick={() => setShowCreateExternalInstructor(true)}
+              data-testid="button-create-external-instructor"
+            >
+              <UserPlus className="mr-2 h-4 w-4" />
+              Créer un formateur externe
+            </Button>
+          </div>
+        </div>
+      </section>
 
-          <Button
-            variant="outline"
-            className="h-11"
-            onClick={() => setShowCreateExternalInstructor(true)}
-            data-testid="button-create-external-instructor"
-          >
-            <UserPlus className="w-4 h-4 mr-2" />
-            Créer un formateur externe
-          </Button>
+      <section className="space-y-8">
+        <div className="grid gap-6 md:grid-cols-3">
+          <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Total consultants</p>
+              <p className="text-3xl font-semibold text-foreground">{consultants.length}</p>
+            </div>
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Users className="h-6 w-6" />
+            </div>
+          </Card>
+
+          <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Intentions {currentYear}</p>
+              <p className="text-3xl font-semibold text-foreground">
+                {Array.isArray(allInterests) ? allInterests.filter(i => {
+                  const date = i.expressedAt ? new Date(i.expressedAt) : new Date();
+                  return date.getFullYear() === currentYear;
+                }).length : 0}
+              </p>
+            </div>
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-yellow-500/10 text-yellow-600">
+              <Heart className="h-6 w-6" />
+            </div>
+          </Card>
+
+          <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Inscriptions validées</p>
+              <p className="text-3xl font-semibold text-foreground">
+                {Array.isArray(allRegistrations) ? allRegistrations.filter(r => r.status === "validated").length : 0}
+              </p>
+            </div>
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+              <UserCheck className="h-6 w-6" />
+            </div>
+          </Card>
         </div>
 
-        {/* Statistics Cards */}
-        <div className="grid md:grid-cols-3 gap-6">
-          <Card className="p-6 shadow-md">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Total Consultants</p>
-                <p className="text-3xl font-bold text-primary">{consultants.length}</p>
-              </div>
-              <div className="bg-primary/10 p-3 rounded-full">
-                <Users className="w-6 h-6 text-primary" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 shadow-md">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Intentions {currentYear}</p>
-                <p className="text-3xl font-bold text-yellow-600">
-                  {Array.isArray(allInterests) ? allInterests.filter(i => {
-                    const date = i.expressedAt ? new Date(i.expressedAt) : new Date();
-                    return date.getFullYear() === currentYear;
-                  }).length : 0}
-                </p>
-              </div>
-              <div className="bg-yellow-500/10 p-3 rounded-full">
-                <Heart className="w-6 h-6 text-yellow-600" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 shadow-md">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Inscriptions validées</p>
-                <p className="text-3xl font-bold text-accent">
-                  {Array.isArray(allRegistrations) ? allRegistrations.filter(r => r.status === "validated").length : 0}
-                </p>
-              </div>
-              <div className="bg-accent/10 p-3 rounded-full">
-                <UserCheck className="w-6 h-6 text-accent" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        <Card className="shadow-md">
+        <Card className="rounded-[1.75rem] border border-border/50 shadow-sm">
           <div className="flex flex-col gap-2 p-6 border-b border-border/60 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-xl font-semibold">Formateurs externes</h2>
@@ -322,7 +330,7 @@ export default function ConsultantManagement() {
           </div>
           {activeExternalInstructors.length === 0 ? (
             <div className="p-6 text-center text-muted-foreground">
-              Aucun formateur externe actif pour le moment. Créez-en un via le bouton ci-dessus.
+              Aucun formateur externe actif pour le moment. Créez-en un via le bouton en haut de page.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -388,7 +396,7 @@ export default function ConsultantManagement() {
         </Card>
 
         {/* Consultants Table */}
-        <Card className="p-6 shadow-md">
+        <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
               <Users className="w-5 h-5" />
@@ -588,9 +596,10 @@ export default function ConsultantManagement() {
             </Tabs>
           </div>
         </Card>
+      </section>
 
-        {/* Archive Confirmation Dialog */}
-        <AlertDialog open={!!archiveDialogUser} onOpenChange={() => setArchiveDialogUser(null)}>
+      {/* Archive Confirmation Dialog */}
+      <AlertDialog open={!!archiveDialogUser} onOpenChange={() => setArchiveDialogUser(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Archiver ce consultant ?</AlertDialogTitle>
@@ -620,21 +629,21 @@ export default function ConsultantManagement() {
           </AlertDialogContent>
         </AlertDialog>
 
-        <CreateExternalInstructorDialog
-          open={showCreateExternalInstructor}
-          onOpenChange={setShowCreateExternalInstructor}
-        />
+      <CreateExternalInstructorDialog
+        open={showCreateExternalInstructor}
+        onOpenChange={setShowCreateExternalInstructor}
+      />
 
-        <EditExternalInstructorDialog
-          userId={editExternalInstructorId}
-          open={editExternalInstructorId !== null}
-          onOpenChange={(open) => {
-            if (!open) setEditExternalInstructorId(null);
-          }}
-        />
+      <EditExternalInstructorDialog
+        userId={editExternalInstructorId}
+        open={editExternalInstructorId !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditExternalInstructorId(null);
+        }}
+      />
 
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={!!deleteDialogUser} onOpenChange={() => setDeleteDialogUser(null)}>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteDialogUser} onOpenChange={() => setDeleteDialogUser(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Supprimer définitivement ce consultant ?</AlertDialogTitle>
@@ -665,8 +674,8 @@ export default function ConsultantManagement() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* History Dialog */}
-        <Dialog open={!!selectedConsultant} onOpenChange={() => setSelectedConsultant(null)}>
+      {/* History Dialog */}
+      <Dialog open={!!selectedConsultant} onOpenChange={() => setSelectedConsultant(null)}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -782,7 +791,6 @@ export default function ConsultantManagement() {
             )}
           </DialogContent>
         </Dialog>
-      </div>
     </div>
   );
 }

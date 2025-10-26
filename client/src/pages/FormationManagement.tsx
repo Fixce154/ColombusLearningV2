@@ -215,31 +215,40 @@ export default function FormationManagement() {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold flex items-center gap-3">
-              <BookOpen className="w-8 h-8 text-primary" />
-              Gestion du Catalogue
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Créez et gérez les formations disponibles pour vos consultants
+    <div className="space-y-12">
+      <section className="surface-elevated relative overflow-hidden rounded-[2rem] px-12 py-14">
+        <div className="pointer-events-none absolute inset-y-8 right-0 hidden w-72 rounded-l-[32px] bg-[radial-gradient(circle_at_center,rgba(10,132,255,0.12),transparent_60%)] md:block" />
+        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-5">
+            <p className="eyebrow text-muted-foreground">Administration RH</p>
+            <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Gestion du catalogue</h1>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              Créez, mettez à jour et publiez les formations accessibles à vos consultants.
             </p>
           </div>
-          <Button
-            onClick={handleCreate}
-            data-testid="button-create-formation"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nouvelle Formation
-          </Button>
+          <div className="flex w-full max-w-xs flex-col gap-4">
+            <div className="rounded-2xl border border-white/40 bg-white/80 p-5 text-[#00313F] shadow-sm backdrop-blur">
+              <p className="text-sm font-semibold">Formations répertoriées</p>
+              <p className="text-3xl font-bold">{formations.length}</p>
+              <p className="text-xs text-[#00313F]/70">Inclut les parcours actifs et en préparation</p>
+            </div>
+            <Button
+              className="h-12 rounded-xl text-sm font-semibold"
+              onClick={handleCreate}
+              data-testid="button-create-formation"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Nouvelle formation
+            </Button>
+          </div>
         </div>
+      </section>
 
-        <Card>
+      <section className="space-y-8">
+        <Card className="rounded-[1.75rem] border border-border/50 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>Catalogue des Formations</span>
+              <span>Catalogue des formations</span>
               <Badge variant="secondary" data-testid="count-formations">
                 {formations.length} formation{formations.length !== 1 ? "s" : ""}
               </Badge>
@@ -248,13 +257,15 @@ export default function FormationManagement() {
           <CardContent>
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : formations.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Aucune formation dans le catalogue</p>
-                <p className="text-sm mt-2">Créez votre première formation pour commencer</p>
+              <div className="py-12 text-center text-muted-foreground">
+                <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <BookOpen className="h-8 w-8" />
+                </div>
+                <p className="font-medium">Aucune formation dans le catalogue</p>
+                <p className="mt-2 text-sm">Créez votre première formation pour commencer</p>
               </div>
             ) : (
               <Table>
@@ -278,12 +289,20 @@ export default function FormationManagement() {
                       </TableCell>
                       <TableCell>{formation.duration}</TableCell>
                       <TableCell>
-                        <Badge variant={
-                          formation.modality === "presentiel" ? "default" :
-                          formation.modality === "distanciel" ? "secondary" : "outline"
-                        }>
-                          {formation.modality === "presentiel" ? "Présentiel" :
-                           formation.modality === "distanciel" ? "Distanciel" : "Hybride"}
+                        <Badge
+                          variant={
+                            formation.modality === "presentiel"
+                              ? "default"
+                              : formation.modality === "distanciel"
+                              ? "secondary"
+                              : "outline"
+                          }
+                        >
+                          {formation.modality === "presentiel"
+                            ? "Présentiel"
+                            : formation.modality === "distanciel"
+                            ? "Distanciel"
+                            : "Hybride"}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -302,7 +321,7 @@ export default function FormationManagement() {
                             onClick={() => handleEdit(formation)}
                             data-testid={`button-edit-${formation.id}`}
                           >
-                            <Pencil className="w-4 h-4" />
+                            <Pencil className="h-4 w-4" />
                           </Button>
                           <Button
                             size="icon"
@@ -310,7 +329,7 @@ export default function FormationManagement() {
                             onClick={() => setDeleteFormation(formation)}
                             data-testid={`button-delete-${formation.id}`}
                           >
-                            <Trash2 className="w-4 h-4 text-destructive" />
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
                       </TableCell>
@@ -321,23 +340,23 @@ export default function FormationManagement() {
             )}
           </CardContent>
         </Card>
+      </section>
 
-        {/* Create/Edit Dialog */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingFormation ? "Modifier la formation" : "Créer une nouvelle formation"}
-              </DialogTitle>
-              <DialogDescription>
-                {editingFormation 
-                  ? "Modifiez les détails de la formation existante"
-                  : "Ajoutez une nouvelle formation au catalogue"}
-              </DialogDescription>
-            </DialogHeader>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingFormation ? "Modifier la formation" : "Créer une nouvelle formation"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingFormation
+                ? "Modifiez les détails de la formation existante"
+                : "Ajoutez une nouvelle formation au catalogue"}
+            </DialogDescription>
+          </DialogHeader>
 
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="title"
@@ -529,37 +548,36 @@ export default function FormationManagement() {
               </form>
             </Form>
           </DialogContent>
-        </Dialog>
+      </Dialog>
 
-        {/* Delete Confirmation */}
-        <AlertDialog open={!!deleteFormation} onOpenChange={() => setDeleteFormation(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
-              <AlertDialogDescription asChild>
-                <div>
-                  <p>Êtes-vous sûr de vouloir supprimer la formation :</p>
-                  <p className="font-semibold mt-2">{deleteFormation?.title}</p>
-                  <p className="mt-2 text-destructive">
-                    Cette action est irréversible et supprimera également toutes les sessions associées.
-                  </p>
-                </div>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel data-testid="button-cancel-delete">Annuler</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => deleteFormation && deleteMutation.mutate(deleteFormation.id)}
-                data-testid="button-confirm-delete"
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Supprimer
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteFormation} onOpenChange={() => setDeleteFormation(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p>Êtes-vous sûr de vouloir supprimer la formation :</p>
+                <p className="mt-2 font-semibold">{deleteFormation?.title}</p>
+                <p className="mt-2 text-destructive">
+                  Cette action est irréversible et supprimera également toutes les sessions associées.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteFormation && deleteMutation.mutate(deleteFormation.id)}
+              data-testid="button-confirm-delete"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

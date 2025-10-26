@@ -161,18 +161,31 @@ export default function InstructorFormations() {
   );
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-12">
+    <div className="space-y-12">
+      <section className="surface-elevated relative overflow-hidden rounded-[2rem] px-12 py-14">
+        <div className="pointer-events-none absolute inset-y-8 right-0 hidden w-72 rounded-l-[32px] bg-[radial-gradient(circle_at_center,rgba(10,132,255,0.12),transparent_60%)] md:block" />
+        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-5">
+            <p className="eyebrow text-muted-foreground">Espace formateur</p>
+            <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
+              Pilotez vos formations
+            </h1>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              Visualisez les formations que vous animez et complétez votre catalogue personnel en toute autonomie.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* My Formations Section */}
-      <div>
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Mes Formations</h1>
-          <p className="text-muted-foreground">
-            Les formations que vous animez en tant que formateur
-          </p>
+      <section className="space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">Mes formations</h2>
+          <p className="text-muted-foreground">Les formations que vous animez en tant que formateur</p>
         </div>
 
         {myFormations.length === 0 ? (
-          <Card>
+          <Card className="surface-tonal rounded-[1.75rem] border-none">
             <CardContent className="p-12 text-center">
               <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
               <p className="text-muted-foreground">
@@ -186,7 +199,7 @@ export default function InstructorFormations() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {myFormations.map((formation) => (
               <FormationCard
                 key={formation.id}
@@ -197,12 +210,12 @@ export default function InstructorFormations() {
             ))}
           </div>
         )}
-      </div>
+      </section>
 
       {/* Catalog Section */}
-      <div>
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-foreground mb-2">Catalogue des formations</h2>
+      <section className="space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">Catalogue des formations</h2>
           <p className="text-muted-foreground">
             {allowSelfManagement
               ? "Sélectionnez les formations que vous souhaitez animer"
@@ -218,7 +231,7 @@ export default function InstructorFormations() {
             </AlertDescription>
           </Alert>
         ) : availableFormations.length === 0 ? (
-          <Card>
+          <Card className="surface-tonal rounded-[1.75rem] border-none">
             <CardContent className="p-12 text-center">
               <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
               <p className="text-muted-foreground">
@@ -229,7 +242,7 @@ export default function InstructorFormations() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {availableFormations.map((formation) => (
               <FormationCard
                 key={formation.id}
@@ -240,7 +253,7 @@ export default function InstructorFormations() {
             ))}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

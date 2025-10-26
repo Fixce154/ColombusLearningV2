@@ -364,32 +364,77 @@ export default function SessionManagement() {
     form.setValue("endDate", formatForInput(endDate));
   }, [selectedSlots, form]);
 
+  const openSessionsCount = sessions.filter((session) => session.status === "open").length;
+  const fullSessionsCount = sessions.filter((session) => session.status === "full").length;
+  const completedSessionsCount = sessions.filter((session) => session.status === "completed").length;
+
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold flex items-center gap-3">
-              <CalendarDays className="w-8 h-8 text-primary" />
-              Gestion des Sessions
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Planifiez et gérez les sessions de formation
+    <div className="space-y-12">
+      <section className="surface-elevated relative overflow-hidden rounded-[2rem] px-12 py-14">
+        <div className="pointer-events-none absolute inset-y-8 right-0 hidden w-72 rounded-l-[32px] bg-[radial-gradient(circle_at_center,rgba(10,132,255,0.12),transparent_60%)] md:block" />
+        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-5">
+            <p className="eyebrow text-muted-foreground">Administration RH</p>
+            <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Orchestration des sessions</h1>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              Planifiez, ajustez et suivez vos sessions de formation en un coup d'œil, tout en maîtrisant les capacités.
             </p>
           </div>
-          <Button
-            onClick={handleCreate}
-            data-testid="button-create-session"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nouvelle Session
-          </Button>
+          <div className="flex w-full max-w-xs flex-col gap-4">
+            <div className="rounded-2xl border border-white/40 bg-white/80 p-5 text-[#00313F] shadow-sm backdrop-blur">
+              <p className="text-sm font-semibold">Sessions planifiées</p>
+              <p className="text-3xl font-bold">{sessions.length}</p>
+              <p className="text-xs text-[#00313F]/70">{openSessionsCount} ouvertes • {fullSessionsCount} complètes</p>
+            </div>
+            <Button
+              className="h-12 rounded-xl text-sm font-semibold"
+              onClick={handleCreate}
+              data-testid="button-create-session"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Nouvelle session
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-8">
+        <div className="grid gap-6 md:grid-cols-3">
+          <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Sessions ouvertes</p>
+              <p className="text-3xl font-semibold text-foreground">{openSessionsCount}</p>
+            </div>
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <CalendarDays className="h-6 w-6" />
+            </div>
+          </Card>
+
+          <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Sessions complètes</p>
+              <p className="text-3xl font-semibold text-foreground">{fullSessionsCount}</p>
+            </div>
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+              <UsersIcon className="h-6 w-6" />
+            </div>
+          </Card>
+
+          <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Sessions terminées</p>
+              <p className="text-3xl font-semibold text-foreground">{completedSessionsCount}</p>
+            </div>
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-green-500/10 text-green-700">
+              <CheckCircle className="h-6 w-6" />
+            </div>
+          </Card>
         </div>
 
-        <Card>
+        <Card className="rounded-[1.75rem] border border-border/50 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>Planning des Sessions</span>
+              <span>Planning des sessions</span>
               <Badge variant="secondary" data-testid="count-sessions">
                 {sessions.length} session{sessions.length !== 1 ? "s" : ""}
               </Badge>
@@ -546,8 +591,9 @@ export default function SessionManagement() {
             )}
           </CardContent>
         </Card>
+      </section>
 
-        {/* Create/Edit Dialog */}
+      {/* Create/Edit Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -926,9 +972,8 @@ export default function SessionManagement() {
                 Supprimer
               </AlertDialogAction>
             </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

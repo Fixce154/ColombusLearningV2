@@ -323,39 +323,56 @@ export default function InterestManagement() {
   );
 
   return (
-    <div className="container mx-auto p-8 space-y-8">
-      {/* Header */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/10 p-3 rounded-xl">
-              <Heart className="w-7 h-7 text-primary" />
+    <div className="space-y-12">
+      <section className="surface-elevated relative overflow-hidden rounded-[2rem] px-12 py-14">
+        <div className="pointer-events-none absolute inset-y-8 right-0 hidden w-72 rounded-l-[32px] bg-[radial-gradient(circle_at_center,rgba(10,132,255,0.12),transparent_60%)] md:block" />
+        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-5">
+            <p className="eyebrow text-muted-foreground">Administration RH</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
+                Pilotage des intentions de formation
+              </h1>
+              {interestUnread > 0 ? (
+                <Badge variant="destructive" className="rounded-full px-3 py-1 text-xs">
+                  {interestUnread} nouveauté{interestUnread > 1 ? "s" : ""}
+                </Badge>
+              ) : null}
             </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl font-bold text-primary">Gestion des intentions de formation</h1>
-                {interestUnread > 0 ? (
-                  <Badge variant="destructive" className="rounded-full px-3 py-1 text-[0.7rem]">
-                    {interestUnread} nouveauté{interestUnread > 1 ? "s" : ""}
-                  </Badge>
-                ) : null}
-              </div>
-              <p className="text-muted-foreground">Approuvez ou refusez les demandes d'intérêt des consultants</p>
-            </div>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              Priorisez les demandes des consultants, approuvez les parcours pertinents et suivez la conversion en inscriptions.
+            </p>
           </div>
-          <Button
-            variant="outline"
-            size="default"
-            onClick={() => refetch()}
-            disabled={isFetching}
-            data-testid="button-refresh-interests"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-            Rafraîchir
-          </Button>
+          <div className="flex w-full max-w-xs flex-col gap-4">
+            <div className="rounded-2xl border border-white/40 bg-white/80 p-5 text-[#00313F] shadow-sm backdrop-blur">
+              <p className="text-sm font-semibold">Intentions à traiter</p>
+              <p className="text-3xl font-bold">{pendingInterests.length}</p>
+              <p className="text-xs text-[#00313F]/70">
+                {interestUnread > 0
+                  ? `${interestUnread} notification${interestUnread > 1 ? "s" : ""} en attente`
+                  : "Données à jour"}
+              </p>
+            </div>
+            <Button
+              className="h-12 rounded-xl text-sm font-semibold"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              data-testid="button-refresh-interests"
+            >
+              {isFetching ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Rafraîchir
+            </Button>
+          </div>
         </div>
+      </section>
+
+      <section className="space-y-8">
         {unreadInterestNotifications.length > 0 ? (
-          <Card className="border border-primary/20 shadow-sm">
+          <Card className="rounded-[1.75rem] border border-primary/20 shadow-sm">
             <div className="space-y-3 p-6 text-[#00313F]">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold">Nouveautés à traiter</h2>
@@ -393,49 +410,40 @@ export default function InterestManagement() {
             </div>
           </Card>
         ) : null}
-      </div>
 
-      {/* Statistics Cards */}
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card className="p-6 shadow-md">
-          <div className="flex items-center justify-between">
+        <div className="grid gap-6 md:grid-cols-3">
+          <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">En attente</p>
-              <p className="text-3xl font-bold text-primary">{pendingInterests.length}</p>
+              <p className="text-3xl font-semibold text-foreground">{pendingInterests.length}</p>
             </div>
-            <div className="bg-yellow-500/10 p-3 rounded-full">
-              <Clock className="w-6 h-6 text-yellow-600" />
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-yellow-500/10 text-yellow-600">
+              <Clock className="h-6 w-6" />
             </div>
-          </div>
-        </Card>
+          </Card>
 
-        <Card className="p-6 shadow-md">
-          <div className="flex items-center justify-between">
+          <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Approuvées</p>
-              <p className="text-3xl font-bold text-accent">{approvedInterests.length}</p>
+              <p className="text-3xl font-semibold text-foreground">{approvedInterests.length}</p>
             </div>
-            <div className="bg-accent/10 p-3 rounded-full">
-              <CheckCircle className="w-6 h-6 text-accent" />
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+              <CheckCircle className="h-6 w-6" />
             </div>
-          </div>
-        </Card>
+          </Card>
 
-        <Card className="p-6 shadow-md">
-          <div className="flex items-center justify-between">
+          <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Converties (inscrites)</p>
-              <p className="text-3xl font-bold text-green-700">{convertedInterests.length}</p>
+              <p className="text-sm text-muted-foreground">Converties</p>
+              <p className="text-3xl font-semibold text-foreground">{convertedInterests.length}</p>
             </div>
-            <div className="bg-green-500/10 p-3 rounded-full">
-              <TrendingUp className="w-6 h-6 text-green-700" />
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-green-500/10 text-green-700">
+              <TrendingUp className="h-6 w-6" />
             </div>
-          </div>
-        </Card>
-      </div>
+          </Card>
+        </div>
 
-      {/* Tabs for different statuses */}
-      <Tabs defaultValue="pending" className="space-y-6">
+        <Tabs defaultValue="pending" className="space-y-6">
         <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="pending" data-testid="tab-pending-interests">
             En attente ({pendingInterests.length})
@@ -452,7 +460,7 @@ export default function InterestManagement() {
         </TabsList>
 
         <TabsContent value="pending" className="space-y-4">
-          <Card className="p-6 shadow-md">
+          <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-yellow-600" />
@@ -464,7 +472,7 @@ export default function InterestManagement() {
         </TabsContent>
 
         <TabsContent value="approved" className="space-y-4">
-          <Card className="p-6 shadow-md">
+          <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-accent" />
@@ -479,7 +487,7 @@ export default function InterestManagement() {
         </TabsContent>
 
         <TabsContent value="converted" className="space-y-4">
-          <Card className="p-6 shadow-md">
+          <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-green-700" />
@@ -494,7 +502,7 @@ export default function InterestManagement() {
         </TabsContent>
 
         <TabsContent value="rejected" className="space-y-4">
-          <Card className="p-6 shadow-md">
+          <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -531,80 +539,81 @@ export default function InterestManagement() {
         </TabsContent>
       </Tabs>
 
-      {/* Aggregated View by Formation */}
-      {aggregated.length > 0 && (
-        <Card className="p-6 shadow-md">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-semibold text-primary">Vue agrégée par formation</h2>
+        {/* Aggregated View by Formation */}
+        {aggregated.length > 0 && (
+          <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-primary" />
+                <h2 className="text-xl font-semibold text-primary">Vue agrégée par formation</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Nombre d'intentions par formation pour planifier l'organisation des sessions
+              </p>
+              <div className="overflow-hidden rounded-2xl border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Formation</TableHead>
+                      <TableHead className="text-center">En attente</TableHead>
+                      <TableHead className="text-center">Approuvées</TableHead>
+                      <TableHead className="text-center">Converties</TableHead>
+                      <TableHead className="text-center">P1</TableHead>
+                      <TableHead className="text-center">P2</TableHead>
+                      <TableHead className="text-center">P3</TableHead>
+                      <TableHead className="text-center">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {aggregated.map((agg) => {
+                      const formation = getFormation(agg.formationId);
+                      const total = agg.pending + agg.approved + agg.converted;
+                      return (
+                        <TableRow key={agg.formationId}>
+                          <TableCell className="font-medium">
+                            {formation?.title || "Formation inconnue"}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {agg.pending > 0 && (
+                              <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-700">
+                                {agg.pending}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {agg.approved > 0 && (
+                              <Badge variant="secondary" className="bg-accent/10 text-accent">
+                                {agg.approved}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {agg.converted > 0 && (
+                              <Badge variant="secondary" className="bg-green-500/10 text-green-700">
+                                {agg.converted}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="destructive" className="text-xs">{agg.p1Count}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="default" className="text-xs">{agg.p2Count}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="secondary" className="text-xs">{agg.p3Count}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center font-semibold">{total}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Nombre d'intentions par formation pour planifier l'organisation des sessions
-            </p>
-            <div className="border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Formation</TableHead>
-                    <TableHead className="text-center">En attente</TableHead>
-                    <TableHead className="text-center">Approuvées</TableHead>
-                    <TableHead className="text-center">Converties</TableHead>
-                    <TableHead className="text-center">P1</TableHead>
-                    <TableHead className="text-center">P2</TableHead>
-                    <TableHead className="text-center">P3</TableHead>
-                    <TableHead className="text-center">Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {aggregated.map((agg) => {
-                    const formation = getFormation(agg.formationId);
-                    const total = agg.pending + agg.approved + agg.converted;
-                    return (
-                      <TableRow key={agg.formationId}>
-                        <TableCell className="font-medium">
-                          {formation?.title || "Formation inconnue"}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {agg.pending > 0 && (
-                            <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-700">
-                              {agg.pending}
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {agg.approved > 0 && (
-                            <Badge variant="secondary" className="bg-accent/10 text-accent">
-                              {agg.approved}
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {agg.converted > 0 && (
-                            <Badge variant="secondary" className="bg-green-500/10 text-green-700">
-                              {agg.converted}
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="destructive" className="text-xs">{agg.p1Count}</Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="default" className="text-xs">{agg.p2Count}</Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="secondary" className="text-xs">{agg.p3Count}</Badge>
-                        </TableCell>
-                        <TableCell className="text-center font-semibold">{total}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </Card>
-      )}
+          </Card>
+        )}
+      </section>
 
       {/* Confirmation Dialog */}
       <AlertDialog open={selectedInterest !== null && actionType !== null} onOpenChange={() => {
