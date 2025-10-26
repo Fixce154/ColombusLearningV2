@@ -11,7 +11,7 @@ interface StatCardProps {
 
 function StatCard({ title, value, icon, description, iconClass = "" }: StatCardProps) {
   return (
-    <Card className="surface-soft relative flex h-full items-center justify-between gap-6 rounded-3xl p-6 transition-transform duration-300 hover:-translate-y-1">
+    <Card className="surface-soft relative flex h-full items-center justify-between gap-6 rounded-2xl p-6 transition-transform duration-300 hover:-translate-y-1">
       <div className="flex-1 space-y-4">
         <div>
           <p className="eyebrow text-muted-foreground">{title}</p>
@@ -19,7 +19,7 @@ function StatCard({ title, value, icon, description, iconClass = "" }: StatCardP
         </div>
         {description && <p className="text-xs text-muted-foreground">{description}</p>}
       </div>
-      <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl ${iconClass}`}>
+      <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${iconClass}`}>
         {icon}
       </div>
     </Card>

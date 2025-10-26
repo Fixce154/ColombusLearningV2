@@ -69,12 +69,12 @@ function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void
       <div className="flex h-screen w-full overflow-hidden">
         <AppSidebar currentUser={user} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="px-8 pt-10 pb-6">
+          <header className="border-b border-black/5 bg-white/90 px-8 py-6 shadow-sm backdrop-blur">
             <div className="flex items-center justify-between gap-6">
               <div className="flex items-center gap-4">
                 <SidebarTrigger
                   data-testid="button-sidebar-toggle"
-                  className="h-11 w-11 rounded-2xl border border-white/40 bg-white/80 text-foreground shadow-sm transition hover:bg-white"
+                  className="h-11 w-11 rounded-xl border border-white/50 bg-white text-foreground shadow-sm transition hover:bg-white"
                 />
                 <div>
                   <p className="eyebrow mb-1 text-muted-foreground">Espace membre</p>
@@ -88,7 +88,7 @@ function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void
                 </div>
                 <button
                   onClick={onLogout}
-                  className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-[0_24px_40px_-28px_rgba(10,132,255,0.65)] transition hover:bg-primary/90"
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white shadow-[0_18px_32px_-24px_rgba(10,132,255,0.55)] transition hover:bg-primary/90"
                   data-testid="button-logout"
                 >
                   <LogOut className="h-4 w-4" />
