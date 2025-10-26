@@ -20,7 +20,28 @@ export async function apiRequest(
   });
 
   await throwIfResNotOk(res);
-  return await res.json();
+
+  const contentType = res.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    return await res.json();
+  }
+
+  const text = await res.text();
+
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (_error) {
+    if (contentType.includes("text/html") || text.trim().startsWith("<")) {
+      throw new Error("Réponse inattendue du serveur. Merci de réessayer plus tard.");
+    }
+
+    return text;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

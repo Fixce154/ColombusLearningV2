@@ -57,9 +57,27 @@ export const formationInterests = pgTable("formation_interests", {
   priority: text("priority").notNull(), // P1, P2, P3
   status: text("status").notNull(), // pending, approved, converted, withdrawn
   expressedAt: timestamp("expressed_at").default(sql`now()`),
+  coachStatus: text("coach_status").notNull().default("pending"), // pending, approved, rejected
+  coachId: varchar("coach_id"),
+  coachValidatedAt: timestamp("coach_validated_at"),
 }, (table) => ({
   userFormationUnique: uniqueIndex("user_formation_unique_idx").on(table.userId, table.formationId),
 }));
+
+export const coachAssignments = pgTable("coach_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  coachId: varchar("coach_id").notNull(),
+  coacheeId: varchar("coachee_id").notNull(),
+  createdAt: timestamp("created_at").default(sql`now()`),
+}, (table) => ({
+  coachCoacheeUnique: uniqueIndex("coach_coachee_unique_idx").on(table.coachId, table.coacheeId),
+}));
+
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at").default(sql`now()`),
+});
 
 export const registrations = pgTable("registrations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -117,7 +135,14 @@ export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true 
   startDate: z.union([z.date(), z.string()]).transform((val) => typeof val === 'string' ? new Date(val) : val),
   endDate: z.union([z.date(), z.string()]).transform((val) => typeof val === 'string' ? new Date(val) : val),
 });
-export const insertFormationInterestSchema = createInsertSchema(formationInterests).omit({ id: true, expressedAt: true, status: true });
+export const insertFormationInterestSchema = createInsertSchema(formationInterests).omit({
+  id: true,
+  expressedAt: true,
+  status: true,
+  coachStatus: true,
+  coachId: true,
+  coachValidatedAt: true,
+});
 export const insertRegistrationSchema = createInsertSchema(registrations).omit({ id: true, registeredAt: true, status: true });
 export const insertInstructorFormationSchema = createInsertSchema(instructorFormations).omit({ id: true, assignedAt: true });
 export const insertInstructorAvailabilitySchema = createInsertSchema(instructorAvailabilities).omit({ id: true, createdAt: true }).extend({
@@ -138,6 +163,10 @@ export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Session = typeof sessions.$inferSelect;
 export type InsertFormationInterest = z.infer<typeof insertFormationInterestSchema>;
 export type FormationInterest = typeof formationInterests.$inferSelect;
+export type CoachAssignment = typeof coachAssignments.$inferSelect;
+export type InsertCoachAssignment = typeof coachAssignments.$inferInsert;
+export type AppSetting = typeof appSettings.$inferSelect;
+export type InsertAppSetting = typeof appSettings.$inferInsert;
 export type InsertRegistration = z.infer<typeof insertRegistrationSchema>;
 export type Registration = typeof registrations.$inferSelect;
 export type InsertInstructorFormation = z.infer<typeof insertInstructorFormationSchema>;
