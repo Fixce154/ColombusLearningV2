@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Calendar, XCircle, Loader2, Heart, AlertCircle, CheckCircle, Trash2 } from "lucide-react";
+import { Calendar, XCircle, Loader2, Heart, AlertCircle, CheckCircle, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { useMemo, useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -155,13 +155,13 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
   };
 
   const firstName = currentUser.name.split(" ")[0] || currentUser.name;
-  const formationCountText = `${formations.length} formation${formations.length === 1 ? "" : "s"} disponibles`;
 
   return (
     <div className="space-y-12">
-      <section className="surface-elevated rounded-3xl px-10 py-12">
-        <div className="flex flex-col gap-10 md:flex-row md:items-center md:justify-between">
-          <div className="max-w-2xl space-y-6">
+      <section className="surface-elevated relative overflow-hidden rounded-[2rem] px-12 py-14">
+        <div className="pointer-events-none absolute inset-y-8 right-0 hidden w-72 rounded-l-[32px] bg-[radial-gradient(circle_at_center,rgba(10,132,255,0.12),transparent_60%)] md:block" />
+        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-5">
             <div className="flex flex-wrap items-center gap-3">
               <p className="eyebrow text-muted-foreground">Tableau de bord</p>
               {dashboardUnread > 0 ? (
@@ -172,59 +172,46 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
             </div>
             <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Bonjour {firstName}</h1>
             <p className="text-base leading-relaxed text-muted-foreground">
-              Visualisez vos priorités et vos prochaines sessions de formation dans un espace clair et élégant.
+              L'outil "Made in Colombus" pour gérer votre parcours de formation
             </p>
-            <div className="flex flex-wrap items-center gap-4 pt-2">
-              <Link href="/catalog">
-                <Button
-                  size="lg"
-                  className="group gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_32px_-26px_rgba(10,132,255,0.55)] transition hover:bg-primary/90"
-                  data-testid="button-browse-catalog"
-                >
-                  <Plus className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
-                  Parcourir le catalogue
-                </Button>
-              </Link>
-              <span className="text-sm font-medium text-muted-foreground">{formationCountText}</span>
-            </div>
-            {unreadDashboardNotifications.length > 0 ? (
-              <div className="mt-6 space-y-3 rounded-2xl border border-primary/10 bg-white/70 p-4 text-[#00313F] shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold">Nouveautés pour vous</p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-3 text-xs text-[#00313F]"
-                    onClick={() => markDashboardNotificationsRead.mutate({ route: "/" })}
-                    disabled={markDashboardNotificationsRead.isPending || dashboardUnread === 0}
-                  >
-                    {markDashboardNotificationsRead.isPending ? "Traitement..." : "Marquer comme lues"}
-                  </Button>
-                </div>
-                <ul className="space-y-2">
-                  {unreadDashboardNotifications.slice(0, 3).map((notification) => (
-                    <li key={notification.id} className="flex items-start gap-3 text-sm">
-                      <span className="mt-1 inline-flex h-2.5 w-2.5 flex-shrink-0 rounded-full bg-primary" />
-                      <div>
-                        <p className="font-medium text-[#00313F]">{notification.title}</p>
-                        {notification.message ? (
-                          <p className="text-sm text-[#00313F]/75">{notification.message}</p>
-                        ) : null}
-                        <p className="text-xs text-[#00313F]/60">
-                          {formatNotificationDate(notification.createdAt)}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                {unreadDashboardNotifications.length > 3 ? (
-                  <p className="text-xs text-[#00313F]/60">
-                    {unreadDashboardNotifications.length - 3} notification(s) supplémentaires en attente.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
           </div>
+          {unreadDashboardNotifications.length > 0 ? (
+            <div className="w-full max-w-md rounded-2xl border border-primary/10 bg-white/80 p-5 text-[#00313F] shadow-sm backdrop-blur-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold">Nouveautés pour vous</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-3 text-xs text-[#00313F]"
+                  onClick={() => markDashboardNotificationsRead.mutate({ route: "/" })}
+                  disabled={markDashboardNotificationsRead.isPending || dashboardUnread === 0}
+                >
+                  {markDashboardNotificationsRead.isPending ? "Traitement..." : "Marquer comme lues"}
+                </Button>
+              </div>
+              <ul className="mt-4 space-y-2">
+                {unreadDashboardNotifications.slice(0, 3).map((notification) => (
+                  <li key={notification.id} className="flex items-start gap-3 text-sm">
+                    <span className="mt-1 inline-flex h-2.5 w-2.5 flex-shrink-0 rounded-full bg-primary" />
+                    <div>
+                      <p className="font-medium text-[#00313F]">{notification.title}</p>
+                      {notification.message ? (
+                        <p className="text-sm text-[#00313F]/75">{notification.message}</p>
+                      ) : null}
+                      <p className="text-xs text-[#00313F]/60">
+                        {formatNotificationDate(notification.createdAt)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {unreadDashboardNotifications.length > 3 ? (
+                <p className="mt-3 text-xs text-[#00313F]/60">
+                  {unreadDashboardNotifications.length - 3} notification(s) supplémentaires en attente.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </section>
 

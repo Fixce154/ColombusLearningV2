@@ -3,9 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import SearchBar from "@/components/SearchBar";
 import FilterPanel from "@/components/FilterPanel";
 import TrainingCard from "@/components/TrainingCard";
-import { BookOpen, Loader2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { BookOpen, Calendar, CheckCircle, Layers, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
-import type { Formation, Session } from "@shared/schema";
+import type { Formation, Session, Registration } from "@shared/schema";
 
 export default function Catalog() {
   const [, setLocation] = useLocation();
@@ -13,6 +14,7 @@ export default function Catalog() {
   const [selectedThemes, setSelectedThemes] = useState<string[]>([]);
   const [selectedModalities, setSelectedModalities] = useState<string[]>([]);
   const [selectedSeniority, setSelectedSeniority] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const { data: formations = [], isLoading: isLoadingFormations } = useQuery<Formation[]>({
     queryKey: ["/api/formations"],
@@ -25,6 +27,10 @@ export default function Catalog() {
       if (!res.ok) throw new Error("Failed to fetch sessions");
       return res.json();
     },
+  });
+
+  const { data: registrations = [], isLoading: isLoadingRegistrations } = useQuery<Registration[]>({
+    queryKey: ["/api/registrations"],
   });
 
   const filteredFormations = useMemo(() => {
@@ -70,7 +76,9 @@ export default function Catalog() {
     setSelectedSeniority([]);
   };
 
-  if (isLoadingFormations || isLoadingSessions) {
+  const totalActiveFilters = selectedThemes.length + selectedModalities.length + selectedSeniority.length;
+
+  if (isLoadingFormations || isLoadingSessions || isLoadingRegistrations) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="space-y-4 text-center">
@@ -83,6 +91,10 @@ export default function Catalog() {
 
   const activeFormations = formations.filter((f) => f.active).length;
   const openSessionsCount = sessions.filter((s) => s.status === "open").length;
+  const completedFormationsCount = useMemo(() => {
+    const completedRegistrations = registrations.filter((registration) => registration.status === "completed");
+    return new Set(completedRegistrations.map((registration) => registration.formationId)).size;
+  }, [registrations]);
 
   return (
     <div className="space-y-12">
@@ -96,73 +108,93 @@ export default function Catalog() {
               Trouvez la formation qui répond à vos objectifs et accédez à des parcours conçus par les experts Colombus.
             </p>
           </div>
-          <div className="grid w-full max-w-sm grid-cols-2 gap-4 text-center text-foreground">
-            <div className="rounded-3xl border border-black/5 bg-white px-5 py-4 shadow-sm">
-              <p className="eyebrow text-muted-foreground">Formations actives</p>
-              <p className="mt-3 text-2xl font-semibold">{activeFormations}</p>
-            </div>
-            <div className="rounded-3xl border border-black/5 bg-white px-5 py-4 shadow-sm">
-              <p className="eyebrow text-muted-foreground">Sessions ouvertes</p>
-              <p className="mt-3 text-2xl font-semibold">{openSessionsCount}</p>
-            </div>
-            <div className="col-span-2 rounded-3xl border border-black/5 bg-secondary px-5 py-4 text-sm text-muted-foreground">
-              Des modalités présentielles, distancielles et hybrides pour répondre à toutes vos réalités terrain.
-            </div>
-          </div>
         </div>
       </section>
 
-      <SearchBar value={searchQuery} onChange={setSearchQuery} />
-
-      <div className="grid gap-8 lg:grid-cols-4">
-        <div className="lg:col-span-1">
-          <div className="sticky top-6">
-            <FilterPanel
-              selectedThemes={selectedThemes}
-              selectedModalities={selectedModalities}
-              selectedSeniority={selectedSeniority}
-              onThemeChange={setSelectedThemes}
-              onModalityChange={setSelectedModalities}
-              onSeniorityChange={setSelectedSeniority}
-              onReset={handleReset}
-            />
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="surface-soft relative flex h-full items-center justify-between gap-6 rounded-2xl p-6 transition-transform duration-300 hover:-translate-y-1">
+          <div className="space-y-2">
+            <p className="eyebrow text-muted-foreground">Formations actives</p>
+            <p className="text-3xl font-semibold tracking-tight text-foreground">{activeFormations}</p>
           </div>
-        </div>
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Layers className="h-5 w-5" />
+          </div>
+        </Card>
+        <Card className="surface-soft relative flex h-full items-center justify-between gap-6 rounded-2xl p-6 transition-transform duration-300 hover:-translate-y-1">
+          <div className="space-y-2">
+            <p className="eyebrow text-muted-foreground">Sessions ouvertes</p>
+            <p className="text-3xl font-semibold tracking-tight text-foreground">{openSessionsCount}</p>
+          </div>
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Calendar className="h-5 w-5" />
+          </div>
+        </Card>
+        <Card className="surface-soft relative flex h-full items-center justify-between gap-6 rounded-2xl p-6 transition-transform duration-300 hover:-translate-y-1">
+          <div className="space-y-2">
+            <p className="eyebrow text-muted-foreground">Formations réalisées</p>
+            <p className="text-3xl font-semibold tracking-tight text-foreground">{completedFormationsCount}</p>
+          </div>
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-secondary text-foreground">
+            <CheckCircle className="h-5 w-5" />
+          </div>
+        </Card>
+      </div>
 
-        <div className="lg:col-span-3 space-y-6">
-          {filteredFormations.length > 0 ? (
-            <>
-              <div className="flex items-baseline gap-3">
-                <p className="text-sm font-semibold text-foreground">
-                  {filteredFormations.length} formation{filteredFormations.length > 1 ? "s" : ""} trouvée{filteredFormations.length > 1 ? "s" : ""}
-                </p>
-                {(searchQuery || selectedThemes.length > 0 || selectedModalities.length > 0 || selectedSeniority.length > 0) && (
-                  <p className="text-sm text-muted-foreground">sur {formations.filter((f) => f.active).length} au total</p>
-                )}
-              </div>
-              <div className="grid gap-6 md:grid-cols-2">
-                {filteredFormations.map((formation) => (
-                  <TrainingCard
-                    key={formation.id}
-                    formation={formation}
-                    nextSessionDate={getNextSession(formation.id)}
-                    onViewDetails={() => setLocation(`/training/${formation.id}`)}
-                  />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="surface-tonal rounded-[1.75rem] p-16 text-center">
-              <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm">
-                <BookOpen className="h-10 w-10" />
-              </div>
-              <h3 className="text-xl font-semibold text-foreground mb-2">Aucune formation trouvée</h3>
-              <p className="mx-auto max-w-md text-sm text-muted-foreground">
-                Essayez de modifier vos filtres ou votre recherche pour découvrir d'autres formations.
+      <SearchBar
+        value={searchQuery}
+        onChange={setSearchQuery}
+        onToggleFilters={() => setFiltersOpen((prev) => !prev)}
+        filtersOpen={filtersOpen}
+        activeFiltersCount={totalActiveFilters}
+      />
+
+      {filtersOpen && (
+        <FilterPanel
+          selectedThemes={selectedThemes}
+          selectedModalities={selectedModalities}
+          selectedSeniority={selectedSeniority}
+          onThemeChange={setSelectedThemes}
+          onModalityChange={setSelectedModalities}
+          onSeniorityChange={setSelectedSeniority}
+          onReset={handleReset}
+          layout="inline"
+        />
+      )}
+
+      <div className="space-y-6">
+        {filteredFormations.length > 0 ? (
+          <>
+            <div className="flex items-baseline gap-3">
+              <p className="text-sm font-semibold text-foreground">
+                {filteredFormations.length} formation{filteredFormations.length > 1 ? "s" : ""} trouvée{filteredFormations.length > 1 ? "s" : ""}
               </p>
+              {(searchQuery || totalActiveFilters > 0) && (
+                <p className="text-sm text-muted-foreground">sur {formations.filter((f) => f.active).length} au total</p>
+              )}
             </div>
-          )}
-        </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              {filteredFormations.map((formation) => (
+                <TrainingCard
+                  key={formation.id}
+                  formation={formation}
+                  nextSessionDate={getNextSession(formation.id)}
+                  onViewDetails={() => setLocation(`/training/${formation.id}`)}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="surface-tonal rounded-[1.75rem] p-16 text-center">
+            <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm">
+              <BookOpen className="h-10 w-10" />
+            </div>
+            <h3 className="text-xl font-semibold text-foreground mb-2">Aucune formation trouvée</h3>
+            <p className="mx-auto max-w-md text-sm text-muted-foreground">
+              Essayez de modifier vos filtres ou votre recherche pour découvrir d'autres formations.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

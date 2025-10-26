@@ -60,16 +60,28 @@ export default function InstructorSessions() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Mes Sessions</h1>
-        <p className="text-muted-foreground">
-          Les sessions de formation que vous animez
-        </p>
-      </div>
+    <div className="space-y-12">
+      <section className="surface-elevated relative overflow-hidden rounded-[2rem] px-12 py-14">
+        <div className="pointer-events-none absolute inset-y-8 right-0 hidden w-72 rounded-l-[32px] bg-[radial-gradient(circle_at_center,rgba(10,132,255,0.12),transparent_60%)] md:block" />
+        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-5">
+            <p className="eyebrow text-muted-foreground">Espace formateur</p>
+            <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Vos sessions de formation</h1>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              Retrouvez vos prochaines sessions, leurs participants et les informations essentielles pour les animer sereinement.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">Mes sessions planifiées</h2>
+          <p className="text-muted-foreground">Les sessions de formation que vous animez</p>
+        </div>
 
       {mySessions.length === 0 ? (
-        <Card>
+        <Card className="surface-tonal rounded-[1.75rem] border-none">
           <CardContent className="p-12 text-center">
             <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">
@@ -122,6 +134,7 @@ export default function InstructorSessions() {
           ))}
         </div>
       )}
+      </section>
     </div>
   );
 }

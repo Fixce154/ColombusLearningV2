@@ -264,238 +264,250 @@ export default function InstructorAvailability() {
   const uniqueDaysCount = slots.length;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2" data-testid="heading-availabilities">
-          Mes disponibilités
-        </h1>
-        <p className="text-muted-foreground">
-          Indiquez vos disponibilités pour les formations que vous enseignez
-        </p>
-      </div>
-
-      {/* No formations assigned */}
-      {myFormations.length === 0 && (
-        <Alert>
-          <AlertDescription>
-            Vous n'êtes affecté à aucune formation. Veuillez vous affecter à des formations depuis la page "Mes formations".
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Formation selector */}
-      {myFormations.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Sélectionnez une formation</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select 
-              value={selectedFormationId} 
-              onValueChange={handleFormationSelect}
-              data-testid="select-formation"
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choisir une formation" />
-              </SelectTrigger>
-              <SelectContent>
-                {myFormations.map((formation) => (
-                  <SelectItem key={formation.id} value={formation.id}>
-                    {formation.title} ({formation.duration})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Availability editor */}
-      {selectedFormationId && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              Disponibilités pour {selectedFormation?.title}
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-2">
-              Durée de la formation : {selectedFormation?.duration}
-              {requiredDays > 0 && ` (${requiredDays} jour${requiredDays > 1 ? 's' : ''})`}
+    <div className="space-y-12">
+      <section className="surface-elevated relative overflow-hidden rounded-[2rem] px-12 py-14">
+        <div className="pointer-events-none absolute inset-y-8 right-0 hidden w-72 rounded-l-[32px] bg-[radial-gradient(circle_at_center,rgba(10,132,255,0.12),transparent_60%)] md:block" />
+        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-5">
+            <p className="eyebrow text-muted-foreground">Espace formateur</p>
+            <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
+              Partagez vos disponibilités
+            </h1>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              Indiquez vos créneaux pour organiser vos futures sessions et permettre aux équipes de planifier rapidement.
             </p>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Calendar */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                <CalendarIcon className="w-4 h-4 inline mr-2" />
-                Sélectionnez vos dates disponibles
-              </label>
-              <div className="border rounded-md p-4 inline-block">
-                <Calendar
-                  mode="multiple"
-                  selected={selectedDates}
-                  onSelect={handleDateSelect}
-                  disabled={isDateDisabled}
-                  locale={fr}
-                  className="rounded-md"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                ℹ️ Seuls les jours de semaine (lundi-vendredi) peuvent être sélectionnés
-              </p>
-            </div>
+          </div>
+        </div>
+      </section>
 
-            {/* Selected slots list with time slot selectors */}
-            {slots.length > 0 && (
-              <div>
-                <label className="text-sm font-medium mb-3 block">
-                  <Clock className="w-4 h-4 inline mr-2" />
-                  Vos disponibilités ({uniqueDaysCount} jour{uniqueDaysCount > 1 ? 's' : ''})
-                </label>
-                <div className="space-y-2">
-                  {[...slots]
-                    .sort((a, b) => a.date.localeCompare(b.date))
-                    .map((slot, index) => {
-                      const date = new Date(slot.date);
-                      return (
-                        <div
-                          key={slot.date}
-                          className="flex items-center gap-3 p-3 border rounded-md bg-card"
-                          data-testid={`slot-item-${index}`}
-                        >
-                          <span className="text-sm font-medium min-w-[180px]">
-                            {format(date, "EEEE d MMMM yyyy", { locale: fr })}
-                          </span>
-                          <Select
-                            value={slot.timeSlot}
-                            onValueChange={(value) => 
-                              handleTimeSlotChange(slot.date, value as 'full_day' | 'morning' | 'afternoon')
-                            }
-                            data-testid={`select-timeslot-${index}`}
-                          >
-                            <SelectTrigger className="w-[200px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="full_day">Journée complète</SelectItem>
-                              <SelectItem value="morning">Matin</SelectItem>
-                              <SelectItem value="afternoon">Après-midi</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveSlot(slot.date)}
-                            data-testid={`button-remove-slot-${index}`}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      );
-                    })}
-                </div>
+      <section className="space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground" data-testid="heading-availabilities">
+            Mes disponibilités
+          </h2>
+          <p className="text-muted-foreground">
+            Indiquez vos disponibilités pour les formations que vous enseignez
+          </p>
+        </div>
 
-                {/* Validation warning */}
-                {requiredDays > 0 && uniqueDaysCount < requiredDays && (
-                  <Alert className="mt-3">
-                    <AlertDescription>
-                      ⚠️ Il manque {requiredDays - uniqueDaysCount} jour{requiredDays - uniqueDaysCount > 1 ? 's' : ''} par rapport à la durée de la formation ({requiredDays} jour{requiredDays > 1 ? 's' : ''}). 
-                      Vous pouvez quand même enregistrer si d'autres formateurs complètent les jours manquants.
-                    </AlertDescription>
-                  </Alert>
-                )}
+        {myFormations.length === 0 && (
+          <Alert>
+            <AlertDescription>
+              Vous n'êtes affecté à aucune formation. Veuillez vous affecter à des formations depuis la page "Mes formations".
+            </AlertDescription>
+          </Alert>
+        )}
 
-                {uniqueDaysCount > requiredDays && (
-                  <Alert className="mt-3">
-                    <AlertDescription>
-                      ℹ️ Vous avez sélectionné {uniqueDaysCount - requiredDays} jour{uniqueDaysCount - requiredDays > 1 ? 's' : ''} de plus que la durée de la formation ({requiredDays} jour{requiredDays > 1 ? 's' : ''}).
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="flex gap-2 pt-4">
-              <Button
-                onClick={handleSave}
-                disabled={saveMutation.isPending || slots.length === 0}
-                data-testid="button-save-availability"
+        {myFormations.length > 0 && (
+          <Card className="rounded-[1.5rem]">
+            <CardHeader>
+              <CardTitle>Sélectionnez une formation</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Select
+                value={selectedFormationId}
+                onValueChange={handleFormationSelect}
+                data-testid="select-formation"
               >
-                <Save className="w-4 h-4 mr-2" />
-                {saveMutation.isPending ? "Enregistrement..." : "Enregistrer"}
-              </Button>
-              {existingAvailability && (
-                <>
-                  {isEditing && (
-                    <Button
-                      variant="outline"
-                      onClick={handleCancel}
-                      data-testid="button-cancel"
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Annuler
-                    </Button>
-                  )}
-                  <Button
-                    variant="destructive"
-                    onClick={() => handleDelete(selectedFormationId)}
-                    disabled={deleteMutation.isPending}
-                    data-testid="button-delete-availability"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    {deleteMutation.isPending ? "Suppression..." : "Supprimer"}
-                  </Button>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                <SelectTrigger>
+                  <SelectValue placeholder="Choisir une formation" />
+                </SelectTrigger>
+                <SelectContent>
+                  {myFormations.map((formation) => (
+                    <SelectItem key={formation.id} value={formation.id}>
+                      {formation.title} ({formation.duration})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Sélectionnez une formation pour consulter ou mettre à jour vos créneaux.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Existing Availabilities Summary */}
-      {validAvailabilities.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Récapitulatif de vos disponibilités</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {validAvailabilities.map((availability) => {
-                const formation = allFormations.find(f => f.id === availability.formationId);
-                if (!formation) return null;
+        {selectedFormationId && (
+          <Card className="rounded-[1.5rem]">
+            <CardHeader>
+              <CardTitle>
+                Disponibilités pour {selectedFormation?.title}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Durée de la formation : {selectedFormation?.duration}
+                {requiredDays > 0 && ` (${requiredDays} jour${requiredDays > 1 ? 's' : ''})`}
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  <CalendarIcon className="w-4 h-4 inline mr-2" />
+                  Sélectionnez vos dates disponibles
+                </label>
+                <div className="inline-block rounded-xl border bg-card p-4">
+                  <Calendar
+                    mode="multiple"
+                    selected={selectedDates}
+                    onSelect={handleDateSelect}
+                    disabled={isDateDisabled}
+                    locale={fr}
+                    className="rounded-md"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  ℹ️ Seuls les jours de semaine (lundi-vendredi) peuvent être sélectionnés
+                </p>
+              </div>
 
-                const availSlots = Array.isArray(availability.slots) 
-                  ? (availability.slots as AvailabilitySlot[]).sort((a, b) => a.date.localeCompare(b.date))
-                  : [];
-
-                return (
-                  <div
-                    key={availability.id}
-                    className="p-4 border rounded-md"
-                    data-testid={`availability-${availability.formationId}`}
-                  >
-                    <div className="font-medium mb-3">{formation.title}</div>
-                    <div className="space-y-1">
-                      {availSlots.map((slot, i) => {
+              {slots.length > 0 && (
+                <div className="space-y-3">
+                  <label className="text-sm font-medium block">
+                    <Clock className="w-4 h-4 inline mr-2" />
+                    Vos disponibilités ({uniqueDaysCount} jour{uniqueDaysCount > 1 ? 's' : ''})
+                  </label>
+                  <div className="space-y-2">
+                    {[...slots]
+                      .sort((a, b) => a.date.localeCompare(b.date))
+                      .map((slot, index) => {
                         const date = new Date(slot.date);
                         return (
-                          <div key={i} className="text-sm text-muted-foreground flex items-center gap-2">
-                            <span className="font-medium">•</span>
-                            <span>{format(date, "EEEE d MMMM yyyy", { locale: fr })}</span>
-                            <span className="text-xs bg-secondary px-2 py-0.5 rounded">
-                              {TIME_SLOT_LABELS[slot.timeSlot]}
+                          <div
+                            key={slot.date}
+                            className="flex flex-col gap-3 rounded-xl border bg-card/60 p-4 sm:flex-row sm:items-center"
+                            data-testid={`slot-item-${index}`}
+                          >
+                            <span className="text-sm font-medium sm:min-w-[200px]">
+                              {format(date, "EEEE d MMMM yyyy", { locale: fr })}
                             </span>
+                            <Select
+                              value={slot.timeSlot}
+                              onValueChange={(value) =>
+                                handleTimeSlotChange(slot.date, value as 'full_day' | 'morning' | 'afternoon')
+                              }
+                              data-testid={`select-timeslot-${index}`}
+                            >
+                              <SelectTrigger className="w-full sm:w-[200px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="full_day">Journée complète</SelectItem>
+                                <SelectItem value="morning">Matin</SelectItem>
+                                <SelectItem value="afternoon">Après-midi</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveSlot(slot.date)}
+                              data-testid={`button-remove-slot-${index}`}
+                              className="self-start"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
                           </div>
                         );
                       })}
-                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
+                  {requiredDays > 0 && uniqueDaysCount < requiredDays && (
+                    <Alert className="mt-3">
+                      <AlertDescription>
+                        ⚠️ Il manque {requiredDays - uniqueDaysCount} jour{requiredDays - uniqueDaysCount > 1 ? 's' : ''} par rapport à la durée de la formation ({requiredDays} jour{requiredDays > 1 ? 's' : ''}). Vous pouvez quand même enregistrer si d'autres formateurs complètent les jours manquants.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {uniqueDaysCount > requiredDays && (
+                    <Alert className="mt-3">
+                      <AlertDescription>
+                        ℹ️ Vous avez sélectionné {uniqueDaysCount - requiredDays} jour{uniqueDaysCount - requiredDays > 1 ? 's' : ''} de plus que la durée de la formation ({requiredDays} jour{requiredDays > 1 ? 's' : ''}).
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3 pt-4">
+                <Button
+                  onClick={handleSave}
+                  disabled={saveMutation.isPending || slots.length === 0}
+                  data-testid="button-save-availability"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {saveMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+                </Button>
+                {existingAvailability && (
+                  <>
+                    {isEditing && (
+                      <Button
+                        variant="outline"
+                        onClick={handleCancel}
+                        data-testid="button-cancel"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Annuler
+                      </Button>
+                    )}
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleDelete(selectedFormationId)}
+                      disabled={deleteMutation.isPending}
+                      data-testid="button-delete-availability"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      {deleteMutation.isPending ? "Suppression..." : "Supprimer"}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {validAvailabilities.length > 0 && (
+          <Card className="rounded-[1.5rem]">
+            <CardHeader>
+              <CardTitle>Récapitulatif de vos disponibilités</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {validAvailabilities.map((availability) => {
+                  const formation = allFormations.find(f => f.id === availability.formationId);
+                  if (!formation) return null;
+
+                  const availSlots = Array.isArray(availability.slots)
+                    ? (availability.slots as AvailabilitySlot[]).sort((a, b) => a.date.localeCompare(b.date))
+                    : [];
+
+                  return (
+                    <div
+                      key={availability.id}
+                      className="rounded-xl border bg-card/60 p-4"
+                      data-testid={`availability-${availability.formationId}`}
+                    >
+                      <div className="mb-3 font-medium">{formation.title}</div>
+                      <div className="space-y-1">
+                        {availSlots.map((slot, i) => {
+                          const date = new Date(slot.date);
+                          return (
+                            <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <span className="font-medium">•</span>
+                              <span>{format(date, "EEEE d MMMM yyyy", { locale: fr })}</span>
+                              <span className="text-xs bg-secondary px-2 py-0.5 rounded">
+                                {TIME_SLOT_LABELS[slot.timeSlot]}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </section>
     </div>
   );
 }
