@@ -36,6 +36,7 @@ function Router({ currentUser }: { currentUser: User }) {
     queryClient.invalidateQueries({ queryKey: ["/api/users"] });
     queryClient.invalidateQueries({ queryKey: ["/api/admin/interests"] });
     queryClient.invalidateQueries({ queryKey: ["/api/admin/registrations"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
   }, [location]);
 
   return (

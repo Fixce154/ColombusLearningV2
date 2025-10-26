@@ -7,6 +7,7 @@ import {
   registrations,
   instructorFormations,
   instructorAvailabilities,
+  notifications,
   type User,
   type InsertUser,
   type Formation,
@@ -21,9 +22,53 @@ import {
   type InsertInstructorFormation,
   type InstructorAvailability,
   type InsertInstructorAvailability,
+  type Notification,
+  type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, asc, ne, inArray } from "drizzle-orm";
+
+export const ensureNotificationsTable = (() => {
+  let ensurePromise: Promise<void> | null = null;
+
+  return async () => {
+    if (!ensurePromise) {
+      ensurePromise = (async () => {
+        try {
+          await db.execute(sql`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+        } catch (extensionError) {
+          console.error("Failed to ensure pgcrypto extension", extensionError);
+        }
+
+        await db.execute(sql`
+          CREATE TABLE IF NOT EXISTS notifications (
+            id varchar(255) PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id varchar(255) NOT NULL,
+            route text NOT NULL,
+            title text NOT NULL,
+            message text,
+            metadata jsonb,
+            read boolean DEFAULT false,
+            created_at timestamp DEFAULT now(),
+            read_at timestamp
+          )
+        `);
+
+        await db.execute(sql`
+          CREATE INDEX IF NOT EXISTS notifications_user_read_idx
+          ON notifications (user_id, read)
+        `);
+
+        await db.execute(sql`
+          CREATE INDEX IF NOT EXISTS notifications_route_idx
+          ON notifications (route)
+        `);
+      })();
+    }
+
+    return ensurePromise;
+  };
+})();
 
 export interface IStorage {
   // User methods
@@ -80,6 +125,15 @@ export interface IStorage {
   createInstructorAvailability(availability: InsertInstructorAvailability): Promise<InstructorAvailability>;
   updateInstructorAvailability(instructorId: string, formationId: string, slots: any): Promise<InstructorAvailability | undefined>;
   deleteInstructorAvailability(instructorId: string, formationId: string): Promise<boolean>;
+
+  // Notification methods
+  listNotifications(userId: string): Promise<Notification[]>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationsRead(
+    userId: string,
+    filter?: { notificationIds?: string[]; route?: string }
+  ): Promise<number>;
+  getUnreadNotificationCounts(userId: string): Promise<Array<{ route: string; count: number }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -494,6 +548,55 @@ export class DatabaseStorage implements IStorage {
       )
       .returning();
     return result.length > 0;
+  }
+
+  // Notification methods
+  async listNotifications(userId: string): Promise<Notification[]> {
+    await ensureNotificationsTable();
+    return await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    await ensureNotificationsTable();
+    const [created] = await db.insert(notifications).values(notification).returning();
+    return created;
+  }
+
+  async markNotificationsRead(
+    userId: string,
+    filter?: { notificationIds?: string[]; route?: string }
+  ): Promise<number> {
+    await ensureNotificationsTable();
+    const conditions = [eq(notifications.userId, userId), eq(notifications.read, false)];
+
+    if (filter?.notificationIds && filter.notificationIds.length > 0) {
+      conditions.push(inArray(notifications.id, filter.notificationIds));
+    } else if (filter?.route) {
+      conditions.push(eq(notifications.route, filter.route));
+    }
+
+    const result = await db
+      .update(notifications)
+      .set({ read: true, readAt: new Date() })
+      .where(and(...conditions))
+      .returning({ id: notifications.id });
+
+    return result.length;
+  }
+
+  async getUnreadNotificationCounts(
+    userId: string
+  ): Promise<Array<{ route: string; count: number }>> {
+    await ensureNotificationsTable();
+    return await db
+      .select({ route: notifications.route, count: sql<number>`count(*)` })
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), eq(notifications.read, false)))
+      .groupBy(notifications.route);
   }
 }
 

@@ -1,12 +1,22 @@
 import { db } from "./db";
-import { users, formations, sessions, registrations, instructorFormations } from "@shared/schema";
+import {
+  users,
+  formations,
+  sessions,
+  registrations,
+  instructorFormations,
+  notifications,
+} from "@shared/schema";
 import { isInstructor } from "@shared/roles";
-import { sql } from "drizzle-orm";
+import { ensureNotificationsTable } from "./storage";
 
 async function seed() {
   console.log("🌱 Seeding database...");
 
+  await ensureNotificationsTable();
+
   // Clear existing data
+  await db.delete(notifications);
   await db.delete(registrations);
   await db.delete(sessions);
   await db.delete(formations);

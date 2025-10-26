@@ -12,6 +12,7 @@ import {
   insertFormationInterestSchema,
   insertRegistrationSchema,
   type InsertUser,
+  type InsertNotification,
 } from "@shared/schema";
 import { INSTRUCTOR_ROLES, InstructorRole, USER_ROLES, isInstructor } from "@shared/roles";
 import { z } from "zod";
@@ -36,6 +37,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       },
     })
   );
+
+  const createNotification = async (notification: InsertNotification) => {
+    try {
+      await storage.createNotification(notification);
+    } catch (error) {
+      console.error("Failed to create notification", error);
+    }
+  };
 
   // Authentication Routes
   app.post("/api/auth/register", async (req, res) => {
@@ -148,7 +157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -156,6 +165,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { password: _, ...userWithoutPassword } = user;
       res.json({ user: userWithoutPassword });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const notifications = await storage.listNotifications(userId);
+      const counts = await storage.getUnreadNotificationCounts(userId);
+      const unreadCounts = counts.reduce<Record<string, number>>((acc, current) => {
+        acc[current.route] = current.count;
+        return acc;
+      }, {});
+      const totalUnread = counts.reduce((sum, current) => sum + current.count, 0);
+
+      res.json({ notifications, unreadCounts, totalUnread });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/read", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const schema = z
+        .object({
+          notificationIds: z.array(z.string()).optional(),
+          route: z.string().optional(),
+        })
+        .refine(
+          (data) => (data.notificationIds && data.notificationIds.length > 0) || !!data.route,
+          "route or notificationIds must be provided"
+        );
+
+      const data = schema.parse(req.body);
+
+      const updated = await storage.markNotificationsRead(userId, {
+        notificationIds: data.notificationIds,
+        route: data.route,
+      });
+
+      res.json({ updated });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
       res.status(500).json({ message: error.message });
     }
   });
@@ -839,8 +894,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validationSchema = insertSessionSchema;
       const data = validationSchema.parse(req.body);
-      
+
       const session = await storage.createSession(data);
+
+      try {
+        const formation = await storage.getFormation(data.formationId);
+        const interests = await storage.listFormationInterests({ formationId: data.formationId });
+        const interestedUsers = interests.filter(
+          (interest) => interest.status === "approved" || interest.status === "converted"
+        );
+
+        if (interestedUsers.length > 0) {
+          const message = `Une nouvelle session pour ${formation?.title ?? "votre formation"} est disponible.`;
+          await Promise.all(
+            interestedUsers.map((interest) =>
+              createNotification({
+                userId: interest.userId,
+                route: "/",
+                title: "Nouvelle session disponible",
+                message,
+              })
+            )
+          );
+        }
+      } catch (notificationError) {
+        console.error("Failed to notify consultants about new session", notificationError);
+      }
+
       res.status(201).json(session);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -946,6 +1026,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "pending",
       });
 
+      try {
+        const rhUsers = (await storage.listUsers(false)).filter((candidate) =>
+          candidate.roles.includes("rh")
+        );
+        if (rhUsers.length > 0) {
+          const message = `${user.name} a exprimé une intention pour ${formation.title}.`;
+          await Promise.all(
+            rhUsers.map((rhUser) =>
+              createNotification({
+                userId: rhUser.id,
+                route: "/interests",
+                title: "Nouvelle intention à valider",
+                message,
+              })
+            )
+          );
+        }
+      } catch (notificationError) {
+        console.error("Failed to notify RH about new interest", notificationError);
+      }
+
       res.status(201).json(interest);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -991,6 +1092,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updated = await storage.updateFormationInterest(req.params.id, req.body);
+
+      if (updated && req.body.status && req.body.status !== interest.status) {
+        const formation = await storage.getFormation(updated.formationId);
+        const formationTitle = formation?.title ?? "votre formation";
+        let title: string | null = null;
+        let message: string | undefined;
+
+        if (req.body.status === "approved") {
+          title = "Intention validée";
+          message = `Votre intention pour ${formationTitle} a été validée par les RH.`;
+        } else if (req.body.status === "converted") {
+          title = "Session planifiée";
+          message = `Une nouvelle session est disponible pour ${formationTitle}.`;
+        } else if (req.body.status === "rejected") {
+          title = "Intention refusée";
+          message = `Votre intention pour ${formationTitle} a été refusée.`;
+        }
+
+        if (title) {
+          await createNotification({
+            userId: updated.userId,
+            route: "/",
+            title,
+            message,
+          });
+        }
+      }
+
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
