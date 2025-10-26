@@ -3,7 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/AppSidebar";
 import Dashboard from "@/pages/Dashboard";
 import Catalog from "@/pages/Catalog";
@@ -72,10 +72,6 @@ function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void
           <header className="border-b border-black/5 bg-white/90 px-8 py-6 shadow-sm backdrop-blur">
             <div className="flex items-center justify-between gap-6">
               <div className="flex items-center gap-4">
-                <SidebarTrigger
-                  data-testid="button-sidebar-toggle"
-                  className="h-11 w-11 rounded-xl border border-white/50 bg-white text-foreground shadow-sm transition hover:bg-white"
-                />
                 <div>
                   <p className="eyebrow mb-1 text-muted-foreground">Espace membre</p>
                   <h1 className="text-xl font-semibold text-foreground">Colombus Learning</h1>

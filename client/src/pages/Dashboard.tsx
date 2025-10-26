@@ -133,15 +133,12 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
   };
 
   const firstName = currentUser.name.split(" ")[0] || currentUser.name;
-  const remainingP1 = Math.max(0, 1 - (currentUser.p1Used || 0));
-  const remainingP2 = Math.max(0, 1 - (currentUser.p2Used || 0));
-  const totalPriorityRemaining = Math.max(0, 2 - ((currentUser.p1Used || 0) + (currentUser.p2Used || 0)));
+  const formationCountText = `${formations.length} formation${formations.length === 1 ? "" : "s"} disponibles`;
 
   return (
     <div className="space-y-12">
-      <section className="surface-elevated relative overflow-hidden rounded-3xl px-10 py-12">
-        <div className="pointer-events-none absolute inset-y-6 right-10 hidden w-64 rounded-3xl bg-[radial-gradient(circle_at_top,rgba(10,132,255,0.16),transparent_60%)] md:block" />
-        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
+      <section className="surface-elevated rounded-3xl px-10 py-12">
+        <div className="flex flex-col gap-10 md:flex-row md:items-center md:justify-between">
           <div className="max-w-2xl space-y-6">
             <p className="eyebrow text-muted-foreground">Tableau de bord</p>
             <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Bonjour {firstName}</h1>
@@ -159,25 +156,7 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
                   Parcourir le catalogue
                 </Button>
               </Link>
-              <span className="text-sm text-muted-foreground">Plus de 120 programmes disponibles cette saison.</span>
-            </div>
-          </div>
-          <div className="grid w-full max-w-sm grid-cols-2 gap-4 text-center text-foreground">
-            <div className="rounded-2xl border border-black/5 bg-white px-5 py-4 shadow-sm">
-              <p className="eyebrow text-muted-foreground">P1 restant</p>
-              <p className="mt-3 text-2xl font-semibold">{remainingP1}</p>
-            </div>
-            <div className="rounded-2xl border border-black/5 bg-white px-5 py-4 shadow-sm">
-              <p className="eyebrow text-muted-foreground">P2 restante</p>
-              <p className="mt-3 text-2xl font-semibold">{remainingP2}</p>
-            </div>
-            <div className="rounded-2xl border border-black/5 bg-secondary px-5 py-4 shadow-sm">
-              <p className="eyebrow text-muted-foreground">Sessions validées</p>
-              <p className="mt-3 text-2xl font-semibold">{upcomingTrainings.length}</p>
-            </div>
-            <div className="rounded-2xl border border-black/5 bg-secondary px-5 py-4 shadow-sm">
-              <p className="eyebrow text-muted-foreground">Priorités dispo.</p>
-              <p className="mt-3 text-2xl font-semibold">{totalPriorityRemaining}</p>
+              <span className="text-sm font-medium text-muted-foreground">{formationCountText}</span>
             </div>
           </div>
         </div>
@@ -217,11 +196,14 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
               return (
                 <Card
                   key={interest.id}
-                  className={`surface-soft h-full rounded-2xl p-6 transition-transform duration-300 ${isRejected ? 'opacity-70' : 'hover:-translate-y-1'}`}
+                  className={`surface-soft flex h-full flex-col rounded-2xl p-6 transition-transform duration-300 ${isRejected ? 'opacity-70' : 'hover:-translate-y-1'}`}
                 >
-                  <div className="space-y-4">
+                  <div className="flex flex-1 flex-col space-y-4">
                     <div className="flex items-start justify-between gap-3">
-                      <h3 className={`flex-1 text-base font-semibold tracking-tight ${isRejected ? 'text-muted-foreground' : 'text-foreground'}`}>
+                      <h3
+                        title={formation.title}
+                        className={`flex-1 text-base font-semibold tracking-tight leading-snug line-clamp-2 min-h-[3.25rem] ${isRejected ? 'text-muted-foreground' : 'text-foreground'}`}
+                      >
                         {formation.title}
                       </h3>
                       <Badge variant={interest.priority === "P1" ? "destructive" : interest.priority === "P2" ? "default" : "secondary"}>
@@ -229,43 +211,46 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
                       </Badge>
                     </div>
 
-                    <p className="text-sm leading-relaxed text-muted-foreground line-clamp-3">
+                    <p
+                      title={formation.description}
+                      className="text-sm leading-relaxed text-muted-foreground line-clamp-2 min-h-[3.3rem]"
+                    >
                       {formation.description}
                     </p>
-                  </div>
 
-                  <div className="mt-4 flex items-center gap-2 text-sm">
-                    {interest.status === "pending" && (
-                      <>
-                        <AlertCircle className="h-4 w-4 text-amber-500" />
-                        <span className="text-amber-600">En attente d'organisation</span>
-                      </>
-                    )}
-                    {interest.status === "approved" && (() => {
-                      const availableSessions = sessions.filter((s) => s.formationId === interest.formationId);
-                      const hasAvailableSessions = availableSessions.length > 0;
+                    <div className="flex min-h-[1.5rem] items-center gap-2 text-sm">
+                      {interest.status === "pending" && (
+                        <>
+                          <AlertCircle className="h-4 w-4 text-amber-500" />
+                          <span className="text-amber-600">En attente d'organisation</span>
+                        </>
+                      )}
+                      {interest.status === "approved" && (() => {
+                        const availableSessions = sessions.filter((s) => s.formationId === interest.formationId);
+                        const hasAvailableSessions = availableSessions.length > 0;
 
-                      return (
+                        return (
+                          <>
+                            <CheckCircle className="h-4 w-4 text-primary" />
+                            <span className="text-primary">
+                              {hasAvailableSessions ? "Inscrivez-vous" : "Sessions en cours d'organisation"}
+                            </span>
+                          </>
+                        );
+                      })()}
+                      {interest.status === "converted" && (
                         <>
                           <CheckCircle className="h-4 w-4 text-primary" />
-                          <span className="text-primary">
-                            {hasAvailableSessions ? "Inscrivez-vous" : "Sessions en cours d'organisation"}
-                          </span>
+                          <span className="text-primary">Inscrit à une session</span>
                         </>
-                      );
-                    })()}
-                    {interest.status === "converted" && (
-                      <>
-                        <CheckCircle className="h-4 w-4 text-primary" />
-                        <span className="text-primary">Inscrit à une session</span>
-                      </>
-                    )}
-                    {interest.status === "rejected" && (
-                      <>
-                        <XCircle className="h-4 w-4 text-destructive" />
-                        <span className="font-medium text-destructive">La demande a été rejetée</span>
-                      </>
-                    )}
+                      )}
+                      {interest.status === "rejected" && (
+                        <>
+                          <XCircle className="h-4 w-4 text-destructive" />
+                          <span className="font-medium text-destructive">La demande a été rejetée</span>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   <div className="mt-5 flex gap-2">
