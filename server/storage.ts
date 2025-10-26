@@ -7,6 +7,7 @@ import {
   registrations,
   instructorFormations,
   instructorAvailabilities,
+  notifications,
   type User,
   type InsertUser,
   type Formation,
@@ -21,6 +22,8 @@ import {
   type InsertInstructorFormation,
   type InstructorAvailability,
   type InsertInstructorAvailability,
+  type Notification,
+  type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, asc, ne, inArray } from "drizzle-orm";
@@ -80,6 +83,15 @@ export interface IStorage {
   createInstructorAvailability(availability: InsertInstructorAvailability): Promise<InstructorAvailability>;
   updateInstructorAvailability(instructorId: string, formationId: string, slots: any): Promise<InstructorAvailability | undefined>;
   deleteInstructorAvailability(instructorId: string, formationId: string): Promise<boolean>;
+
+  // Notification methods
+  listNotifications(userId: string): Promise<Notification[]>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationsRead(
+    userId: string,
+    filter?: { notificationIds?: string[]; route?: string }
+  ): Promise<number>;
+  getUnreadNotificationCounts(userId: string): Promise<Array<{ route: string; count: number }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -494,6 +506,51 @@ export class DatabaseStorage implements IStorage {
       )
       .returning();
     return result.length > 0;
+  }
+
+  // Notification methods
+  async listNotifications(userId: string): Promise<Notification[]> {
+    return await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [created] = await db.insert(notifications).values(notification).returning();
+    return created;
+  }
+
+  async markNotificationsRead(
+    userId: string,
+    filter?: { notificationIds?: string[]; route?: string }
+  ): Promise<number> {
+    const conditions = [eq(notifications.userId, userId), eq(notifications.read, false)];
+
+    if (filter?.notificationIds && filter.notificationIds.length > 0) {
+      conditions.push(inArray(notifications.id, filter.notificationIds));
+    } else if (filter?.route) {
+      conditions.push(eq(notifications.route, filter.route));
+    }
+
+    const result = await db
+      .update(notifications)
+      .set({ read: true, readAt: new Date() })
+      .where(and(...conditions))
+      .returning({ id: notifications.id });
+
+    return result.length;
+  }
+
+  async getUnreadNotificationCounts(
+    userId: string
+  ): Promise<Array<{ route: string; count: number }>> {
+    return await db
+      .select({ route: notifications.route, count: sql<number>`count(*)` })
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), eq(notifications.read, false)))
+      .groupBy(notifications.route);
   }
 }
 

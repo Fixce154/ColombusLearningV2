@@ -17,6 +17,7 @@ import type { User } from "@shared/schema";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useNotifications } from "@/hooks/use-notifications";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +62,8 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
   const [panelPosition, setPanelPosition] = useState<{ top: number; left: number } | null>(
     null,
   );
+  const { data: notificationsData } = useNotifications();
+  const unreadCounts = notificationsData?.unreadCounts ?? {};
 
   const becomeInstructorMutation = useMutation({
     mutationFn: async () => {
@@ -271,40 +274,54 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
         </div>
 
         <div className="mt-12 flex flex-1 flex-col items-center gap-5">
-          {menuSections.map((section, index) => (
-            <Tooltip key={index} delayDuration={100}>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  ref={(button) => {
-                    buttonRefs.current[index] = button;
-                  }}
-                  onClick={() => {
-                    if (isSectionDialogOpen && activeSectionIndex === index) {
-                      setIsSectionDialogOpen(false);
-                      setActiveSectionIndex(null);
-                      return;
-                    }
+          {menuSections.map((section, index) => {
+            const sectionUnread = section.items.reduce((total, item) => {
+              if (!item.url) return total;
+              return total + (unreadCounts[item.url] ?? 0);
+            }, 0);
 
-                    setActiveSectionIndex(index);
-                    setIsSectionDialogOpen(true);
-                    updatePanelPosition(index);
-                  }}
-                  className={`flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
-                    activeSectionIndex === index && isSectionDialogOpen
-                      ? "bg-white text-[#00313F]"
-                      : "bg-white/10 text-white hover:bg-white/20"
-                  }`}
-                  aria-label={getSectionTitle(section)}
-                >
-                  <section.icon className="h-5 w-5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="text-sm font-medium">
-                {getSectionTitle(section)}
-              </TooltipContent>
-            </Tooltip>
-          ))}
+            return (
+              <Tooltip key={index} delayDuration={100}>
+                <TooltipTrigger asChild>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      ref={(button) => {
+                        buttonRefs.current[index] = button;
+                      }}
+                      onClick={() => {
+                        if (isSectionDialogOpen && activeSectionIndex === index) {
+                          setIsSectionDialogOpen(false);
+                          setActiveSectionIndex(null);
+                          return;
+                        }
+
+                        setActiveSectionIndex(index);
+                        setIsSectionDialogOpen(true);
+                        updatePanelPosition(index);
+                      }}
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
+                        activeSectionIndex === index && isSectionDialogOpen
+                          ? "bg-white text-[#00313F]"
+                          : "bg-white/10 text-white hover:bg-white/20"
+                      }`}
+                      aria-label={getSectionTitle(section)}
+                    >
+                      <section.icon className="h-5 w-5" />
+                    </button>
+                    {sectionUnread > 0 ? (
+                      <span className="absolute -right-1 -top-1 inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1 text-[0.65rem] font-semibold text-destructive-foreground shadow-sm">
+                        {sectionUnread > 9 ? "9+" : sectionUnread}
+                      </span>
+                    ) : null}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-sm font-medium">
+                  {getSectionTitle(section)}
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
         </div>
 
         <Tooltip delayDuration={100}>
@@ -347,6 +364,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
                   {activeSection.items.map((item) => {
                     if (item.url) {
                       const isCurrentLocation = location === item.url;
+                      const itemUnread = unreadCounts[item.url] ?? 0;
                       return (
                         <Link
                           key={item.title}
@@ -362,7 +380,12 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
                           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00313F]/8 text-[#00313F]">
                             <item.icon className="h-4 w-4" />
                           </span>
-                          <span>{item.title}</span>
+                          <span className="flex-1 text-left">{item.title}</span>
+                          {itemUnread > 0 ? (
+                            <span className="inline-flex items-center justify-center rounded-full bg-destructive px-2 py-0.5 text-[0.65rem] font-semibold text-destructive-foreground">
+                              {itemUnread > 9 ? "9+" : itemUnread}
+                            </span>
+                          ) : null}
                         </Link>
                       );
                     }
