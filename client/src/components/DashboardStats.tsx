@@ -11,7 +11,7 @@ interface StatCardProps {
 
 function StatCard({ title, value, icon, description, iconClass = "" }: StatCardProps) {
   return (
-    <Card className="surface-soft relative flex h-full items-center justify-between gap-6 rounded-3xl p-6 transition-transform duration-300 hover:-translate-y-1">
+    <Card className="surface-soft relative flex h-full items-center justify-between gap-6 rounded-2xl p-6 transition-transform duration-300 hover:-translate-y-1">
       <div className="flex-1 space-y-4">
         <div>
           <p className="eyebrow text-muted-foreground">{title}</p>
@@ -19,7 +19,7 @@ function StatCard({ title, value, icon, description, iconClass = "" }: StatCardP
         </div>
         {description && <p className="text-xs text-muted-foreground">{description}</p>}
       </div>
-      <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl ${iconClass}`}>
+      <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${iconClass}`}>
         {icon}
       </div>
     </Card>
@@ -39,6 +39,10 @@ export default function DashboardStats({
   p1Used,
   p2Used,
 }: DashboardStatsProps) {
+  const p1Remaining = Math.max(0, 1 - p1Used);
+  const p2Remaining = Math.max(0, 1 - p2Used);
+  const prioritiesRemaining = Math.max(0, 2 - (p1Used + p2Used));
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6" data-testid="dashboard-stats">
       <StatCard
@@ -49,18 +53,18 @@ export default function DashboardStats({
         data-testid="stat-upcoming"
       />
       <StatCard
-        title="Complétées"
+        title="Formations réalisées"
         value={completedCount}
         icon={<CheckCircle className="h-5 w-5" />}
         iconClass="bg-secondary text-foreground"
         data-testid="stat-completed"
       />
       <StatCard
-        title="Priorités"
-        value={`${p1Used + p2Used}/2`}
+        title="Priorités restantes"
+        value={prioritiesRemaining}
         icon={<AlertCircle className="h-5 w-5" />}
         iconClass="bg-destructive/10 text-destructive"
-        description={`P1: ${p1Used}/1 • P2: ${p2Used}/1`}
+        description={`P1 restantes: ${p1Remaining} • P2 restantes: ${p2Remaining}`}
         data-testid="stat-priorities"
       />
     </div>
