@@ -2,6 +2,7 @@ import { db } from "./db";
 import {
   users,
   formations,
+  formationInterests,
   sessions,
   registrations,
   instructorFormations,
@@ -20,6 +21,7 @@ async function seed() {
   // Clear existing data
   await db.delete(notifications);
   await db.delete(registrations);
+  await db.delete(formationInterests);
   await db.delete(coachAssignments);
   await db.delete(sessions);
   await db.delete(formations);
