@@ -2,7 +2,6 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { randomBytes } from "crypto";
 import { inflateRawSync } from "zlib";
 import { pool } from "./db";
 import { storage } from "./storage";
