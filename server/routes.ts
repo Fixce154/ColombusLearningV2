@@ -178,10 +178,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const notifications = await storage.listNotifications(userId);
       const counts = await storage.getUnreadNotificationCounts(userId);
       const unreadCounts = counts.reduce<Record<string, number>>((acc, current) => {
-        acc[current.route] = current.count;
+        const count = typeof current.count === "number" ? current.count : Number(current.count) || 0;
+        acc[current.route] = count;
         return acc;
       }, {});
-      const totalUnread = counts.reduce((sum, current) => sum + current.count, 0);
+      const totalUnread = counts.reduce((sum, current) => {
+        const count = typeof current.count === "number" ? current.count : Number(current.count) || 0;
+        return sum + count;
+      }, 0);
 
       res.json({ notifications, unreadCounts, totalUnread });
     } catch (error: any) {
