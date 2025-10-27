@@ -144,6 +144,30 @@ export default function InterestManagement() {
     },
   });
 
+  const bulkApproveMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map((id) => apiRequest(`/api/interests/${id}`, "PATCH", { status: "approved" })));
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/interests"] });
+      toast({
+        title: "Intentions approuvées",
+        description:
+          count > 1
+            ? `${count} intentions ont été approuvées avec succès`
+            : "L'intention sélectionnée a été approuvée avec succès",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible d'approuver les intentions",
+      });
+    },
+  });
+
   const updateCoachValidationMutation = useMutation({
     mutationFn: async (value: boolean) => {
       return apiRequest("/api/admin/settings/coach-validation", "PATCH", {
@@ -236,6 +260,9 @@ export default function InterestManagement() {
   const rejectedInterests = interests.filter(i => i.status === "rejected");
   const pendingCoachValidation = pendingInterests.filter(i => i.coachStatus !== "approved");
   const pendingRhValidation = pendingInterests.filter(i => i.coachStatus === "approved");
+  const approvablePendingInterests = pendingInterests.filter(
+    (interest) => coachValidationOnly || interest.coachStatus === "approved"
+  );
 
   if (isLoadingInterests) {
     return (
@@ -570,9 +597,35 @@ export default function InterestManagement() {
         <TabsContent value="pending" className="space-y-4">
           <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
             <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-yellow-600" />
-                <h2 className="text-xl font-semibold text-primary">Intentions en attente de validation</h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-yellow-600" />
+                  <h2 className="text-xl font-semibold text-primary">Intentions en attente de validation</h2>
+                </div>
+                {approvablePendingInterests.length > 0 && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() =>
+                      bulkApproveMutation.mutate(approvablePendingInterests.map((interest) => interest.id))
+                    }
+                    disabled={bulkApproveMutation.isPending}
+                    data-testid="button-approve-all-interests"
+                  >
+                    {bulkApproveMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Validation...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4" />
+                        Tout valider
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 <Badge variant="outline" className="border-dashed">
