@@ -860,6 +860,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     jobRole: z.string().optional(),
   });
 
+  const updateOwnProfileSchema = z
+    .object({
+      firstName: z.string().min(1, "Le prénom est requis"),
+      lastName: z.string().min(1, "Le nom est requis"),
+      email: z.string().email("Email invalide"),
+      employeeId: z.string().optional(),
+      hireDate: z.string().optional(),
+      grade: z.string().optional(),
+      jobRole: z.string().optional(),
+      businessUnit: z.string().optional(),
+      currentPassword: z.string().optional(),
+      newPassword: z
+        .string()
+        .min(6, "Le mot de passe doit contenir au moins 6 caractères")
+        .optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (data.newPassword && !data.currentPassword) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["currentPassword"],
+          message: "Le mot de passe actuel est requis pour le modifier",
+        });
+      }
+    });
+
   const coachAssignmentSchema = z
     .object({
       coachId: z.string().min(1, "Le coach est requis"),
@@ -955,6 +981,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { password: _, ...userWithoutPassword } = createdUser;
       res.status(201).json({ user: userWithoutPassword });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Données invalides", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/users/me", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const parsed = updateOwnProfileSchema.parse(req.body);
+
+      const updates: Partial<InsertUser> = {
+        name: `${parsed.firstName.trim()} ${parsed.lastName.trim()}`.trim(),
+        email: parsed.email.trim(),
+      };
+
+      updates.employeeId = parsed.employeeId?.trim()
+        ? parsed.employeeId.trim()
+        : (null as any);
+      updates.grade = parsed.grade?.trim() ? parsed.grade.trim() : (null as any);
+      updates.jobRole = parsed.jobRole?.trim() ? parsed.jobRole.trim() : (null as any);
+      updates.businessUnit = parsed.businessUnit?.trim()
+        ? parsed.businessUnit.trim()
+        : (null as any);
+
+      if (parsed.hireDate?.trim()) {
+        const parsedDate = new Date(parsed.hireDate.trim());
+        if (!Number.isNaN(parsedDate.getTime())) {
+          updates.hireDate = parsedDate;
+        }
+      } else {
+        updates.hireDate = null as any;
+      }
+
+      const newPassword = parsed.newPassword?.trim();
+      if (newPassword) {
+        if (user.password !== parsed.currentPassword?.trim()) {
+          return res.status(400).json({ message: "Le mot de passe actuel est incorrect" });
+        }
+        updates.password = newPassword;
+      }
+
+      const updatedUser = await storage.updateUser(userId, updates);
+
+      if (!updatedUser) {
+        return res.status(500).json({ message: "Failed to update profile" });
+      }
+
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json({ user: userWithoutPassword });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Données invalides", errors: error.errors });
@@ -1127,30 +1211,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Archive the user
-      await storage.updateUser(req.params.id, { archived: true });
-
-      // Delete pending and approved intentions
       const interests = await storage.listFormationInterests({ userId: req.params.id });
-      for (const interest of interests) {
-        if (interest.status === "pending" || interest.status === "approved") {
-          // Refund quota before deleting
-          if (interest.priority === "P1" && (targetUser.p1Used || 0) > 0) {
-            await storage.updateUser(req.params.id, { p1Used: (targetUser.p1Used || 0) - 1 });
-          } else if (interest.priority === "P2" && (targetUser.p2Used || 0) > 0) {
-            await storage.updateUser(req.params.id, { p2Used: (targetUser.p2Used || 0) - 1 });
-          }
-          await storage.deleteFormationInterest(interest.id);
-        }
-      }
+      await Promise.all(interests.map((interest) => storage.deleteFormationInterest(interest.id)));
 
-      // Delete pending and validated registrations
       const registrations = await storage.listRegistrations(req.params.id);
-      for (const registration of registrations) {
-        if (registration.status === "pending" || registration.status === "validated") {
-          await storage.deleteRegistration(registration.id);
-        }
-      }
+      await Promise.all(registrations.map((registration) => storage.deleteRegistration(registration.id)));
+
+      await storage.updateUser(req.params.id, {
+        archived: true,
+        p1Used: 0,
+        p2Used: 0,
+      });
 
       res.json({ message: "User archived successfully" });
     } catch (error: any) {

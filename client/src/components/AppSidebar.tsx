@@ -11,6 +11,7 @@ import {
   Minus,
   Settings,
   UserCheck,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -171,26 +172,35 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
       });
     }
 
+    const settingsItems: MenuItem[] = [
+      {
+        title: "Mes informations",
+        url: "/account",
+        icon: UserCog,
+        description: "Mettre à jour mes informations personnelles",
+      },
+    ];
+
+    if (isInstructor(roles)) {
+      settingsItems.push({
+        title: "Ne plus être formateur",
+        icon: Minus,
+        action: "resignInstructor",
+        description: "Retirer l'accès formateur",
+      });
+    } else {
+      settingsItems.push({
+        title: "Devenir formateur",
+        icon: Plus,
+        action: "becomeInstructor",
+        description: "Accéder aux fonctionnalités formateur",
+      });
+    }
+
     sections.push({
       label: "Gérer mon rôle",
       icon: Settings,
-      items: isInstructor(roles)
-        ? [
-            {
-              title: "Ne plus être formateur",
-              icon: Minus,
-              action: "resignInstructor",
-              description: "Retirer l'accès formateur",
-            },
-          ]
-        : [
-            {
-              title: "Devenir formateur",
-              icon: Plus,
-              action: "becomeInstructor",
-              description: "Accéder aux fonctionnalités formateur",
-            },
-          ],
+      items: settingsItems,
     });
 
     return sections;

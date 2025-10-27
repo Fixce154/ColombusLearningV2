@@ -67,12 +67,24 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import CreateCollaboratorDialog from "@/components/CreateCollaboratorDialog";
 import EditExternalInstructorDialog from "@/components/EditExternalInstructorDialog";
+import { formatRoles } from "@shared/roles";
 
 type BulkUploadResult = {
   createdCount: number;
   skippedCount: number;
   errors: Array<{ row: number; message: string }>;
   createdUsers: Array<{ name: string; email: string; temporaryPassword: string }>;
+};
+
+const splitName = (fullName: string) => {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return { firstName: "", lastName: "" };
+  }
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: "" };
+  }
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
 };
 
 export default function ConsultantManagement() {
@@ -743,19 +755,20 @@ export default function ConsultantManagement() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10"></TableHead>
+                      <TableHead>Matricule</TableHead>
                       <TableHead>Nom</TableHead>
-                      <TableHead>Unité d'affaires</TableHead>
-                      <TableHead>Seniorité</TableHead>
-                      <TableHead className="text-center">Intentions {currentYear}</TableHead>
-                      <TableHead className="text-center">Inscriptions</TableHead>
-                      <TableHead className="text-center">Quota P1/P2</TableHead>
+                      <TableHead>Prénom</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Date d'entrée</TableHead>
+                      <TableHead>Grade</TableHead>
+                      <TableHead>Rôle</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {consultants.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                           Aucun collaborateur trouvé
                         </TableCell>
                       </TableRow>
@@ -775,6 +788,7 @@ export default function ConsultantManagement() {
                               user.id !== consultant.id &&
                               !assignedCoacheeIds.has(user.id)
                           );
+                        const { firstName, lastName } = splitName(consultant.name);
 
                         return (
                           <Fragment key={consultant.id}>
@@ -790,38 +804,19 @@ export default function ConsultantManagement() {
                                   <ChevronRight className="w-4 h-4 text-muted-foreground" />
                                 )}
                               </TableCell>
-                              <TableCell className="font-medium">{consultant.name}</TableCell>
-                              <TableCell>{consultant.businessUnit || "-"}</TableCell>
+                              <TableCell className="font-medium">{consultant.employeeId || "-"}</TableCell>
+                              <TableCell>{lastName || "-"}</TableCell>
+                              <TableCell>{firstName || consultant.name}</TableCell>
+                              <TableCell>{consultant.email}</TableCell>
                               <TableCell>
-                            <Badge variant="secondary">{consultant.grade || consultant.seniority || "Non défini"}</Badge>
+                                {consultant.hireDate
+                                  ? format(new Date(consultant.hireDate), "dd/MM/yyyy", { locale: fr })
+                                  : "-"}
                               </TableCell>
-                              <TableCell className="text-center">
-                                <div className="flex items-center justify-center gap-1">
-                                  <Badge variant="outline">{stats.totalInterests}</Badge>
-                                </div>
+                              <TableCell>
+                                <Badge variant="secondary">{consultant.grade || "Non défini"}</Badge>
                               </TableCell>
-                              <TableCell className="text-center">
-                                <div className="flex items-center justify-center gap-1">
-                                  <Badge variant="default" className="bg-accent/10 text-accent">
-                                    {stats.validatedRegistrations}
-                                  </Badge>
-                                  {stats.pendingRegistrations > 0 && (
-                                    <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-700">
-                                      +{stats.pendingRegistrations}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <div className="flex items-center justify-center gap-1">
-                                  <span className="text-sm text-muted-foreground">
-                                    P1: {consultant.p1Used || 0}/1
-                                  </span>
-                                  <span className="text-sm text-muted-foreground">
-                                    P2: {consultant.p2Used || 0}/1
-                                  </span>
-                                </div>
-                              </TableCell>
+                              <TableCell>{formatRoles(consultant.roles)}</TableCell>
                               <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-center justify-end gap-2">
                                   <Button
@@ -856,7 +851,7 @@ export default function ConsultantManagement() {
                             </TableRow>
                             {isExpanded && (
                               <TableRow>
-                                <TableCell colSpan={8} className="bg-muted/30 p-4">
+                                <TableCell colSpan={9} className="bg-muted/30 p-4">
                                   <div className="grid md:grid-cols-3 gap-4">
                                     {/* Intentions Stats */}
                                     <div className="space-y-2">

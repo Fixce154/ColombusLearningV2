@@ -19,6 +19,7 @@ import Login from "@/pages/Login";
 import NotFound from "@/pages/not-found";
 import DataVisualization from "@/pages/DataVisualization";
 import CoachDashboard from "@/pages/CoachDashboard";
+import AccountSettings from "@/pages/AccountSettings";
 import type { User } from "@shared/schema";
 import { Loader2, LogOut } from "lucide-react";
 import { useEffect } from "react";
@@ -47,6 +48,7 @@ function Router({ currentUser }: { currentUser: User }) {
       <Route path="/catalog" component={Catalog} />
       <Route path="/training/:id" component={() => <TrainingDetail currentUser={currentUser} />} />
       <Route path="/my-trainings" component={() => <Dashboard currentUser={currentUser} />} />
+      <Route path="/account" component={() => <AccountSettings currentUser={currentUser} />} />
       <Route path="/interests" component={InterestManagement} />
       <Route path="/consultants" component={ConsultantManagement} />
       <Route path="/formations" component={FormationManagement} />
