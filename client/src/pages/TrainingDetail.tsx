@@ -243,7 +243,7 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
   const existingInterest = interests.find(i => i.formationId === formation.id && i.status !== "withdrawn");
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {/* Back Button */}
       <Button variant="ghost" onClick={() => setLocation("/catalog")} className="gap-2" data-testid="button-back-to-catalog">
         <ArrowLeft className="w-4 h-4" />
@@ -311,28 +311,57 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
       )}
 
       {/* Header */}
-      <div className="space-y-6">
-        <div className="flex items-start gap-3 flex-wrap">
-          {formation.seniorityRequired && <SeniorityBadge seniority={formation.seniorityRequired} />}
-          <ModalityBadge modality={formation.modality as "presentiel" | "distanciel" | "hybride"} />
-          <Badge className="bg-primary/10 text-primary border-primary/20 px-3 py-1.5 gap-1.5 border font-medium">
-            <Clock className="w-3.5 h-3.5" />
-            {formation.duration}
-          </Badge>
-          <Badge className="bg-secondary text-secondary-foreground px-3 py-1.5 font-medium">{formation.theme}</Badge>
-        </div>
+      <Card className="relative overflow-hidden rounded-3xl border border-primary/10 bg-gradient-to-br from-background via-background to-primary/10 shadow-lg">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/10 blur-3xl" aria-hidden />
+        <div className="relative p-8 space-y-6">
+          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                {formation.seniorityRequired && <SeniorityBadge seniority={formation.seniorityRequired} />}
+                <ModalityBadge modality={formation.modality as "presentiel" | "distanciel" | "hybride"} />
+                <Badge className="bg-primary/10 text-primary border-primary/20 px-3 py-1.5 gap-1.5 border font-medium">
+                  <Clock className="w-3.5 h-3.5" />
+                  {formation.duration}
+                </Badge>
+                <Badge className="bg-secondary text-secondary-foreground px-3 py-1.5 font-medium">
+                  {formation.theme}
+                </Badge>
+              </div>
 
-        <div>
-          <h1 className="text-4xl font-bold text-primary tracking-tight mb-2" data-testid="text-training-title">
-            {formation.title}
-          </h1>
-          <p className="text-lg text-muted-foreground leading-relaxed">{formation.description}</p>
+              <div className="space-y-3">
+                <h1 className="text-4xl font-bold text-primary tracking-tight" data-testid="text-training-title">
+                  {formation.title}
+                </h1>
+                <p className="text-lg text-muted-foreground leading-relaxed max-w-3xl">
+                  {formation.description}
+                </p>
+              </div>
+            </div>
+
+            {!existingInterest && (
+              <Button
+                size="lg"
+                className="self-start shadow-md"
+                onClick={() => setShowInterestDialog(true)}
+                data-testid="button-express-interest"
+                disabled={isSeniorityMismatch}
+              >
+                Je suis intéressé
+              </Button>
+            )}
+          </div>
+
+          {isSeniorityMismatch && !existingInterest && (
+            <p className="text-sm text-muted-foreground">
+              Cette formation nécessite un niveau de séniorité {formation.seniorityRequired}
+            </p>
+          )}
         </div>
-      </div>
+      </Card>
 
       {/* Tabs */}
       <Tabs defaultValue="description" className="w-full">
-        <TabsList className="h-12 bg-muted p-1 shadow-sm">
+        <TabsList className="h-12 bg-muted p-1 shadow-sm rounded-2xl">
           <TabsTrigger value="description" className="px-6 font-medium">Description</TabsTrigger>
           <TabsTrigger value="sessions" className="px-6 font-medium gap-2">
             <Calendar className="w-4 h-4" />
@@ -341,7 +370,7 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
         </TabsList>
 
         <TabsContent value="description" className="space-y-6 mt-8">
-          <Card className="p-8 shadow-md">
+          <Card className="p-8 shadow-md rounded-3xl border border-border/60 bg-background/95">
             <div className="flex items-center gap-3 mb-6">
               <div className="bg-accent/10 p-2.5 rounded-lg">
                 <BookOpen className="w-5 h-5 text-accent" />
@@ -351,7 +380,7 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
             <p className="text-muted-foreground leading-relaxed text-base">{formation.description}</p>
           </Card>
 
-          <Card className="p-8 shadow-md">
+          <Card className="p-8 shadow-md rounded-3xl border border-border/60 bg-background/95">
             <div className="flex items-center gap-3 mb-6">
               <div className="bg-primary/10 p-2.5 rounded-lg">
                 <Target className="w-5 h-5 text-primary" />
@@ -362,14 +391,14 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
           </Card>
 
           {formation.prerequisites && (
-            <Card className="p-8 shadow-md">
+            <Card className="p-8 shadow-md rounded-3xl border border-border/60 bg-background/95">
               <h2 className="text-xl font-semibold text-primary mb-4">Prérequis</h2>
               <p className="text-muted-foreground leading-relaxed text-base">{formation.prerequisites}</p>
             </Card>
           )}
 
           {formation.tags && formation.tags.length > 0 && (
-            <Card className="p-8 shadow-md">
+            <Card className="p-8 shadow-md rounded-3xl border border-border/60 bg-background/95">
               <h2 className="text-xl font-semibold text-primary mb-4">Mots-clés</h2>
               <div className="flex flex-wrap gap-3">
                 {formation.tags.map((tag) => (
@@ -435,7 +464,7 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
               </div>
             </>
           ) : (
-            <Card className="p-16 text-center shadow-md">
+            <Card className="p-16 text-center shadow-md rounded-3xl border border-dashed border-border/60 bg-background/95">
               <div className="bg-muted p-5 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
                 <Calendar className="w-12 h-12 text-muted-foreground" />
               </div>
@@ -447,26 +476,6 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
           )}
         </TabsContent>
       </Tabs>
-
-      {/* Express Interest Button - Always visible */}
-      {!existingInterest && (
-        <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t shadow-lg pt-6 pb-6">
-          <Button 
-            size="lg" 
-            className="w-full shadow-md" 
-            onClick={() => setShowInterestDialog(true)} 
-            data-testid="button-express-interest"
-            disabled={isSeniorityMismatch}
-          >
-            Manifester mon intérêt pour cette formation
-          </Button>
-          {isSeniorityMismatch && (
-            <p className="text-sm text-muted-foreground text-center mt-3">
-              Cette formation nécessite un niveau de séniorité {formation.seniorityRequired}
-            </p>
-          )}
-        </div>
-      )}
 
       {/* Express Interest Dialog */}
       <Dialog open={showInterestDialog} onOpenChange={setShowInterestDialog}>
