@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -71,6 +72,7 @@ export default function SessionManagement() {
   const [deleteSession, setDeleteSession] = useState<Session | null>(null);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const [selectedSlots, setSelectedSlots] = useState<Array<{date: string, timeSlot: string, instructorId: string}>>([]);
+  const [registrationDrafts, setRegistrationDrafts] = useState<Record<string, { userId: string; priority: "P1" | "P2" | "P3" }>>({});
   const { toast } = useToast();
 
   const { data: sessions = [], isLoading } = useQuery<Session[]>({
@@ -228,6 +230,37 @@ export default function SessionManagement() {
     },
   });
 
+  const enrollMutation = useMutation({
+    mutationFn: async ({ sessionId, formationId, userId, priority }: { sessionId: string; formationId: string; userId: string; priority: "P1" | "P2" | "P3" }) => {
+      return apiRequest("/api/registrations", "POST", {
+        sessionId,
+        formationId,
+        userId,
+        priority,
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/registrations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/interests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      toast({
+        title: "Consultant inscrit",
+        description: "Le collaborateur a été ajouté à la session avec succès",
+      });
+      setRegistrationDrafts((prev) => ({
+        ...prev,
+        [variables.sessionId]: { userId: "", priority: "P3" },
+      }));
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible d'inscrire le collaborateur",
+      });
+    },
+  });
+
   const handleCreate = () => {
     setEditingSession(null);
     setSelectedSlots([]);
@@ -269,7 +302,8 @@ export default function SessionManagement() {
   const getFormation = (id: string) => formations.find(f => f.id === id);
   const getInstructor = (id: string | null | undefined) => id ? instructors.find(u => u.id === id) : null;
   const getUser = (id: string) => allUsers.find(u => u.id === id);
-  
+  const consultantUsers = allUsers.filter((user) => user.roles.includes("consultant") && !user.archived);
+
   const getSessionRegistrations = (sessionId: string) => {
     return registrations.filter(r => r.sessionId === sessionId && r.status === "validated");
   };
@@ -277,6 +311,22 @@ export default function SessionManagement() {
   const getRemainingSeats = (sessionId: string, capacity: number) => {
     const enrolledCount = getSessionRegistrations(sessionId).length;
     return capacity - enrolledCount;
+  };
+
+  const getRegistrationDraft = (sessionId: string) =>
+    registrationDrafts[sessionId] ?? { userId: "", priority: "P3" as "P1" | "P2" | "P3" };
+
+  const updateRegistrationDraft = (
+    sessionId: string,
+    updates: Partial<{ userId: string; priority: "P1" | "P2" | "P3" }>
+  ) => {
+    setRegistrationDrafts((prev) => {
+      const existing = prev[sessionId] ?? { userId: "", priority: "P3" as "P1" | "P2" | "P3" };
+      return {
+        ...prev,
+        [sessionId]: { ...existing, ...updates },
+      };
+    });
   };
 
   const toggleSession = (sessionId: string) => {
@@ -469,13 +519,17 @@ export default function SessionManagement() {
                 </TableHeader>
                 <TableBody>
                   {sessions.map((session) => {
-                    const formation = getFormation(session.formationId);
-                    const instructor = getInstructor(session.instructorId);
-                    const sessionRegs = getSessionRegistrations(session.id);
-                    const remainingSeats = getRemainingSeats(session.id, session.capacity);
-                    const isExpanded = expandedSession === session.id;
-                    
-                    return (
+                  const formation = getFormation(session.formationId);
+                  const instructor = getInstructor(session.instructorId);
+                  const sessionRegs = getSessionRegistrations(session.id);
+                  const remainingSeats = getRemainingSeats(session.id, session.capacity);
+                  const isExpanded = expandedSession === session.id;
+                  const draft = getRegistrationDraft(session.id);
+                  const registeredIds = new Set(sessionRegs.map((reg) => reg.userId));
+                  const availableCandidates = consultantUsers.filter((user) => !registeredIds.has(user.id));
+                  const canEnroll = draft.userId !== "" && remainingSeats > 0;
+
+                  return (
                       <React.Fragment key={`session-fragment-${session.id}`}>
                         <TableRow 
                           key={session.id} 
@@ -579,6 +633,101 @@ export default function SessionManagement() {
                                     })}
                                   </div>
                                 )}
+
+                                <div className="rounded-lg border border-dashed border-border/60 bg-background/60 p-3">
+                                  <h5 className="text-sm font-semibold text-foreground">Inscrire un collaborateur</h5>
+                                  <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end">
+                                    <div className="flex-1">
+                                      <Label htmlFor={`select-user-${session.id}`}>Consultant</Label>
+                                      <Select
+                                        onValueChange={(value) => updateRegistrationDraft(session.id, { userId: value })}
+                                        value={draft.userId}
+                                      >
+                                        <SelectTrigger
+                                          id={`select-user-${session.id}`}
+                                          data-testid={`select-user-${session.id}`}
+                                          disabled={availableCandidates.length === 0}
+                                        >
+                                          <SelectValue
+                                            placeholder={
+                                              availableCandidates.length === 0
+                                                ? "Aucun consultant disponible"
+                                                : "Choisir un consultant"
+                                            }
+                                          />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {availableCandidates.length === 0 ? (
+                                            <div className="px-2 py-1 text-sm text-muted-foreground">
+                                              Aucun consultant à inscrire
+                                            </div>
+                                          ) : (
+                                            availableCandidates.map((user) => (
+                                              <SelectItem value={user.id} key={`${session.id}-${user.id}`}>
+                                                {user.name}
+                                                {user.businessUnit ? ` • ${user.businessUnit}` : ""}
+                                                {user.seniority ? ` • ${user.seniority}` : ""}
+                                              </SelectItem>
+                                            ))
+                                          )}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="md:w-40">
+                                      <Label htmlFor={`select-priority-${session.id}`}>Priorité</Label>
+                                      <Select
+                                        onValueChange={(value: "P1" | "P2" | "P3") =>
+                                          updateRegistrationDraft(session.id, { priority: value })
+                                        }
+                                        value={draft.priority}
+                                      >
+                                        <SelectTrigger
+                                          id={`select-priority-${session.id}`}
+                                          data-testid={`select-priority-${session.id}`}
+                                        >
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="P1">Priorité P1</SelectItem>
+                                          <SelectItem value="P2">Priorité P2</SelectItem>
+                                          <SelectItem value="P3">Priorité P3</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <Button
+                                      onClick={() =>
+                                        enrollMutation.mutate({
+                                          sessionId: session.id,
+                                          formationId: session.formationId,
+                                          userId: draft.userId,
+                                          priority: draft.priority,
+                                        })
+                                      }
+                                      disabled={!canEnroll || enrollMutation.isPending}
+                                      className="md:w-auto"
+                                      data-testid={`button-enroll-${session.id}`}
+                                    >
+                                      {enrollMutation.isPending ? (
+                                        <>
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                          Inscription...
+                                        </>
+                                      ) : (
+                                        "Inscrire"
+                                      )}
+                                    </Button>
+                                  </div>
+                                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                    <span>
+                                      {remainingSeats > 0
+                                        ? `${remainingSeats} place${remainingSeats > 1 ? "s" : ""} restante${remainingSeats > 1 ? "s" : ""}`
+                                        : "Session complète"}
+                                    </span>
+                                    {draft.userId && remainingSeats <= 0 && (
+                                      <span className="text-destructive">Aucune place disponible pour le moment</span>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </TableCell>
                           </TableRow>

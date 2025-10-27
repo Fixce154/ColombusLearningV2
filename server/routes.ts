@@ -1823,6 +1823,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updates.coachStatus = "approved";
       }
 
+      if (updates.status === "withdrawn") {
+        if (!user.roles.includes("rh")) {
+          return res.status(403).json({ message: "Unauthorized" });
+        }
+
+        if (interest.status !== "approved" && interest.status !== "converted") {
+          return res.status(400).json({
+            message: "Seules les intentions validées ou converties peuvent être annulées",
+          });
+        }
+
+        const registrations = await storage.listRegistrations(interest.userId);
+        const now = new Date();
+        let hasPastRegistrations = false;
+
+        for (const registration of registrations) {
+          if (registration.formationId !== interest.formationId) continue;
+          const session = await storage.getSession(registration.sessionId);
+          if (!session) continue;
+
+          if (session.endDate.getTime() > now.getTime() && registration.status !== "completed") {
+            await storage.deleteRegistration(registration.id);
+          } else {
+            hasPastRegistrations = true;
+          }
+        }
+
+        if (!hasPastRegistrations) {
+          const interestOwner = await storage.getUser(interest.userId);
+          if (interestOwner) {
+            if (interest.priority === "P1" && (interestOwner.p1Used || 0) > 0) {
+              await storage.updateUser(interest.userId, { p1Used: (interestOwner.p1Used || 0) - 1 });
+            } else if (interest.priority === "P2" && (interestOwner.p2Used || 0) > 0) {
+              await storage.updateUser(interest.userId, { p2Used: (interestOwner.p2Used || 0) - 1 });
+            }
+          }
+        }
+      }
+
       // Refund quota if interest is being rejected
       if (
         updates.status === "rejected" &&
@@ -1856,6 +1895,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else if (req.body.status === "rejected") {
           title = "Intention refusée";
           message = `Votre intention pour ${formationTitle} a été refusée.`;
+        } else if (req.body.status === "withdrawn") {
+          title = "Intention annulée";
+          message = `Votre intention pour ${formationTitle} a été annulée par les RH.`;
         }
 
         if (title) {
@@ -2414,19 +2456,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const isRh = user.roles.includes("rh");
+
       // Validate request body
-      const validationSchema = insertRegistrationSchema.omit({ userId: true });
-      const data = validationSchema.parse(req.body);
+      const validationSchema = isRh
+        ? insertRegistrationSchema
+        : insertRegistrationSchema.omit({ userId: true });
+      const parsedData = validationSchema.parse(req.body) as {
+        formationId: string;
+        sessionId: string;
+        priority: "P1" | "P2" | "P3";
+        userId?: string;
+      };
+
+      const targetUserId = isRh && parsedData.userId ? parsedData.userId : userId;
+
+      const targetUser = targetUserId === userId ? user : await storage.getUser(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (targetUser.archived) {
+        return res.status(400).json({ message: "Impossible d'inscrire un collaborateur archivé" });
+      }
+
+      const data = {
+        formationId: parsedData.formationId,
+        sessionId: parsedData.sessionId,
+        priority: parsedData.priority,
+      };
 
       // Check if session exists
       const session = await storage.getSession(data.sessionId);
       if (!session) {
         return res.status(404).json({ message: "Session not found" });
+      }
+
+      // Check if formation exists (needed for notifications/intention creation)
+      const formation = await storage.getFormation(data.formationId);
+      if (!formation) {
+        return res.status(404).json({ message: "Formation not found" });
       }
 
       // Check capacity - count only validated and pending registrations
@@ -2436,36 +2510,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if already registered for this formation
-      const existingForFormation = await storage.listRegistrations(userId);
+      const existingForFormation = await storage.listRegistrations(targetUserId);
       const alreadyRegistered = existingForFormation.find(
-        r => r.formationId === data.formationId && r.status !== "cancelled"
+        (r) => r.formationId === data.formationId && r.status !== "cancelled"
       );
       if (alreadyRegistered) {
         return res.status(400).json({ message: "Vous êtes déjà inscrit à cette formation" });
       }
 
-      // Check if user has an approved intention for this formation
-      const intentions = await storage.listFormationInterests({ userId });
-      const approvedIntention = intentions.find(
-        i => i.formationId === data.formationId && i.status === "approved"
-      );
+      // Check if user has an approved or converted intention for this formation
+      const intentions = await storage.listFormationInterests({
+        userId: targetUserId,
+        formationId: data.formationId,
+      });
+      let approvedIntention = intentions.find((i) => i.status === "approved");
+      const convertedIntention = intentions.find((i) => i.status === "converted");
+
+      // If no intention exists and an RH is enrolling, create a validated intention
+      if (!approvedIntention && !convertedIntention && isRh) {
+        if (data.priority === "P1") {
+          if ((targetUser.p1Used || 0) >= 1) {
+            return res.status(400).json({ message: "Le collaborateur a déjà utilisé sa priorité P1 cette année" });
+          }
+          await storage.updateUser(targetUserId, { p1Used: (targetUser.p1Used || 0) + 1 });
+        } else if (data.priority === "P2") {
+          if ((targetUser.p2Used || 0) >= 1) {
+            return res.status(400).json({ message: "Le collaborateur a déjà utilisé sa priorité P2 cette année" });
+          }
+          await storage.updateUser(targetUserId, { p2Used: (targetUser.p2Used || 0) + 1 });
+        }
+
+        const createdInterest = await storage.createFormationInterest({
+          userId: targetUserId,
+          formationId: data.formationId,
+          priority: data.priority,
+          status: "approved",
+        });
+
+        const updatedInterest = await storage.updateFormationInterest(createdInterest.id, {
+          coachStatus: "approved",
+          coachValidatedAt: new Date(),
+        });
+
+        approvedIntention = updatedInterest ?? createdInterest;
+
+        await createNotification({
+          userId: targetUserId,
+          route: "/",
+          title: "Intention validée",
+          message: `Votre intention pour ${formation.title} a été validée par les RH.`,
+        });
+      }
 
       let registrationStatus = "pending";
-      
+
       // If intention was approved, auto-validate the registration
       // Note: quota was already consumed when intention was expressed, don't consume again
       if (approvedIntention) {
         registrationStatus = "validated";
-        
+
         // Mark intention as converted
         await storage.updateFormationInterest(approvedIntention.id, { status: "converted" });
+      } else if (convertedIntention) {
+        registrationStatus = "validated";
+      } else if (isRh) {
+        // RH enrolment without prior intention defaults to validated status
+        registrationStatus = "validated";
       }
 
       const registration = await storage.createRegistration({
         ...data,
-        userId,
+        userId: targetUserId,
         status: registrationStatus,
       });
+
+      if (targetUserId !== userId) {
+        await createNotification({
+          userId: targetUserId,
+          route: "/",
+          title: "Nouvelle inscription",
+          message: `Vous avez été inscrit à la session du ${session.startDate.toLocaleDateString("fr-FR")} pour ${formation.title}.`,
+        });
+      }
 
       res.status(201).json(registration);
     } catch (error: any) {

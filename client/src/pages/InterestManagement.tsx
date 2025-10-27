@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Heart, CheckCircle, XCircle, Clock, Loader2, TrendingUp, RefreshCw } from "lucide-react";
+import { Heart, CheckCircle, XCircle, Clock, Loader2, TrendingUp, RefreshCw, Undo2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { FormationInterest, Formation, User } from "@shared/schema";
@@ -52,6 +52,7 @@ interface AdminInterestsResponse {
 export default function InterestManagement() {
   const [selectedInterest, setSelectedInterest] = useState<FormationInterest | null>(null);
   const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
+  const [cancelInterestTarget, setCancelInterestTarget] = useState<FormationInterest | null>(null);
   const { toast } = useToast();
 
   // Fetch all interests (RH access)
@@ -213,6 +214,28 @@ export default function InterestManagement() {
     },
   });
 
+  const cancelInterestMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/interests/${id}`, "PATCH", { status: "withdrawn" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/interests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/registrations"] });
+      toast({
+        title: "Intention annulée",
+        description: "L'intention a été annulée et les inscriptions associées ont été retirées",
+      });
+      setCancelInterestTarget(null);
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible d'annuler l'intention",
+      });
+    },
+  });
+
   // Delete all rejected interests mutation
   const deleteAllRejectedMutation = useMutation({
     mutationFn: async () => {
@@ -246,6 +269,15 @@ export default function InterestManagement() {
     updateStatusMutation.mutate({ id: selectedInterest.id, status: newStatus, action: actionType });
   };
 
+  const handleCancelInterest = (interest: FormationInterest) => {
+    setCancelInterestTarget(interest);
+  };
+
+  const confirmCancelInterest = () => {
+    if (!cancelInterestTarget) return;
+    cancelInterestMutation.mutate(cancelInterestTarget.id);
+  };
+
   const handleCoachValidationToggle = (checked: boolean | "indeterminate") => {
     const value = checked === true;
     updateCoachValidationMutation.mutate(value);
@@ -258,6 +290,7 @@ export default function InterestManagement() {
   const approvedInterests = interests.filter(i => i.status === "approved");
   const convertedInterests = interests.filter(i => i.status === "converted");
   const rejectedInterests = interests.filter(i => i.status === "rejected");
+  const withdrawnInterests = interests.filter(i => i.status === "withdrawn");
   const pendingCoachValidation = pendingInterests.filter(i => i.coachStatus !== "approved");
   const pendingRhValidation = pendingInterests.filter(i => i.coachStatus === "approved");
   const approvablePendingInterests = pendingInterests.filter(
@@ -279,157 +312,184 @@ export default function InterestManagement() {
     data,
     showActions = false,
     showDeleteAction = false,
+    showCancelAction = false,
     coachValidationOnly = false,
   }: {
     data: FormationInterest[];
     showActions?: boolean;
     showDeleteAction?: boolean;
+    showCancelAction?: boolean;
     coachValidationOnly?: boolean;
-  }) => (
-    <div className="border rounded-lg">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Consultant</TableHead>
-            <TableHead>Formation</TableHead>
-            <TableHead>Priorité</TableHead>
-            <TableHead>Date d'expression</TableHead>
-            <TableHead>Statut</TableHead>
-            <TableHead>Validation coach</TableHead>
-            {(showActions || showDeleteAction) && <TableHead className="text-right">Actions</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.length === 0 ? (
+  }) => {
+    const hasActions = showActions || showDeleteAction || showCancelAction;
+
+    return (
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={(showActions || showDeleteAction) ? 7 : 6} className="text-center py-12 text-muted-foreground">
-                Aucune intention à afficher
-              </TableCell>
+              <TableHead>Consultant</TableHead>
+              <TableHead>Formation</TableHead>
+              <TableHead>Priorité</TableHead>
+              <TableHead>Date d'expression</TableHead>
+              <TableHead>Statut</TableHead>
+              <TableHead>Validation coach</TableHead>
+              {hasActions && <TableHead className="text-right">Actions</TableHead>}
             </TableRow>
-          ) : (
-            data.map((interest) => {
-              const formation = getFormation(interest.formationId);
-              const user = getUser(interest.userId);
-              const canApprove = coachValidationOnly || interest.coachStatus === "approved";
+          </TableHeader>
+          <TableBody>
+            {data.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={hasActions ? 7 : 6} className="text-center py-12 text-muted-foreground">
+                  Aucune intention à afficher
+                </TableCell>
+              </TableRow>
+            ) : (
+              data.map((interest) => {
+                const formation = getFormation(interest.formationId);
+                const user = getUser(interest.userId);
+                const canApprove = coachValidationOnly || interest.coachStatus === "approved";
+                const canCancel = interest.status === "approved" || interest.status === "converted";
 
-              return (
-                <TableRow key={interest.id}>
-                  <TableCell className="font-medium">
-                    <div>
-                      <div>{user?.name || "Utilisateur inconnu"}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {user?.businessUnit || ""} {user?.seniority ? `• ${user.seniority}` : ""}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="max-w-md">
-                      <div className="font-medium">{formation?.title || "Formation inconnue"}</div>
-                      <div className="text-sm text-muted-foreground line-clamp-1">{formation?.description}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <PriorityBadge priority={interest.priority as "P1" | "P2" | "P3"} />
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {interest.expressedAt ? format(new Date(interest.expressedAt), "dd MMM yyyy", { locale: fr }) : "-"}
-                  </TableCell>
-                  <TableCell>
-                    {interest.status === "pending" && (
-                      <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-700 border-yellow-500/20">
-                        <Clock className="w-3 h-3 mr-1" />
-                        En attente
-                      </Badge>
-                    )}
-                    {interest.status === "approved" && (
-                      <Badge variant="secondary" className="bg-accent/10 text-accent border-accent/20">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Approuvé
-                      </Badge>
-                    )}
-                    {interest.status === "converted" && (
-                      <Badge variant="secondary" className="bg-green-500/10 text-green-700 border-green-500/20">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Inscrit
-                      </Badge>
-                    )}
-                    {interest.status === "rejected" && (
-                      <Badge variant="destructive">
-                        <XCircle className="w-3 h-3 mr-1" />
-                        Refusée
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {interest.coachStatus === "approved" && (
-                      <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-700 border-emerald-500/20">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Validée
-                      </Badge>
-                    )}
-                    {interest.coachStatus === "rejected" && (
-                      <Badge variant="destructive">
-                        <XCircle className="w-3 h-3 mr-1" />
-                        Refusée
-                      </Badge>
-                    )}
-                    {interest.coachStatus === "pending" && (
-                      <Badge variant="outline" className="text-muted-foreground border-dashed">
-                        <Clock className="w-3 h-3 mr-1" />
-                        En attente
-                      </Badge>
-                    )}
-                  </TableCell>
-                  {showActions && (
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="default"
-                          onClick={() => handleAction(interest, "approve")}
-                          data-testid={`button-approve-interest-${interest.id}`}
-                          disabled={!canApprove || updateStatusMutation.isPending}
-                          title={!canApprove ? "En attente de validation coach" : undefined}
-                        >
-                          <CheckCircle className="w-4 h-4 mr-1" />
-                          Approuver
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleAction(interest, "reject")}
-                          data-testid={`button-reject-interest-${interest.id}`}
-                          disabled={updateStatusMutation.isPending}
-                        >
-                          <XCircle className="w-4 h-4 mr-1" />
-                          Refuser
-                        </Button>
+                return (
+                  <TableRow key={interest.id}>
+                    <TableCell className="font-medium">
+                      <div>
+                        <div>{user?.name || "Utilisateur inconnu"}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {user?.businessUnit || ""} {user?.seniority ? `• ${user.seniority}` : ""}
+                        </div>
                       </div>
                     </TableCell>
-                  )}
-                  {showDeleteAction && (
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => deleteInterestMutation.mutate(interest.id)}
-                        disabled={deleteInterestMutation.isPending}
-                        data-testid={`button-delete-interest-${interest.id}`}
-                      >
-                        <XCircle className="w-4 h-4 mr-1" />
-                        Supprimer
-                      </Button>
+                    <TableCell>
+                      <div className="max-w-md">
+                        <div className="font-medium">{formation?.title || "Formation inconnue"}</div>
+                        <div className="text-sm text-muted-foreground line-clamp-1">{formation?.description}</div>
+                      </div>
                     </TableCell>
-                  )}
-                </TableRow>
-              );
-            })
-          )}
-        </TableBody>
-      </Table>
-    </div>
-  );
-
+                    <TableCell>
+                      <PriorityBadge priority={interest.priority as "P1" | "P2" | "P3"} />
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {interest.expressedAt ? format(new Date(interest.expressedAt), "dd MMM yyyy", { locale: fr }) : "-"}
+                    </TableCell>
+                    <TableCell>
+                      {interest.status === "pending" && (
+                        <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-700 border-yellow-500/20">
+                          <Clock className="w-3 h-3 mr-1" />
+                          En attente
+                        </Badge>
+                      )}
+                      {interest.status === "approved" && (
+                        <Badge variant="secondary" className="bg-accent/10 text-accent border-accent/20">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Approuvé
+                        </Badge>
+                      )}
+                      {interest.status === "converted" && (
+                        <Badge variant="secondary" className="bg-green-500/10 text-green-700 border-green-500/20">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Inscrit
+                        </Badge>
+                      )}
+                      {interest.status === "rejected" && (
+                        <Badge variant="destructive">
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Refusée
+                        </Badge>
+                      )}
+                      {interest.status === "withdrawn" && (
+                        <Badge variant="outline" className="border-dashed text-muted-foreground">
+                          <Undo2 className="w-3 h-3 mr-1" />
+                          Annulée
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {interest.coachStatus === "approved" && (
+                        <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-700 border-emerald-500/20">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Validée
+                        </Badge>
+                      )}
+                      {interest.coachStatus === "rejected" && (
+                        <Badge variant="destructive">
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Refusée
+                        </Badge>
+                      )}
+                      {interest.coachStatus === "pending" && (
+                        <Badge variant="outline" className="text-muted-foreground border-dashed">
+                          <Clock className="w-3 h-3 mr-1" />
+                          En attente
+                        </Badge>
+                      )}
+                    </TableCell>
+                    {hasActions && (
+                      <TableCell className="text-right">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {showActions && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handleAction(interest, "approve")}
+                                data-testid={`button-approve-interest-${interest.id}`}
+                                disabled={!canApprove || updateStatusMutation.isPending}
+                                title={!canApprove ? "En attente de validation coach" : undefined}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Approuver
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleAction(interest, "reject")}
+                                data-testid={`button-reject-interest-${interest.id}`}
+                                disabled={updateStatusMutation.isPending}
+                              >
+                                <XCircle className="w-4 h-4 mr-1" />
+                                Refuser
+                              </Button>
+                            </>
+                          )}
+                          {showCancelAction && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleCancelInterest(interest)}
+                              data-testid={`button-cancel-interest-${interest.id}`}
+                              disabled={!canCancel || cancelInterestMutation.isPending}
+                              title={!canCancel ? "Seules les intentions validées ou converties peuvent être annulées" : undefined}
+                            >
+                              <Undo2 className="w-4 h-4 mr-1" />
+                              Annuler
+                            </Button>
+                          )}
+                          {showDeleteAction && (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => deleteInterestMutation.mutate(interest.id)}
+                              disabled={deleteInterestMutation.isPending}
+                              data-testid={`button-delete-interest-${interest.id}`}
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Supprimer
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  };
   return (
     <div className="space-y-12">
       <section className="surface-elevated relative overflow-hidden rounded-[2rem] px-12 py-14">
@@ -579,7 +639,7 @@ export default function InterestManagement() {
         </Card>
 
         <Tabs defaultValue="pending" className="space-y-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+        <TabsList className="grid w-full max-w-2xl grid-cols-5">
           <TabsTrigger value="pending" data-testid="tab-pending-interests">
             En attente ({pendingInterests.length})
           </TabsTrigger>
@@ -591,6 +651,9 @@ export default function InterestManagement() {
           </TabsTrigger>
           <TabsTrigger value="rejected" data-testid="tab-rejected-interests">
             Refusées ({rejectedInterests.length})
+          </TabsTrigger>
+          <TabsTrigger value="withdrawn" data-testid="tab-withdrawn-interests">
+            Annulées ({withdrawnInterests.length})
           </TabsTrigger>
         </TabsList>
 
@@ -656,7 +719,7 @@ export default function InterestManagement() {
               <p className="text-sm text-muted-foreground">
                 Ces intentions ont été approuvées. Les consultants peuvent maintenant s'inscrire aux sessions disponibles.
               </p>
-              <InterestTable data={approvedInterests} showActions={false} />
+              <InterestTable data={approvedInterests} showCancelAction />
             </div>
           </Card>
         </TabsContent>
@@ -671,7 +734,23 @@ export default function InterestManagement() {
               <p className="text-sm text-muted-foreground">
                 Ces consultants se sont inscrits à une session suite à l'approbation de leur intention.
               </p>
-              <InterestTable data={convertedInterests} showActions={false} />
+              <InterestTable data={convertedInterests} showCancelAction />
+            </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="withdrawn" className="space-y-4">
+          <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Undo2 className="w-5 h-5 text-muted-foreground" />
+                <h2 className="text-xl font-semibold text-primary">Intentions annulées</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Ces intentions ont été annulées par les RH. Les consultants pourront formuler une nouvelle demande si
+                nécessaire.
+              </p>
+              <InterestTable data={withdrawnInterests} />
             </div>
           </Card>
         </TabsContent>
@@ -733,6 +812,7 @@ export default function InterestManagement() {
                       <TableHead className="text-center">En attente</TableHead>
                       <TableHead className="text-center">Approuvées</TableHead>
                       <TableHead className="text-center">Converties</TableHead>
+                      <TableHead className="text-center">Annulées</TableHead>
                       <TableHead className="text-center">P1</TableHead>
                       <TableHead className="text-center">P2</TableHead>
                       <TableHead className="text-center">P3</TableHead>
@@ -766,6 +846,13 @@ export default function InterestManagement() {
                             {agg.converted > 0 && (
                               <Badge variant="secondary" className="bg-green-500/10 text-green-700">
                                 {agg.converted}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {agg.withdrawn > 0 && (
+                              <Badge variant="outline" className="border-dashed text-muted-foreground">
+                                {agg.withdrawn}
                               </Badge>
                             )}
                           </TableCell>
@@ -845,6 +932,57 @@ export default function InterestManagement() {
                 </>
               ) : (
                 actionType === "approve" ? "Approuver" : "Refuser"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={cancelInterestTarget !== null} onOpenChange={() => setCancelInterestTarget(null)}>
+        <AlertDialogContent data-testid="dialog-cancel-interest">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-muted-foreground">
+              Annuler l'intention validée ?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-base pt-2 space-y-2">
+                {cancelInterestTarget && (
+                  <>
+                    <p>
+                      <strong>Consultant :</strong> {getUser(cancelInterestTarget.userId)?.name}
+                    </p>
+                    <p>
+                      <strong>Formation :</strong> {getFormation(cancelInterestTarget.formationId)?.title}
+                    </p>
+                    <p className="mt-4 text-muted-foreground">
+                      Les inscriptions à venir pour cette formation seront supprimées pour ce consultant.
+                    </p>
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setCancelInterestTarget(null)}
+              disabled={cancelInterestMutation.isPending}
+              data-testid="button-cancel-cancel"
+            >
+              Retour
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmCancelInterest}
+              disabled={cancelInterestMutation.isPending}
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/90"
+              data-testid="button-confirm-cancel"
+            >
+              {cancelInterestMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Annulation...
+                </>
+              ) : (
+                "Annuler l'intention"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
