@@ -2509,13 +2509,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "La session est complète" });
       }
 
-      // Check if already registered for this formation
-      const existingForFormation = await storage.listRegistrations(targetUserId);
-      const alreadyRegistered = existingForFormation.find(
-        (r) => r.formationId === data.formationId && r.status !== "cancelled"
+      // Check if already registered for this session
+      const existingForSession = await storage.listRegistrations(targetUserId);
+      const alreadyRegistered = existingForSession.find(
+        (r) => r.sessionId === data.sessionId && r.status !== "cancelled"
       );
       if (alreadyRegistered) {
-        return res.status(400).json({ message: "Vous êtes déjà inscrit à cette formation" });
+        return res.status(400).json({ message: "Vous êtes déjà inscrit à cette session" });
       }
 
       // Check if user has an approved or converted intention for this formation
