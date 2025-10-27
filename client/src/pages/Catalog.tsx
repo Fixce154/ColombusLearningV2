@@ -78,6 +78,13 @@ export default function Catalog() {
 
   const totalActiveFilters = selectedThemes.length + selectedModalities.length + selectedSeniority.length;
 
+  const activeFormations = formations.filter((f) => f.active).length;
+  const openSessionsCount = sessions.filter((s) => s.status === "open").length;
+  const completedFormationsCount = useMemo(() => {
+    const completedRegistrations = registrations.filter((registration) => registration.status === "completed");
+    return new Set(completedRegistrations.map((registration) => registration.formationId)).size;
+  }, [registrations]);
+
   if (isLoadingFormations || isLoadingSessions || isLoadingRegistrations) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -88,13 +95,6 @@ export default function Catalog() {
       </div>
     );
   }
-
-  const activeFormations = formations.filter((f) => f.active).length;
-  const openSessionsCount = sessions.filter((s) => s.status === "open").length;
-  const completedFormationsCount = useMemo(() => {
-    const completedRegistrations = registrations.filter((registration) => registration.status === "completed");
-    return new Set(completedRegistrations.map((registration) => registration.formationId)).size;
-  }, [registrations]);
 
   return (
     <div className="space-y-12">
