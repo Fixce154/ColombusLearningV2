@@ -322,8 +322,8 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
                       <section.icon className="h-5 w-5" />
                     </button>
                     {sectionUnread > 0 ? (
-                      <span className="absolute -right-1 -top-1 inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1 text-[0.65rem] font-semibold text-destructive-foreground shadow-sm">
-                        {sectionUnread > 9 ? "9+" : sectionUnread}
+                      <span className="absolute -right-1 -top-1 inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1 text-xs font-semibold text-destructive-foreground shadow-sm">
+                        !
                       </span>
                     ) : null}
                   </div>
