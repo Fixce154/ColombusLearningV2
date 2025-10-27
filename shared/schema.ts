@@ -12,6 +12,21 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const SENIORITY_LEVELS = [
+  "Stagiaire",
+  "Alternant",
+  "Junior",
+  "Senior",
+  "Supervising Senior",
+  "Manager",
+  "Super Manager",
+  "Directeur",
+  "Partner",
+  "Senior Partner",
+] as const;
+
+export type SeniorityLevel = (typeof SENIORITY_LEVELS)[number];
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
@@ -22,7 +37,7 @@ export const users = pgTable("users", {
   grade: text("grade"),
   jobRole: text("job_role"),
   roles: text("roles").array().notNull(), // consultant, rh, formateur, formateur_externe, manager
-  seniority: text("seniority"), // junior, confirme, senior, expert
+  seniority: text("seniority"), // e.g. Stagiaire, Alternant, Junior, Senior...
   businessUnit: text("business_unit"),
   p1Used: integer("p1_used").default(0),
   p2Used: integer("p2_used").default(0),

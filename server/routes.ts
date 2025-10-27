@@ -15,6 +15,7 @@ import {
   type InsertUser,
   type InsertNotification,
   type FormationInterest,
+  SENIORITY_LEVELS,
 } from "@shared/schema";
 import { INSTRUCTOR_ROLES, InstructorRole, USER_ROLES, isInstructor } from "@shared/roles";
 import { z } from "zod";
@@ -853,7 +854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .array(z.enum(USER_ROLES))
       .nonempty("Au moins un rôle est requis"),
     businessUnit: z.string().optional(),
-    seniority: z.string().optional(),
+    seniority: z.enum(SENIORITY_LEVELS).optional(),
     employeeId: z.string().optional(),
     hireDate: z.string().optional(),
     grade: z.string().optional(),
