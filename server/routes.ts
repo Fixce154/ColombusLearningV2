@@ -309,8 +309,7 @@ const mapAccessValuesToRoles = (rawValue: string): string[] => {
 };
 
 const generateTemporaryPassword = (): string => {
-  const base = randomBytes(6).toString("base64").replace(/[^a-zA-Z0-9]/g, "");
-  return `Temp${base.slice(0, 6)}!1`;
+  return "Colombus 138";
 };
 
 type BulkUploadSummary = {
