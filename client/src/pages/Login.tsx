@@ -34,9 +34,8 @@ const registerSchema = z.object({
   email: z.string().email("Email invalide"),
   password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
   name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
-  role: z.enum(["consultant", "rh", "formateur", "manager"]),
+  role: z.enum(["consultant", "rh"]),
   seniority: z.enum(["junior", "confirme", "senior", "expert"]).optional(),
-  businessUnit: z.string().optional(),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -66,7 +65,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       name: "",
       role: "consultant",
       seniority: "junior",
-      businessUnit: "",
     },
   });
 
@@ -184,7 +182,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
                 <Button
                   type="submit"
-                  className="w-full rounded-full bg-primary py-4 text-sm font-semibold text-white shadow-[0_24px_40px_-28px_rgba(10,132,255,0.65)] hover:bg-primary/90"
+                  className="w-full rounded-xl bg-primary py-4 text-sm font-semibold text-white shadow-[0_24px_40px_-28px_rgba(10,132,255,0.65)] hover:bg-primary/90"
                   disabled={isLoading}
                   data-testid="button-login"
                 >
@@ -291,9 +289,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="consultant">Consultant</SelectItem>
-                          <SelectItem value="rh">Ressources Humaines</SelectItem>
-                          <SelectItem value="formateur">Formateur interne</SelectItem>
-                          <SelectItem value="manager">Manager</SelectItem>
+                          <SelectItem value="rh">Fonction transverse</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -325,24 +321,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                   )}
                 />
 
-                <FormField
-                  control={registerForm.control}
-                  name="businessUnit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Unité métier (optionnel)</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="Digital, Finance, RH..."
-                          data-testid="input-business-unit"
-                          disabled={isLoading}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
 
                 {error && (
                   <div className="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/10 p-3">
