@@ -2526,8 +2526,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let approvedIntention = intentions.find((i) => i.status === "approved");
       const convertedIntention = intentions.find((i) => i.status === "converted");
 
-      // If no intention exists and RH is enrolling the consultant, create a validated intention
-      if (!approvedIntention && !convertedIntention && isRh && targetUserId !== userId) {
+      // If no intention exists and an RH is enrolling, create a validated intention
+      if (!approvedIntention && !convertedIntention && isRh) {
         if (data.priority === "P1") {
           if ((targetUser.p1Used || 0) >= 1) {
             return res.status(400).json({ message: "Le collaborateur a déjà utilisé sa priorité P1 cette année" });
@@ -2573,7 +2573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateFormationInterest(approvedIntention.id, { status: "converted" });
       } else if (convertedIntention) {
         registrationStatus = "validated";
-      } else if (isRh && targetUserId !== userId) {
+      } else if (isRh) {
         // RH enrolment without prior intention defaults to validated status
         registrationStatus = "validated";
       }
