@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -64,8 +65,15 @@ import { fr } from "date-fns/locale";
 import PriorityBadge from "@/components/PriorityBadge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import CreateExternalInstructorDialog from "@/components/CreateExternalInstructorDialog";
+import CreateCollaboratorDialog from "@/components/CreateCollaboratorDialog";
 import EditExternalInstructorDialog from "@/components/EditExternalInstructorDialog";
+
+type BulkUploadResult = {
+  createdCount: number;
+  skippedCount: number;
+  errors: Array<{ row: number; message: string }>;
+  createdUsers: Array<{ name: string; email: string; temporaryPassword: string }>;
+};
 
 export default function ConsultantManagement() {
   const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
@@ -73,10 +81,13 @@ export default function ConsultantManagement() {
   const [selectedConsultant, setSelectedConsultant] = useState<User | null>(null);
   const [archiveDialogUser, setArchiveDialogUser] = useState<User | null>(null);
   const [deleteDialogUser, setDeleteDialogUser] = useState<User | null>(null);
-  const [showCreateExternalInstructor, setShowCreateExternalInstructor] = useState(false);
+  const [showCreateCollaboratorDialog, setShowCreateCollaboratorDialog] = useState(false);
   const [editExternalInstructorId, setEditExternalInstructorId] = useState<string | null>(null);
   const [coachToAssign, setCoachToAssign] = useState<User | null>(null);
   const [selectedCoacheeId, setSelectedCoacheeId] = useState<string | null>(null);
+  const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null);
+  const [bulkUploadResult, setBulkUploadResult] = useState<BulkUploadResult | null>(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
   const { toast } = useToast();
 
   const { data: activeUsers = [], isLoading: isLoadingActiveUsers } = useQuery<User[]>({
@@ -150,8 +161,9 @@ export default function ConsultantManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/coach-assignments"] });
       toast({
-        title: "Consultant archivé",
-        description: "Le consultant a été archivé avec succès. Ses intentions et inscriptions en cours ont été supprimées.",
+        title: "Collaborateur archivé",
+        description:
+          "Le collaborateur a été archivé avec succès. Ses intentions et inscriptions en cours ont été supprimées.",
       });
       setArchiveDialogUser(null);
     },
@@ -172,8 +184,8 @@ export default function ConsultantManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/coach-assignments"] });
       toast({
-        title: "Consultant supprimé",
-        description: "Le consultant a été définitivement supprimé avec toutes ses données.",
+        title: "Collaborateur supprimé",
+        description: "Le collaborateur a été définitivement supprimé avec toutes ses données.",
       });
       setDeleteDialogUser(null);
     },
@@ -215,7 +227,7 @@ export default function ConsultantManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/coach-assignments"] });
       toast({
         title: "Coaché assigné",
-        description: "Le consultant a bien été associé au coach.",
+        description: "Le collaborateur a bien été associé au coach.",
       });
       setCoachToAssign(null);
       setSelectedCoacheeId(null);
@@ -245,6 +257,51 @@ export default function ConsultantManagement() {
         title: "Erreur",
         description: error.message || "Impossible de supprimer l'association",
         variant: "destructive",
+      });
+    },
+  });
+
+  const bulkUploadMutation = useMutation({
+    mutationFn: async ({ fileName, fileContent }: { fileName: string; fileContent: string }) => {
+      const response = await fetch("/api/admin/users/bulk-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ fileName, fileContent }),
+      });
+
+      if (!response.ok) {
+        let message = "Impossible d'importer le fichier";
+        try {
+          const errorBody = await response.json();
+          if (errorBody?.message) {
+            message = errorBody.message;
+          }
+        } catch (error) {
+          console.error("Failed to parse bulk upload error", error);
+        }
+        throw new Error(message);
+      }
+
+      return (await response.json()) as BulkUploadResult;
+    },
+    onSuccess: (data) => {
+      setBulkUploadResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: "Import terminé",
+        description: `${data.createdCount} collaborateur${data.createdCount > 1 ? "s" : ""} ajouté${
+          data.createdCount > 1 ? "s" : ""
+        }`,
+      });
+      setBulkUploadFile(null);
+      setFileInputKey((prev) => prev + 1);
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Import impossible",
+        description: error?.message || "Une erreur est survenue lors de l'import.",
       });
     },
   });
@@ -347,6 +404,39 @@ export default function ConsultantManagement() {
     };
   };
 
+  const handleBulkUpload = async () => {
+    if (!bulkUploadFile || bulkUploadMutation.isPending) {
+      return;
+    }
+
+    try {
+      const arrayBuffer = await bulkUploadFile.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      const chunkSize = 0x8000;
+      let binary = "";
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        let chunkString = "";
+        for (let j = 0; j < chunk.length; j++) {
+          chunkString += String.fromCharCode(chunk[j]);
+        }
+        binary += chunkString;
+      }
+      const base64 = btoa(binary);
+
+      await bulkUploadMutation.mutateAsync({
+        fileName: bulkUploadFile.name,
+        fileContent: base64,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Lecture impossible",
+        description: error?.message || "Impossible de lire le fichier sélectionné.",
+      });
+    }
+  };
+
   const handleAssignCoachee = () => {
     if (!coachToAssign || !selectedCoacheeId) return;
     createCoachAssignmentMutation.mutate({
@@ -371,7 +461,7 @@ export default function ConsultantManagement() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-4">
           <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground">Chargement des consultants...</p>
+          <p className="text-muted-foreground">Chargement des collaborateurs...</p>
         </div>
       </div>
     );
@@ -386,7 +476,7 @@ export default function ConsultantManagement() {
         <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
           <div className="max-w-2xl space-y-5">
             <p className="eyebrow text-muted-foreground">Administration RH</p>
-            <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Gestion des consultants</h1>
+            <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Gestion des collaborateurs</h1>
             <p className="text-base leading-relaxed text-muted-foreground">
               Pilotez les parcours de vos collaborateurs, suivez leurs intentions et assurez le lien avec les formateurs externes.
             </p>
@@ -399,11 +489,11 @@ export default function ConsultantManagement() {
             </div>
             <Button
               className="h-12 rounded-xl text-sm font-semibold"
-              onClick={() => setShowCreateExternalInstructor(true)}
-              data-testid="button-create-external-instructor"
+              onClick={() => setShowCreateCollaboratorDialog(true)}
+              data-testid="button-create-collaborator"
             >
               <UserPlus className="mr-2 h-4 w-4" />
-              Créer un formateur externe
+              Nouveau collaborateur
             </Button>
           </div>
         </div>
@@ -413,7 +503,7 @@ export default function ConsultantManagement() {
         <div className="grid gap-6 md:grid-cols-3">
           <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Total consultants</p>
+              <p className="text-sm text-muted-foreground">Total collaborateurs</p>
               <p className="text-3xl font-semibold text-foreground">{consultants.length}</p>
             </div>
             <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -448,6 +538,106 @@ export default function ConsultantManagement() {
             </div>
           </Card>
         </div>
+
+        <Card className="rounded-[1.75rem] border border-dashed border-primary/40 p-6 shadow-sm">
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <div className="space-y-4 md:max-w-2xl">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Import de collaborateurs</h3>
+                <p className="text-sm text-muted-foreground">
+                  Importez un fichier Excel (.xlsx) contenant les colonnes matricule, nom, prénom, email, date d’entrée, grade,
+                  rôle et type d’accès (RH, collaborateur, coach, formateur externe).
+                </p>
+              </div>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li>Les types d’accès multiples peuvent être séparés par une virgule ou un point-virgule.</li>
+                <li>Un mot de passe temporaire est généré pour chaque profil créé.</li>
+              </ul>
+            </div>
+            <div className="w-full max-w-sm space-y-3">
+              <Input
+                key={fileInputKey}
+                type="file"
+                accept=".xlsx,.xlsm"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  setBulkUploadFile(file);
+                  setBulkUploadResult(null);
+                }}
+                disabled={bulkUploadMutation.isPending}
+              />
+              <Button
+                className="w-full"
+                onClick={handleBulkUpload}
+                disabled={!bulkUploadFile || bulkUploadMutation.isPending}
+              >
+                {bulkUploadMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Import en cours...
+                  </>
+                ) : (
+                  "Importer le fichier"
+                )}
+              </Button>
+              {bulkUploadFile && !bulkUploadMutation.isPending ? (
+                <p className="text-xs text-muted-foreground">Fichier sélectionné : {bulkUploadFile.name}</p>
+              ) : null}
+            </div>
+          </div>
+
+          {bulkUploadResult ? (
+            <div className="mt-6 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl bg-muted/40 p-4">
+                  <p className="text-sm text-muted-foreground">Collaborateurs créés</p>
+                  <p className="text-2xl font-semibold text-primary">{bulkUploadResult.createdCount}</p>
+                </div>
+                <div className="rounded-xl bg-muted/40 p-4">
+                  <p className="text-sm text-muted-foreground">Profils ignorés</p>
+                  <p className="text-2xl font-semibold text-primary">{bulkUploadResult.skippedCount}</p>
+                </div>
+              </div>
+
+              {bulkUploadResult.createdUsers.length > 0 ? (
+                <div className="overflow-x-auto rounded-xl border border-border/60">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Collaborateur</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Mot de passe temporaire</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {bulkUploadResult.createdUsers.map((user) => (
+                        <TableRow key={user.email}>
+                          <TableCell>{user.name}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <code className="rounded bg-muted px-2 py-1 text-xs font-medium">{user.temporaryPassword}</code>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : null}
+
+              {bulkUploadResult.errors.length > 0 ? (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm">
+                  <p className="font-semibold text-destructive">Lignes non importées</p>
+                  <ul className="mt-2 space-y-1 text-destructive">
+                    {bulkUploadResult.errors.map((error) => (
+                      <li key={`${error.row}-${error.message}`}>
+                        Ligne {error.row} — {error.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </Card>
 
         <Card className="rounded-[1.75rem] border border-border/50 shadow-sm">
           <div className="flex flex-col gap-2 p-6 border-b border-border/60 md:flex-row md:items-center md:justify-between">
@@ -530,20 +720,20 @@ export default function ConsultantManagement() {
           )}
         </Card>
 
-        {/* Consultants Table */}
+        {/* Collaborators Table */}
         <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
               <Users className="w-5 h-5" />
-              Liste des consultants
+              Liste des collaborateurs
             </h2>
 
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "active" | "archived")}>
               <TabsList>
-                <TabsTrigger value="active" data-testid="tab-active-consultants">
+                <TabsTrigger value="active" data-testid="tab-active-collaborators">
                   Actifs ({activeUsers.filter(u => u.roles.includes("consultant")).length})
                 </TabsTrigger>
-                <TabsTrigger value="archived" data-testid="tab-archived-consultants">
+                <TabsTrigger value="archived" data-testid="tab-archived-collaborators">
                   Historique ({archivedUsers.filter(u => u.roles.includes("consultant")).length})
                 </TabsTrigger>
               </TabsList>
@@ -566,7 +756,7 @@ export default function ConsultantManagement() {
                     {consultants.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
-                          Aucun consultant trouvé
+                          Aucun collaborateur trouvé
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -603,7 +793,7 @@ export default function ConsultantManagement() {
                               <TableCell className="font-medium">{consultant.name}</TableCell>
                               <TableCell>{consultant.businessUnit || "-"}</TableCell>
                               <TableCell>
-                                <Badge variant="secondary">{consultant.seniority || "Non défini"}</Badge>
+                            <Badge variant="secondary">{consultant.grade || consultant.seniority || "Non défini"}</Badge>
                               </TableCell>
                               <TableCell className="text-center">
                                 <div className="flex items-center justify-center gap-1">
@@ -767,7 +957,7 @@ export default function ConsultantManagement() {
                                                       className="flex items-center gap-2 rounded-full border border-border/60 bg-background px-3 py-1"
                                                     >
                                                       <span className="text-sm font-medium">
-                                                        {coachee?.name || "Consultant inconnu"}
+                                                        {coachee?.name || "Collaborateur inconnu"}
                                                       </span>
                                                       <Button
                                                         size="icon"
@@ -812,7 +1002,7 @@ export default function ConsultantManagement() {
                                           )}
                                           {!consultant.archived && availableCoacheesForCoach.length === 0 && (
                                             <p className="text-xs text-muted-foreground">
-                                              Tous les consultants actifs sont déjà assignés à ce coach.
+                                              Tous les collaborateurs actifs sont déjà assignés à ce coach.
                                             </p>
                                           )}
                                         </div>
@@ -842,9 +1032,9 @@ export default function ConsultantManagement() {
       <AlertDialog open={!!archiveDialogUser} onOpenChange={() => setArchiveDialogUser(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Archiver ce consultant ?</AlertDialogTitle>
+              <AlertDialogTitle>Archiver ce collaborateur ?</AlertDialogTitle>
               <AlertDialogDescription>
-                L'archivage du consultant <strong>{archiveDialogUser?.name}</strong> aura les conséquences suivantes :
+                L'archivage du collaborateur <strong>{archiveDialogUser?.name}</strong> aura les conséquences suivantes :
                 <ul className="list-disc list-inside mt-2 space-y-1">
                   <li>Suppression de toutes les intentions en attente ou approuvées</li>
                   <li>Suppression de toutes les inscriptions en attente ou validées</li>
@@ -852,7 +1042,7 @@ export default function ConsultantManagement() {
                   <li>Conservation de l'historique complet des formations</li>
                 </ul>
                 <p className="mt-2 text-yellow-600">
-                  Le consultant archivé sera accessible dans l'onglet "Historique".
+                  Le collaborateur archivé sera accessible dans l'onglet "Historique".
                 </p>
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -869,9 +1059,9 @@ export default function ConsultantManagement() {
           </AlertDialogContent>
         </AlertDialog>
 
-      <CreateExternalInstructorDialog
-        open={showCreateExternalInstructor}
-        onOpenChange={setShowCreateExternalInstructor}
+      <CreateCollaboratorDialog
+        open={showCreateCollaboratorDialog}
+        onOpenChange={setShowCreateCollaboratorDialog}
       />
 
       <EditExternalInstructorDialog
@@ -895,7 +1085,7 @@ export default function ConsultantManagement() {
           <DialogHeader>
             <DialogTitle>Assigner un coaché</DialogTitle>
             <DialogDescription>
-              Sélectionnez le consultant à rattacher à {coachToAssign?.name}.
+              Sélectionnez le collaborateur à rattacher à {coachToAssign?.name}.
             </DialogDescription>
           </DialogHeader>
           {coachToAssign ? (
@@ -906,7 +1096,7 @@ export default function ConsultantManagement() {
                   onValueChange={(value) => setSelectedCoacheeId(value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Choisir un consultant" />
+                    <SelectValue placeholder="Choisir un collaborateur" />
                   </SelectTrigger>
                   <SelectContent>
                     {availableCoachees.map((coachee) => (
@@ -918,7 +1108,7 @@ export default function ConsultantManagement() {
                 </Select>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Tous les consultants actifs sont déjà assignés à ce coach.
+                  Tous les collaborateurs actifs sont déjà assignés à ce coach.
                 </p>
               )}
               <div className="flex justify-end gap-2">
@@ -949,11 +1139,11 @@ export default function ConsultantManagement() {
       <AlertDialog open={!!deleteDialogUser} onOpenChange={() => setDeleteDialogUser(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Supprimer définitivement ce consultant ?</AlertDialogTitle>
+              <AlertDialogTitle>Supprimer définitivement ce collaborateur ?</AlertDialogTitle>
               <AlertDialogDescription>
-                La suppression du consultant <strong>{deleteDialogUser?.name}</strong> est <strong>irréversible</strong> et aura les conséquences suivantes :
+                La suppression du collaborateur <strong>{deleteDialogUser?.name}</strong> est <strong>irréversible</strong> et aura les conséquences suivantes :
                 <ul className="list-disc list-inside mt-2 space-y-1">
-                  <li>Suppression définitive du compte consultant</li>
+                  <li>Suppression définitive du compte collaborateur</li>
                   <li>Suppression de toutes les intentions de formation</li>
                   <li>Suppression de toutes les inscriptions</li>
                   <li>Perte complète de l'historique de formation</li>

@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import { randomBytes } from "crypto";
+import { inflateRawSync } from "zlib";
 import { pool } from "./db";
 import { storage } from "./storage";
 import { requireAuth, optionalAuth, type AuthRequest } from "./auth";
@@ -21,6 +23,302 @@ import { z } from "zod";
 const PgSession = connectPgSimple(session);
 
 const COACH_VALIDATION_SETTING_KEY = "coach_validation_only";
+
+const ZIP_LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;
+const ZIP_CENTRAL_DIR_SIGNATURE = 0x02014b50;
+const ZIP_END_OF_CENTRAL_DIR_SIGNATURE = 0x06054b50;
+const EXCEL_EPOCH = Date.UTC(1899, 11, 30);
+
+const decodeXmlEntities = (value: string): string =>
+  value
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+
+const normalizeHeaderKey = (header: string): string =>
+  header
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const columnLettersToIndex = (letters: string): number => {
+  let index = 0;
+  for (let i = 0; i < letters.length; i++) {
+    index = index * 26 + (letters.charCodeAt(i) - 64);
+  }
+  return index - 1;
+};
+
+const extractZipEntries = (buffer: Buffer): Map<string, Buffer> => {
+  const entries = new Map<string, Buffer>();
+
+  let endOfCentralDirOffset = -1;
+  for (let i = buffer.length - 22; i >= 0; i--) {
+    if (buffer.readUInt32LE(i) === ZIP_END_OF_CENTRAL_DIR_SIGNATURE) {
+      endOfCentralDirOffset = i;
+      break;
+    }
+  }
+
+  if (endOfCentralDirOffset === -1) {
+    throw new Error("Archive ZIP invalide ou corrompue");
+  }
+
+  const centralDirectorySize = buffer.readUInt32LE(endOfCentralDirOffset + 12);
+  const centralDirectoryOffset = buffer.readUInt32LE(endOfCentralDirOffset + 16);
+  const centralDirectoryEnd = centralDirectoryOffset + centralDirectorySize;
+
+  let cursor = centralDirectoryOffset;
+  while (cursor < centralDirectoryEnd) {
+    const signature = buffer.readUInt32LE(cursor);
+    if (signature !== ZIP_CENTRAL_DIR_SIGNATURE) {
+      throw new Error("Entrée du répertoire central invalide dans l'archive ZIP");
+    }
+
+    const compressionMethod = buffer.readUInt16LE(cursor + 10);
+    const compressedSize = buffer.readUInt32LE(cursor + 20);
+    const fileNameLength = buffer.readUInt16LE(cursor + 28);
+    const extraFieldLength = buffer.readUInt16LE(cursor + 30);
+    const fileCommentLength = buffer.readUInt16LE(cursor + 32);
+    const localHeaderOffset = buffer.readUInt32LE(cursor + 42);
+    const fileName = buffer
+      .slice(cursor + 46, cursor + 46 + fileNameLength)
+      .toString("utf8");
+
+    cursor += 46 + fileNameLength + extraFieldLength + fileCommentLength;
+
+    if (fileName.endsWith("/")) {
+      continue;
+    }
+
+    const localHeaderSignature = buffer.readUInt32LE(localHeaderOffset);
+    if (localHeaderSignature !== ZIP_LOCAL_FILE_HEADER_SIGNATURE) {
+      throw new Error("En-tête local invalide dans l'archive ZIP");
+    }
+
+    const localFileNameLength = buffer.readUInt16LE(localHeaderOffset + 26);
+    const localExtraFieldLength = buffer.readUInt16LE(localHeaderOffset + 28);
+    const dataStart = localHeaderOffset + 30 + localFileNameLength + localExtraFieldLength;
+    const dataEnd = dataStart + compressedSize;
+    const compressedData = buffer.slice(dataStart, dataEnd);
+
+    let fileData: Buffer;
+    if (compressionMethod === 0) {
+      fileData = Buffer.from(compressedData);
+    } else if (compressionMethod === 8) {
+      fileData = inflateRawSync(compressedData);
+    } else {
+      continue;
+    }
+
+    entries.set(fileName, fileData);
+  }
+
+  return entries;
+};
+
+const parseSharedStrings = (xml: string): string[] => {
+  const sharedStrings: string[] = [];
+  const siRegex = /<si[^>]*>([\s\S]*?)<\/si>/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = siRegex.exec(xml)) !== null) {
+    const entry = match[1];
+    const textMatches = entry.match(/<t[^>]*>([\s\S]*?)<\/t>/g);
+    if (textMatches) {
+      const text = textMatches
+        .map((textMatch) => {
+          const innerMatch = /<t[^>]*>([\s\S]*?)<\/t>/.exec(textMatch);
+          return innerMatch ? decodeXmlEntities(innerMatch[1]) : "";
+        })
+        .join("");
+      sharedStrings.push(text);
+    } else {
+      sharedStrings.push("");
+    }
+  }
+
+  return sharedStrings;
+};
+
+const parseWorksheet = (xml: string, sharedStrings: string[]): string[][] => {
+  const rows: Record<number, Record<number, string>> = {};
+  const cellRegex = /<c[^>]*r="([A-Z]+)(\d+)"[^>]*?(?:t="([^"]+)")?[^>]*>([\s\S]*?)<\/c>/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = cellRegex.exec(xml)) !== null) {
+    const columnLetters = match[1];
+    const rowIndex = Number.parseInt(match[2], 10) - 1;
+    const cellType = match[3] ?? "";
+    const cellContent = match[4] ?? "";
+
+    let rawValue = "";
+    const valueMatch = /<v>([\s\S]*?)<\/v>/.exec(cellContent);
+    if (valueMatch) {
+      rawValue = decodeXmlEntities(valueMatch[1].trim());
+    } else {
+      const inlineMatch = /<t[^>]*>([\s\S]*?)<\/t>/.exec(cellContent);
+      if (inlineMatch) {
+        rawValue = decodeXmlEntities(inlineMatch[1].trim());
+      }
+    }
+
+    let value = rawValue;
+    if (cellType === "s") {
+      const index = Number(rawValue);
+      if (!Number.isNaN(index) && sharedStrings[index]) {
+        value = sharedStrings[index];
+      }
+    } else if (cellType === "b") {
+      value = rawValue === "1" ? "TRUE" : "FALSE";
+    }
+
+    const columnIndex = columnLettersToIndex(columnLetters);
+    if (!rows[rowIndex]) {
+      rows[rowIndex] = {};
+    }
+    rows[rowIndex][columnIndex] = value;
+  }
+
+  const rowIndices = Object.keys(rows).map((key) => Number(key));
+  if (rowIndices.length === 0) {
+    return [];
+  }
+
+  const maxRowIndex = Math.max(...rowIndices);
+  const result: string[][] = [];
+
+  for (let rowIndex = 0; rowIndex <= maxRowIndex; rowIndex++) {
+    const rowValues = rows[rowIndex] ?? {};
+    const columnIndices = Object.keys(rowValues).map((key) => Number(key));
+    const maxColumnIndex = columnIndices.length ? Math.max(...columnIndices) : -1;
+    const rowArray: string[] = [];
+    for (let columnIndex = 0; columnIndex <= maxColumnIndex; columnIndex++) {
+      rowArray[columnIndex] = (rowValues as Record<number, string>)[columnIndex] ?? "";
+    }
+    result.push(rowArray);
+  }
+
+  return result;
+};
+
+const parseXlsxRows = (buffer: Buffer): Array<Record<string, string>> => {
+  const entries = extractZipEntries(buffer);
+  const worksheet = entries.get("xl/worksheets/sheet1.xml");
+
+  if (!worksheet) {
+    throw new Error("Feuille principale introuvable dans le fichier Excel");
+  }
+
+  const sharedStringsXml = entries.get("xl/sharedStrings.xml");
+  const sharedStrings = sharedStringsXml ? parseSharedStrings(sharedStringsXml.toString("utf8")) : [];
+  const rows = parseWorksheet(worksheet.toString("utf8"), sharedStrings);
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const headers = rows[0].map((header) => normalizeHeaderKey(header));
+  const data: Array<Record<string, string>> = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.every((cell) => !String(cell ?? "").trim())) {
+      continue;
+    }
+
+    const entry: Record<string, string> = {};
+    row.forEach((value, index) => {
+      const key = headers[index];
+      if (!key) return;
+      entry[key] = String(value ?? "").trim();
+    });
+    data.push(entry);
+  }
+
+  return data;
+};
+
+const parseExcelDate = (value?: string): Date | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+
+  const numeric = Number(trimmed);
+  if (!Number.isNaN(numeric)) {
+    const milliseconds = EXCEL_EPOCH + Math.round(numeric * 24 * 60 * 60 * 1000);
+    const date = new Date(milliseconds);
+    if (!Number.isNaN(date.getTime())) {
+      return date;
+    }
+  }
+
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed;
+  }
+
+  return undefined;
+};
+
+const normalizeAccessValue = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const mapAccessValuesToRoles = (rawValue: string): string[] => {
+  const values = rawValue
+    .split(/[,;]/)
+    .map((value) => normalizeAccessValue(value))
+    .filter(Boolean);
+
+  const roles = new Set<string>();
+
+  for (const value of values) {
+    if (value.includes("rh")) {
+      roles.add("rh");
+      roles.add("consultant");
+    } else if (value.includes("coach")) {
+      roles.add("coach");
+      roles.add("consultant");
+    } else if (value.includes("formateur_externe") || value.includes("formateur externe")) {
+      roles.add("formateur_externe");
+    } else if (value.includes("formateur")) {
+      roles.add("formateur");
+      roles.add("consultant");
+    } else if (value.includes("manager")) {
+      roles.add("manager");
+      roles.add("consultant");
+    } else if (value.includes("collaborateur") || value.includes("consultant")) {
+      roles.add("consultant");
+    }
+  }
+
+  if (roles.size === 0) {
+    roles.add("consultant");
+  }
+
+  return Array.from(roles);
+};
+
+const generateTemporaryPassword = (): string => {
+  const base = randomBytes(6).toString("base64").replace(/[^a-zA-Z0-9]/g, "");
+  return `Temp${base.slice(0, 6)}!1`;
+};
+
+type BulkUploadSummary = {
+  createdCount: number;
+  skippedCount: number;
+  errors: Array<{ row: number; message: string }>;
+  createdUsers: Array<{ name: string; email: string; temporaryPassword: string }>;
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Session configuration
@@ -558,6 +856,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .nonempty("Au moins un rôle est requis"),
     businessUnit: z.string().optional(),
     seniority: z.string().optional(),
+    employeeId: z.string().optional(),
+    hireDate: z.string().optional(),
+    grade: z.string().optional(),
+    jobRole: z.string().optional(),
   });
 
   const coachAssignmentSchema = z
@@ -623,13 +925,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
       );
 
+      let hireDate: Date | undefined;
+      if (parsed.hireDate) {
+        const parsedDate = new Date(parsed.hireDate);
+        if (!Number.isNaN(parsedDate.getTime())) {
+          hireDate = parsedDate;
+        }
+      }
+
+      const grade = parsed.grade?.trim() ? parsed.grade.trim() : undefined;
+      const jobRole = parsed.jobRole?.trim() ? parsed.jobRole.trim() : undefined;
+      const employeeId = parsed.employeeId?.trim() ? parsed.employeeId.trim() : undefined;
+      const businessUnit = parsed.businessUnit?.trim() ? parsed.businessUnit.trim() : undefined;
+      const seniority = parsed.seniority?.trim() ? parsed.seniority.trim() : grade;
+
       const createdUser = await storage.createUser({
         name: parsed.name,
         email: parsed.email,
         password: parsed.password,
         roles: normalizedRoles,
-        businessUnit: parsed.businessUnit,
-        seniority: parsed.seniority,
+        businessUnit,
+        seniority,
+        employeeId,
+        hireDate,
+        grade,
+        jobRole,
         archived: false,
         p1Used: 0,
         p2Used: 0,
@@ -641,6 +961,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Données invalides", errors: error.errors });
       }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/users/bulk-upload", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const { fileContent } = req.body ?? {};
+      if (!fileContent || typeof fileContent !== "string") {
+        return res.status(400).json({ message: "Fichier manquant ou invalide" });
+      }
+
+      let buffer: Buffer;
+      try {
+        buffer = Buffer.from(fileContent, "base64");
+      } catch (error) {
+        return res.status(400).json({ message: "Impossible de décoder le fichier fourni" });
+      }
+
+      let rows: Array<Record<string, string>>;
+      try {
+        rows = parseXlsxRows(buffer);
+      } catch (error: any) {
+        return res
+          .status(400)
+          .json({ message: error?.message || "Le fichier Excel est invalide ou ne peut pas être analysé." });
+      }
+
+      if (rows.length === 0) {
+        return res.status(400).json({ message: "Le fichier ne contient aucune donnée exploitable." });
+      }
+
+      const activeUsers = await storage.listUsers(false);
+      const archivedUsers = await storage.listUsers(true);
+
+      const knownEmails = new Set<string>();
+      const knownEmployeeIds = new Set<string>();
+
+      [...activeUsers, ...archivedUsers].forEach((existing) => {
+        knownEmails.add(existing.email.toLowerCase());
+        if (existing.employeeId) {
+          knownEmployeeIds.add(existing.employeeId.toLowerCase());
+        }
+      });
+
+      const result: BulkUploadSummary = {
+        createdCount: 0,
+        skippedCount: 0,
+        errors: [],
+        createdUsers: [],
+      };
+
+      for (let index = 0; index < rows.length; index++) {
+        const row = rows[index];
+        const rowNumber = index + 2;
+
+        const lastName = (row["nom"] ?? row["name"] ?? "").trim();
+        const firstName = (row["prenom"] ?? row["prénom"] ?? "").trim();
+        const emailRaw = (row["email"] ?? "").trim();
+        const accessRaw = (row["type_d_acces"] ?? row["type_dacces"] ?? "").trim();
+        const employeeId = (row["matricule"] ?? "").trim();
+        const grade = (row["grade"] ?? "").trim();
+        const jobRole = (row["role"] ?? "").trim();
+        const businessUnit = (row["business_unit"] ?? "").trim();
+        const hireDateValue = row["date_d_entree"] ?? row["date_entree"] ?? row["date_dentree"] ?? "";
+
+        if (!lastName || !firstName || !emailRaw || !accessRaw) {
+          result.skippedCount += 1;
+          result.errors.push({
+            row: rowNumber,
+            message: "Colonnes obligatoires manquantes (nom, prénom, email ou type d'accès).",
+          });
+          continue;
+        }
+
+        const normalizedEmail = emailRaw.toLowerCase();
+        if (!emailRaw.includes("@")) {
+          result.skippedCount += 1;
+          result.errors.push({ row: rowNumber, message: "Adresse email invalide." });
+          continue;
+        }
+
+        if (knownEmails.has(normalizedEmail)) {
+          result.skippedCount += 1;
+          result.errors.push({
+            row: rowNumber,
+            message: `Un compte existe déjà avec l'email ${emailRaw}.`,
+          });
+          continue;
+        }
+
+        if (employeeId && knownEmployeeIds.has(employeeId.toLowerCase())) {
+          result.skippedCount += 1;
+          result.errors.push({
+            row: rowNumber,
+            message: `Le matricule ${employeeId} est déjà utilisé.`,
+          });
+          continue;
+        }
+
+        const roles = mapAccessValuesToRoles(accessRaw);
+        const hireDate = parseExcelDate(hireDateValue);
+
+        try {
+          const temporaryPassword = generateTemporaryPassword();
+          const createdUser = await storage.createUser({
+            name: `${firstName} ${lastName}`.trim(),
+            email: emailRaw,
+            password: temporaryPassword,
+            roles,
+            employeeId: employeeId || undefined,
+            hireDate,
+            grade: grade || undefined,
+            jobRole: jobRole || undefined,
+            businessUnit: businessUnit || undefined,
+            seniority: grade || undefined,
+            archived: false,
+            p1Used: 0,
+            p2Used: 0,
+          });
+
+          knownEmails.add(normalizedEmail);
+          if (employeeId) {
+            knownEmployeeIds.add(employeeId.toLowerCase());
+          }
+
+          result.createdCount += 1;
+          result.createdUsers.push({
+            name: createdUser.name,
+            email: createdUser.email,
+            temporaryPassword,
+          });
+        } catch (error: any) {
+          result.skippedCount += 1;
+          result.errors.push({
+            row: rowNumber,
+            message: error?.message || "Erreur lors de la création du collaborateur.",
+          });
+        }
+      }
+
+      res.json(result);
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

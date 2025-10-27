@@ -13,7 +13,7 @@ export const INSTRUCTOR_ROLES = ["formateur", "formateur_externe"] as const;
 export type InstructorRole = (typeof INSTRUCTOR_ROLES)[number];
 
 const ROLE_LABEL_MAP: Record<UserRole, string> = {
-  consultant: "Consultant",
+  consultant: "Collaborateur",
   rh: "Ressources Humaines",
   formateur: "Formateur interne",
   formateur_externe: "Formateur externe",
