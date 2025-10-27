@@ -627,11 +627,16 @@ export class DatabaseStorage implements IStorage {
     userId: string
   ): Promise<Array<{ route: string; count: number }>> {
     await ensureNotificationsTable();
-    return await db
+    const unread = await db
       .select({ route: notifications.route, count: sql<number>`count(*)` })
       .from(notifications)
       .where(and(eq(notifications.userId, userId), eq(notifications.read, false)))
       .groupBy(notifications.route);
+
+    return unread.map(({ route, count }) => ({
+      route,
+      count: typeof count === "number" ? count : Number(count) || 0,
+    }));
   }
 
   async listCoachAssignments(): Promise<CoachAssignment[]> {
