@@ -50,6 +50,9 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
       if (!res.ok) throw new Error("Failed to fetch coach overview");
       return res.json();
     },
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   const { data: formations = [] } = useQuery<Formation[]>({
@@ -101,7 +104,12 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
   });
 
   const coachees = overview?.coachees ?? [];
-  const interests = overview?.interests ?? [];
+  const interests = useMemo(() => {
+    return (overview?.interests ?? []).map((interest) => ({
+      ...interest,
+      coachStatus: interest.coachStatus ?? "pending",
+    }));
+  }, [overview?.interests]);
   const registrations = overview?.registrations ?? [];
   const coachValidationOnly = overview?.settings.coachValidationOnly ?? false;
 
