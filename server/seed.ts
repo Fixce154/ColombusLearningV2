@@ -52,6 +52,16 @@ async function seed() {
         p2Used: 0,
       },
       {
+        email: "thomas.petit@colombus.fr",
+        password: "password",
+        name: "Thomas Petit",
+        roles: ["consultant"],
+        seniority: "junior",
+        businessUnit: "Finance",
+        p1Used: 0,
+        p2Used: 0,
+      },
+      {
         email: "pierre.bernard@colombus.fr",
         password: "password",
         name: "Pierre Bernard",
@@ -72,10 +82,20 @@ async function seed() {
         p2Used: 0,
       },
       {
+        email: "laure.rousseau@colombus.fr",
+        password: "password",
+        name: "Laure Rousseau",
+        roles: ["consultant"],
+        seniority: "expert",
+        businessUnit: "Conseil",
+        p1Used: 0,
+        p2Used: 0,
+      },
+      {
         email: "jean.dubois@colombus.fr",
         password: "password",
         name: "Jean Dubois",
-        roles: ["consultant", "manager", "coach"], // Un manager est aussi consultant et peut être coach
+        roles: ["consultant", "manager", "coach"],
         seniority: "senior",
         businessUnit: "Digital",
         p1Used: 0,
