@@ -551,7 +551,7 @@ export default function ConsultantManagement() {
               </div>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>Les types d’accès multiples peuvent être séparés par une virgule ou un point-virgule.</li>
-                <li>Un mot de passe temporaire est généré pour chaque profil créé.</li>
+                <li>Un mot de passe temporaire est généré pour chaque profil créé "Colombus138".</li>
               </ul>
             </div>
             <div className="w-full max-w-sm space-y-3">
