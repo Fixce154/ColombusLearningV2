@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -637,25 +638,24 @@ export default function SessionManagement() {
                                   <h5 className="text-sm font-semibold text-foreground">Inscrire un collaborateur</h5>
                                   <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end">
                                     <div className="flex-1">
-                                      <FormLabel>Consultant</FormLabel>
+                                      <Label htmlFor={`select-user-${session.id}`}>Consultant</Label>
                                       <Select
                                         onValueChange={(value) => updateRegistrationDraft(session.id, { userId: value })}
                                         value={draft.userId}
                                       >
-                                        <FormControl>
-                                          <SelectTrigger
-                                            data-testid={`select-user-${session.id}`}
-                                            disabled={availableCandidates.length === 0}
-                                          >
-                                            <SelectValue
-                                              placeholder={
-                                                availableCandidates.length === 0
-                                                  ? "Aucun consultant disponible"
-                                                  : "Choisir un consultant"
-                                              }
-                                            />
-                                          </SelectTrigger>
-                                        </FormControl>
+                                        <SelectTrigger
+                                          id={`select-user-${session.id}`}
+                                          data-testid={`select-user-${session.id}`}
+                                          disabled={availableCandidates.length === 0}
+                                        >
+                                          <SelectValue
+                                            placeholder={
+                                              availableCandidates.length === 0
+                                                ? "Aucun consultant disponible"
+                                                : "Choisir un consultant"
+                                            }
+                                          />
+                                        </SelectTrigger>
                                         <SelectContent>
                                           {availableCandidates.length === 0 ? (
                                             <div className="px-2 py-1 text-sm text-muted-foreground">
@@ -674,18 +674,19 @@ export default function SessionManagement() {
                                       </Select>
                                     </div>
                                     <div className="md:w-40">
-                                      <FormLabel>Priorité</FormLabel>
+                                      <Label htmlFor={`select-priority-${session.id}`}>Priorité</Label>
                                       <Select
                                         onValueChange={(value: "P1" | "P2" | "P3") =>
                                           updateRegistrationDraft(session.id, { priority: value })
                                         }
                                         value={draft.priority}
                                       >
-                                        <FormControl>
-                                          <SelectTrigger data-testid={`select-priority-${session.id}`}>
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                        </FormControl>
+                                        <SelectTrigger
+                                          id={`select-priority-${session.id}`}
+                                          data-testid={`select-priority-${session.id}`}
+                                        >
+                                          <SelectValue />
+                                        </SelectTrigger>
                                         <SelectContent>
                                           <SelectItem value="P1">Priorité P1</SelectItem>
                                           <SelectItem value="P2">Priorité P2</SelectItem>
