@@ -104,7 +104,12 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
   });
 
   const coachees = overview?.coachees ?? [];
-  const interests = overview?.interests ?? [];
+  const interests = useMemo(() => {
+    return (overview?.interests ?? []).map((interest) => ({
+      ...interest,
+      coachStatus: interest.coachStatus ?? "pending",
+    }));
+  }, [overview?.interests]);
   const registrations = overview?.registrations ?? [];
   const coachValidationOnly = overview?.settings.coachValidationOnly ?? false;
 
