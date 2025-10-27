@@ -17,6 +17,10 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
+  employeeId: text("employee_id"),
+  hireDate: timestamp("hire_date"),
+  grade: text("grade"),
+  jobRole: text("job_role"),
   roles: text("roles").array().notNull(), // consultant, rh, formateur, formateur_externe, manager
   seniority: text("seniority"), // junior, confirme, senior, expert
   businessUnit: text("business_unit"),

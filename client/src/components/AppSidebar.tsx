@@ -144,7 +144,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
           { title: "Formations", url: "/formations", icon: BookOpen },
           { title: "Sessions", url: "/sessions", icon: Calendar },
           { title: "Intentions", url: "/interests", icon: Heart },
-          { title: "Consultants", url: "/consultants", icon: Users },
+          { title: "Collaborateurs", url: "/consultants", icon: Users },
           { title: "Data visualisation", url: "/data-visualisation", icon: BarChart },
         ],
       });
