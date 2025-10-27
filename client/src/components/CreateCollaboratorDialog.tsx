@@ -24,6 +24,7 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { SENIORITY_LEVELS, type SeniorityLevel } from "@shared/schema";
 
 const createCollaboratorSchema = z
   .object({
@@ -35,7 +36,7 @@ const createCollaboratorSchema = z
     confirmPassword: z.string().min(6, "Veuillez confirmer le mot de passe"),
     employeeId: z.string().optional(),
     hireDate: z.string().optional(),
-    grade: z.string().optional(),
+    seniority: z.enum(SENIORITY_LEVELS).optional(),
     jobRole: z.string().optional(),
     businessUnit: z.string().optional(),
     additionalAccess: z.array(z.enum(["rh", "coach"])).optional(),
@@ -43,6 +44,23 @@ const createCollaboratorSchema = z
   .refine((data) => data.password === data.confirmPassword, {
     path: ["confirmPassword"],
     message: "Les mots de passe ne correspondent pas",
+  })
+  .superRefine((data, ctx) => {
+    if (data.accountType === "collaborateur" && !data.seniority) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["seniority"],
+        message: "Veuillez sélectionner une séniorité",
+      });
+    }
+
+    if (data.accountType !== "collaborateur" && data.seniority) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["seniority"],
+        message: "La séniorité ne s'applique qu'aux collaborateurs",
+      });
+    }
   });
 
 export type CreateCollaboratorFormData = z.infer<typeof createCollaboratorSchema>;
@@ -77,7 +95,7 @@ export default function CreateCollaboratorDialog({ open, onOpenChange }: CreateC
       confirmPassword: "",
       employeeId: "",
       hireDate: "",
-      grade: "",
+      seniority: SENIORITY_LEVELS[0],
       jobRole: "",
       businessUnit: "",
       additionalAccess: [],
@@ -85,6 +103,7 @@ export default function CreateCollaboratorDialog({ open, onOpenChange }: CreateC
   });
 
   const accountType = form.watch("accountType");
+  const seniority = form.watch("seniority");
   const isCollaborator = accountType === "collaborateur";
 
   const mutation = useMutation({
@@ -125,7 +144,7 @@ export default function CreateCollaboratorDialog({ open, onOpenChange }: CreateC
         roles: Array.from(accessSet),
         employeeId: data.employeeId?.trim() ? data.employeeId.trim() : undefined,
         hireDate: hireDateValue,
-        grade: data.grade?.trim() ? data.grade.trim() : undefined,
+        seniority: data.seniority ?? undefined,
         jobRole: data.jobRole?.trim() ? data.jobRole.trim() : undefined,
         businessUnit: data.businessUnit?.trim() ? data.businessUnit.trim() : undefined,
       });
@@ -158,11 +177,14 @@ export default function CreateCollaboratorDialog({ open, onOpenChange }: CreateC
     if (!isCollaborator) {
       form.setValue("employeeId", "");
       form.setValue("hireDate", "");
-      form.setValue("grade", "");
+      form.setValue("seniority", undefined);
       form.setValue("jobRole", "");
       form.setValue("additionalAccess", []);
     }
-  }, [isCollaborator, form]);
+    if (isCollaborator && !seniority) {
+      form.setValue("seniority", SENIORITY_LEVELS[0]);
+    }
+  }, [form, isCollaborator, seniority]);
 
   const accessOptions = useMemo<AdditionalAccess[]>(() => (isCollaborator ? ["rh", "coach"] : []), [isCollaborator]);
 
@@ -288,13 +310,28 @@ export default function CreateCollaboratorDialog({ open, onOpenChange }: CreateC
 
                 <FormField
                   control={form.control}
-                  name="grade"
+                  name="seniority"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Grade</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Senior" disabled={mutation.isPending} />
-                      </FormControl>
+                      <FormLabel>Séniorité</FormLabel>
+                      <Select
+                        value={field.value ?? undefined}
+                        onValueChange={(value) => field.onChange(value as SeniorityLevel)}
+                        disabled={mutation.isPending}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner une séniorité" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {SENIORITY_LEVELS.map((level) => (
+                            <SelectItem key={level} value={level}>
+                              {level}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

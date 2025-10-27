@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -23,20 +23,38 @@ import {
 import { Input } from "@/components/ui/input";
 import { GraduationCap, AlertCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { User } from "@shared/schema";
+import { SENIORITY_LEVELS, type SeniorityLevel, type User } from "@shared/schema";
 
 const loginSchema = z.object({
   email: z.string().email("Email invalide"),
   password: z.string().min(1, "Mot de passe requis"),
 });
 
-const registerSchema = z.object({
-  email: z.string().email("Email invalide"),
-  password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
-  name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
-  role: z.enum(["consultant", "rh"]),
-  seniority: z.enum(["junior", "confirme", "senior", "expert"]).optional(),
-});
+const registerSchema = z
+  .object({
+    email: z.string().email("Email invalide"),
+    password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
+    name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
+    role: z.enum(["consultant", "rh"]),
+    seniority: z.enum(SENIORITY_LEVELS).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.role === "consultant" && !data.seniority) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["seniority"],
+        message: "La séniorité est requise pour les consultants",
+      });
+    }
+
+    if (data.role !== "consultant" && data.seniority) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["seniority"],
+        message: "La séniorité ne concerne que les consultants",
+      });
+    }
+  });
 
 type LoginFormData = z.infer<typeof loginSchema>;
 type RegisterFormData = z.infer<typeof registerSchema>;
@@ -64,9 +82,22 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       password: "",
       name: "",
       role: "consultant",
-      seniority: "junior",
+      seniority: SENIORITY_LEVELS[0],
     },
   });
+
+  const selectedRole = registerForm.watch("role");
+  const selectedSeniority = registerForm.watch("seniority");
+
+  useEffect(() => {
+    if (selectedRole !== "consultant" && selectedSeniority) {
+      registerForm.setValue("seniority", undefined);
+    }
+
+    if (selectedRole === "consultant" && !selectedSeniority) {
+      registerForm.setValue("seniority", SENIORITY_LEVELS[0]);
+    }
+  }, [registerForm, selectedRole, selectedSeniority]);
 
   const onLogin = async (data: LoginFormData) => {
     setError(null);
@@ -303,17 +334,24 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Séniorité</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select
+                        onValueChange={(value) =>
+                          field.onChange(value as SeniorityLevel)
+                        }
+                        value={field.value ?? undefined}
+                        disabled={isLoading || selectedRole !== "consultant"}
+                      >
                         <FormControl>
                           <SelectTrigger data-testid="select-seniority">
                             <SelectValue placeholder="Sélectionnez votre niveau" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="junior">Junior</SelectItem>
-                          <SelectItem value="confirme">Confirmé</SelectItem>
-                          <SelectItem value="senior">Senior</SelectItem>
-                          <SelectItem value="expert">Expert</SelectItem>
+                          {SENIORITY_LEVELS.map((level) => (
+                            <SelectItem key={level} value={level}>
+                              {level}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
