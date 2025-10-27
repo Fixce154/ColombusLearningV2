@@ -50,6 +50,9 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
       if (!res.ok) throw new Error("Failed to fetch coach overview");
       return res.json();
     },
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   const { data: formations = [] } = useQuery<Formation[]>({

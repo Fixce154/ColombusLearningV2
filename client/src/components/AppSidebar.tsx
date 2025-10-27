@@ -18,7 +18,7 @@ import type { User } from "@shared/schema";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useNotifications } from "@/hooks/use-notifications";
+import { useMarkNotificationsRead, useNotifications } from "@/hooks/use-notifications";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,6 +64,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
     null,
   );
   const { data: notificationsData } = useNotifications();
+  const markNotificationsRead = useMarkNotificationsRead();
   const unreadCounts = notificationsData?.unreadCounts ?? {};
 
   const becomeInstructorMutation = useMutation({
@@ -381,7 +382,12 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
                           key={item.title}
                           href={item.url}
                           data-testid={`link-${item.url.slice(1) || "home"}`}
-                          onClick={() => setIsSectionDialogOpen(false)}
+                          onClick={() => {
+                            if (itemUnread > 0) {
+                              markNotificationsRead.mutate({ route: item.url });
+                            }
+                            setIsSectionDialogOpen(false);
+                          }}
                           className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                             isCurrentLocation
                               ? "bg-[#00313F]/10 text-[#00313F]"
