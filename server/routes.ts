@@ -29,6 +29,7 @@ import { randomBytes, randomUUID } from "crypto";
 const PgSession = connectPgSimple(session);
 
 const COACH_VALIDATION_SETTING_KEY = "coach_validation_only";
+const FORMATION_REVIEWS_VISIBILITY_SETTING_KEY = "formation_reviews_visible";
 
 const ZIP_LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;
 const ZIP_CENTRAL_DIR_SIGNATURE = 0x02014b50;
@@ -57,6 +58,19 @@ const attendanceTokenRequestSchema = z.object({
 
 const attendanceSignSchema = z.object({
   token: z.string().min(1, "Le jeton est obligatoire"),
+});
+
+const formationReviewInputSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  comment: z
+    .string()
+    .trim()
+    .max(1000, "Le commentaire doit contenir au maximum 1000 caractères")
+    .optional(),
+});
+
+const reviewVisibilitySchema = z.object({
+  visible: z.boolean(),
 });
 
 const sanitizeMaterial = (material: FormationMaterial) => ({
@@ -420,6 +434,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to create notification", error);
     }
+  };
+
+  const enrichFormationsWithRatings = async (
+    formationsList: Formation[]
+  ): Promise<Array<Formation & { averageRating: number | null; reviewCount: number }>> => {
+    if (formationsList.length === 0) {
+      return formationsList.map((formation) => ({
+        ...formation,
+        averageRating: null,
+        reviewCount: 0,
+      }));
+    }
+
+    const stats = await storage.getFormationReviewStats(
+      formationsList.map((formation) => formation.id)
+    );
+    const statsMap = new Map(
+      stats.map((stat) => [stat.formationId, stat] as const)
+    );
+
+    return formationsList.map((formation) => {
+      const stat = statsMap.get(formation.id);
+      const reviewCount = stat?.reviewCount ?? 0;
+      const averageRating =
+        stat && reviewCount > 0
+          ? Math.round((stat.averageRating + Number.EPSILON) * 10) / 10
+          : null;
+
+      return {
+        ...formation,
+        averageRating,
+        reviewCount,
+      };
+    });
   };
 
   // Authentication Routes
@@ -1505,6 +1553,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/reviews-visibility", async (_req, res) => {
+    try {
+      const visibleSetting = await storage.getSetting<boolean>(
+        FORMATION_REVIEWS_VISIBILITY_SETTING_KEY
+      );
+      res.json({ reviewsVisible: visibleSetting ?? true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get(
     "/api/admin/settings/coach-validation",
     requireAuth,
@@ -1550,12 +1609,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
+  app.patch(
+    "/api/admin/settings/reviews-visibility",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const userId = (req as AuthRequest).userId!;
+        const user = await storage.getUser(userId);
+
+        if (!user || !user.roles.includes("rh")) {
+          return res.status(403).json({ message: "Unauthorized" });
+        }
+
+        const data = reviewVisibilitySchema.parse(req.body);
+        await storage.setSetting(
+          FORMATION_REVIEWS_VISIBILITY_SETTING_KEY,
+          data.visible
+        );
+
+        res.json({ reviewsVisible: data.visible });
+      } catch (error: any) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({
+            message: "Données invalides",
+            errors: error.errors,
+          });
+        }
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
   // Formation Routes
   app.get("/api/formations", optionalAuth, async (req, res) => {
     try {
       const activeOnly = req.query.active !== "false";
       const formations = await storage.listFormations(activeOnly);
-      res.json(formations);
+      const formationsWithRatings = await enrichFormationsWithRatings(formations);
+      res.json(formationsWithRatings);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1567,8 +1658,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!formation) {
         return res.status(404).json({ message: "Formation not found" });
       }
-      res.json(formation);
+      const [enriched] = await enrichFormationsWithRatings([formation]);
+      res.json(enriched);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/formations/:id/reviews", optionalAuth, async (req, res) => {
+    try {
+      const formation = await storage.getFormation(req.params.id);
+      if (!formation) {
+        return res.status(404).json({ message: "Formation not found" });
+      }
+
+      const visibleSetting = await storage.getSetting<boolean>(
+        FORMATION_REVIEWS_VISIBILITY_SETTING_KEY
+      );
+      const reviewsVisible = visibleSetting ?? true;
+
+      if (!reviewsVisible) {
+        const viewerId = (req as AuthRequest).userId;
+        const viewer = viewerId ? await storage.getUser(viewerId) : undefined;
+        if (viewer && viewer.roles.includes("rh")) {
+          const reviews = await storage.listFormationReviewsWithUsers(req.params.id);
+          return res.json({ reviewsVisible, reviews });
+        }
+
+        if (viewerId) {
+          const personalReview = await storage.getFormationReviewForUser(
+            req.params.id,
+            viewerId
+          );
+          if (personalReview) {
+            return res.json({
+              reviewsVisible: false,
+              reviews: [
+                {
+                  ...personalReview,
+                  reviewerName: viewer?.name ?? "Vous",
+                },
+              ],
+            });
+          }
+        }
+        return res.json({ reviewsVisible: false, reviews: [] });
+      }
+
+      const reviews = await storage.listFormationReviewsWithUsers(req.params.id);
+      res.json({ reviewsVisible: true, reviews });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/formations/:id/reviews", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "Utilisateur introuvable" });
+      }
+
+      const formation = await storage.getFormation(req.params.id);
+      if (!formation) {
+        return res.status(404).json({ message: "Formation not found" });
+      }
+
+      const data = formationReviewInputSchema.parse(req.body);
+      const comment = data.comment?.trim();
+
+      const registrations = await storage.listRegistrations(userId);
+      const hasCompletedFormation = registrations.some(
+        (registration) =>
+          registration.formationId === req.params.id &&
+          registration.status === "completed"
+      );
+
+      if (!hasCompletedFormation) {
+        return res.status(403).json({
+          message:
+            "Vous devez avoir terminé cette formation pour laisser un avis.",
+        });
+      }
+
+      const review = await storage.upsertFormationReview({
+        formationId: req.params.id,
+        userId,
+        rating: data.rating,
+        comment: comment && comment.length > 0 ? comment : null,
+      });
+
+      res.status(201).json({
+        review: {
+          ...review,
+          reviewerName: user.name,
+        },
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res
+          .status(400)
+          .json({ message: "Données invalides", errors: error.errors });
+      }
       res.status(500).json({ message: error.message });
     }
   });
@@ -1819,7 +2011,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
-      
+
       if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
@@ -1835,6 +2027,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message });
     }
   });
+
+  app.get("/api/admin/formation-reviews", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const reviews = await storage.listAllFormationReviewsWithDetails();
+      res.json(reviews);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete(
+    "/api/admin/formation-reviews/:id",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const userId = (req as AuthRequest).userId!;
+        const user = await storage.getUser(userId);
+
+        if (!user || !user.roles.includes("rh")) {
+          return res.status(403).json({ message: "Unauthorized" });
+        }
+
+        const deleted = await storage.deleteFormationReview(req.params.id);
+        if (!deleted) {
+          return res.status(404).json({ message: "Avis introuvable" });
+        }
+
+        res.status(204).send();
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
 
   // Session Routes
   app.get("/api/sessions", optionalAuth, async (req, res) => {

@@ -2,11 +2,11 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import SearchBar from "@/components/SearchBar";
 import FilterPanel from "@/components/FilterPanel";
-import TrainingCard from "@/components/TrainingCard";
+import TrainingCard, { FormationWithRating } from "@/components/TrainingCard";
 import { Card } from "@/components/ui/card";
 import { BookOpen, Calendar, CheckCircle, Layers, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
-import type { Formation, Session, Registration } from "@shared/schema";
+import type { Session, Registration } from "@shared/schema";
 
 export default function Catalog() {
   const [, setLocation] = useLocation();
@@ -16,7 +16,7 @@ export default function Catalog() {
   const [selectedSeniority, setSelectedSeniority] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const { data: formations = [], isLoading: isLoadingFormations } = useQuery<Formation[]>({
+  const { data: formations = [], isLoading: isLoadingFormations } = useQuery<FormationWithRating[]>({
     queryKey: ["/api/formations"],
   });
 
@@ -32,6 +32,12 @@ export default function Catalog() {
   const { data: registrations = [], isLoading: isLoadingRegistrations } = useQuery<Registration[]>({
     queryKey: ["/api/registrations"],
   });
+
+  const { data: reviewSettings } = useQuery<{ reviewsVisible: boolean }>({
+    queryKey: ["/api/settings/reviews-visibility"],
+  });
+
+  const reviewsVisible = reviewSettings?.reviewsVisible ?? true;
 
   const filteredFormations = useMemo(() => {
     return formations.filter((formation) => {
@@ -180,6 +186,7 @@ export default function Catalog() {
                   formation={formation}
                   nextSessionDate={getNextSession(formation.id)}
                   onViewDetails={() => setLocation(`/training/${formation.id}`)}
+                  reviewsVisible={reviewsVisible}
                 />
               ))}
             </div>

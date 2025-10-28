@@ -5,14 +5,31 @@ import ModalityBadge from "./ModalityBadge";
 import SeniorityBadge from "./SeniorityBadge";
 import { Clock, Calendar, ArrowRight } from "lucide-react";
 import type { Formation } from "@shared/schema";
+import RatingStars from "./RatingStars";
+
+export type FormationWithRating = Formation & {
+  averageRating?: number | null;
+  reviewCount?: number;
+};
 
 interface TrainingCardProps {
-  formation: Formation;
+  formation: FormationWithRating;
   nextSessionDate?: Date;
   onViewDetails: () => void;
+  reviewsVisible?: boolean;
 }
 
-export default function TrainingCard({ formation, nextSessionDate, onViewDetails }: TrainingCardProps) {
+export default function TrainingCard({
+  formation,
+  nextSessionDate,
+  onViewDetails,
+  reviewsVisible = true,
+}: TrainingCardProps) {
+  const hasRatings =
+    reviewsVisible &&
+    typeof formation.averageRating === "number" &&
+    (formation.reviewCount ?? 0) > 0;
+
   return (
     <Card
       className="surface-soft group flex h-full cursor-pointer flex-col justify-between rounded-3xl p-6 transition-transform duration-300 hover:-translate-y-1"
@@ -30,6 +47,16 @@ export default function TrainingCard({ formation, nextSessionDate, onViewDetails
             {formation.title}
           </h3>
           <p className="text-sm leading-relaxed text-muted-foreground line-clamp-3">{formation.description}</p>
+          {hasRatings && (
+            <div className="flex items-center gap-2">
+              <RatingStars value={formation.averageRating ?? 0} size="sm" />
+              <span className="text-xs font-medium text-muted-foreground">
+                {formation.averageRating?.toFixed(1)}
+                <span className="mx-1 text-muted-foreground/40">•</span>
+                {formation.reviewCount} avis
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
