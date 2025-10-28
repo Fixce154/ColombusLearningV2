@@ -34,11 +34,14 @@ const loginSchema = z.object({
 
 const registerSchema = z
   .object({
+    firstName: z.string().min(1, "Le prénom est requis"),
+    lastName: z.string().min(1, "Le nom est requis"),
     email: z.string().email("Email invalide"),
     password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
-    name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
     role: z.enum(["consultant", "rh"]),
     seniority: z.enum(SENIORITY_LEVELS).optional(),
+    employeeId: z.string().optional(),
+    hireDate: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.role === "consultant" && !data.seniority) {
@@ -80,11 +83,14 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const registerForm = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
+      firstName: "",
+      lastName: "",
       email: "",
       password: "",
-      name: "",
       role: "consultant",
       seniority: SENIORITY_LEVELS[0],
+      employeeId: "",
+      hireDate: "",
     },
   });
 
@@ -121,7 +127,31 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setIsLoading(true);
 
     try {
-      const response: { user: User } = await apiRequest("/api/auth/register", "POST", data);
+      const payload: Record<string, unknown> = {
+        email: data.email.trim(),
+        password: data.password,
+        role: data.role,
+        name: `${data.firstName.trim()} ${data.lastName.trim()}`.trim(),
+      };
+
+      const employeeId = data.employeeId?.trim();
+      if (employeeId) {
+        payload.employeeId = employeeId;
+      }
+
+      const hireDate = data.hireDate?.trim();
+      if (hireDate) {
+        const parsedDate = new Date(hireDate);
+        if (!Number.isNaN(parsedDate.getTime())) {
+          payload.hireDate = parsedDate.toISOString();
+        }
+      }
+
+      if (data.seniority && data.role === "consultant") {
+        payload.seniority = data.seniority;
+      }
+
+      const response: { user: User } = await apiRequest("/api/auth/register", "POST", payload);
       onLoginSuccess(response.user);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     } catch (err: any) {
@@ -258,24 +288,45 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <TabsContent value="register" className="mt-8 space-y-4">
             <Form {...registerForm}>
               <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
-                <FormField
-                  control={registerForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nom complet</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="Jean Dupont"
-                          data-testid="input-name"
-                          disabled={isLoading}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField
+                    control={registerForm.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nom</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Dupont"
+                            data-testid="input-last-name"
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={registerForm.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Prénom</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Jean"
+                            data-testid="input-first-name"
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={registerForm.control}
@@ -316,6 +367,46 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                     </FormItem>
                   )}
                 />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField
+                    control={registerForm.control}
+                    name="employeeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Matricule (optionnel)</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="CLB1234"
+                            data-testid="input-employee-id"
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={registerForm.control}
+                    name="hireDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date d'entrée (optionnel)</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="date"
+                            data-testid="input-hire-date"
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={registerForm.control}

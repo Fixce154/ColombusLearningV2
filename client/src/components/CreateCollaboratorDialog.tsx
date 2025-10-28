@@ -36,8 +36,8 @@ const createCollaboratorSchema = z
     confirmPassword: z.string().min(6, "Veuillez confirmer le mot de passe"),
     employeeId: z.string().optional(),
     hireDate: z.string().optional(),
+    role: z.enum(["consultant", "rh"]).optional(),
     seniority: z.enum(SENIORITY_LEVELS).optional(),
-    jobRole: z.string().optional(),
     businessUnit: z.string().optional(),
     additionalAccess: z.array(z.enum(["rh", "coach"])).optional(),
   })
@@ -46,6 +46,14 @@ const createCollaboratorSchema = z
     message: "Les mots de passe ne correspondent pas",
   })
   .superRefine((data, ctx) => {
+    if (data.accountType === "collaborateur" && !data.role) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["role"],
+        message: "Veuillez sélectionner un rôle",
+      });
+    }
+
     if (data.accountType === "collaborateur" && !data.seniority) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -54,11 +62,13 @@ const createCollaboratorSchema = z
       });
     }
 
-    if (data.accountType !== "collaborateur" && data.seniority) {
+    if (data.accountType !== "collaborateur" && (data.seniority || data.role)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["seniority"],
-        message: "La séniorité ne s'applique qu'aux collaborateurs",
+        path: data.seniority ? ["seniority"] : ["role"],
+        message: data.seniority
+          ? "La séniorité ne s'applique qu'aux collaborateurs"
+          : "Le rôle est réservé aux collaborateurs",
       });
     }
   });
@@ -95,8 +105,8 @@ export default function CreateCollaboratorDialog({ open, onOpenChange }: CreateC
       confirmPassword: "",
       employeeId: "",
       hireDate: "",
+      role: "consultant",
       seniority: SENIORITY_LEVELS[0],
-      jobRole: "",
       businessUnit: "",
       additionalAccess: [],
     },
@@ -104,6 +114,7 @@ export default function CreateCollaboratorDialog({ open, onOpenChange }: CreateC
 
   const accountType = form.watch("accountType");
   const seniority = form.watch("seniority");
+  const selectedRole = form.watch("role");
   const isCollaborator = accountType === "collaborateur";
 
   const mutation = useMutation({
@@ -111,6 +122,9 @@ export default function CreateCollaboratorDialog({ open, onOpenChange }: CreateC
       const accessSet = new Set<string>();
 
       if (data.accountType === "collaborateur") {
+        if (data.role === "rh") {
+          accessSet.add("rh");
+        }
         accessSet.add("consultant");
       }
 
@@ -145,7 +159,6 @@ export default function CreateCollaboratorDialog({ open, onOpenChange }: CreateC
         employeeId: data.employeeId?.trim() ? data.employeeId.trim() : undefined,
         hireDate: hireDateValue,
         seniority: data.seniority ?? undefined,
-        jobRole: data.jobRole?.trim() ? data.jobRole.trim() : undefined,
         businessUnit: data.businessUnit?.trim() ? data.businessUnit.trim() : undefined,
       });
     },
@@ -178,13 +191,23 @@ export default function CreateCollaboratorDialog({ open, onOpenChange }: CreateC
       form.setValue("employeeId", "");
       form.setValue("hireDate", "");
       form.setValue("seniority", undefined);
-      form.setValue("jobRole", "");
+      form.setValue("role", undefined);
       form.setValue("additionalAccess", []);
+    } else {
+      const role = form.getValues("role");
+      if (!role) {
+        form.setValue("role", "consultant");
+      }
+
+      if (role === "consultant" && !seniority) {
+        form.setValue("seniority", SENIORITY_LEVELS[0]);
+      }
+
+      if (role && role !== "consultant") {
+        form.setValue("seniority", undefined);
+      }
     }
-    if (isCollaborator && !seniority) {
-      form.setValue("seniority", SENIORITY_LEVELS[0]);
-    }
-  }, [form, isCollaborator, seniority]);
+  }, [form, isCollaborator, seniority, selectedRole]);
 
   const accessOptions = useMemo<AdditionalAccess[]>(() => (isCollaborator ? ["rh", "coach"] : []), [isCollaborator]);
 
@@ -316,8 +339,10 @@ export default function CreateCollaboratorDialog({ open, onOpenChange }: CreateC
                       <FormLabel>Séniorité</FormLabel>
                       <Select
                         value={field.value ?? undefined}
-                        onValueChange={(value) => field.onChange(value as SeniorityLevel)}
-                        disabled={mutation.isPending}
+                      onValueChange={(value) => field.onChange(value as SeniorityLevel)}
+                        disabled={
+                          mutation.isPending || selectedRole !== "consultant"
+                        }
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -332,20 +357,32 @@ export default function CreateCollaboratorDialog({ open, onOpenChange }: CreateC
                           ))}
                         </SelectContent>
                       </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
                 <FormField
                   control={form.control}
-                  name="jobRole"
+                  name="role"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Rôle</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Consultant data" disabled={mutation.isPending} />
-                      </FormControl>
+                      <Select
+                        value={field.value ?? undefined}
+                        onValueChange={(value) => field.onChange(value as CreateCollaboratorFormData["role"])}
+                        disabled={mutation.isPending}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner un rôle" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="consultant">Consultant</SelectItem>
+                          <SelectItem value="rh">Fonction transverse</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

@@ -44,11 +44,13 @@ import {
   Download,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type {
-  User,
-  Session,
-  Registration,
-  FormationInterest,
+import {
+  SENIORITY_LEVELS,
+  type SeniorityLevel,
+  type User,
+  type Session,
+  type Registration,
+  type FormationInterest,
 } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
@@ -85,6 +87,43 @@ type FormationReviewWithUser = {
 type FormationReviewsResponse = {
   reviewsVisible: boolean;
   reviews: FormationReviewWithUser[];
+};
+
+const SENIORITY_CATEGORY_ORDER = ["junior", "confirme", "senior", "expert"] as const;
+
+const SENIORITY_CATEGORY_MAP: Record<SeniorityLevel, (typeof SENIORITY_CATEGORY_ORDER)[number]> = {
+  Stagiaire: "junior",
+  Alternant: "junior",
+  Junior: "junior",
+  Senior: "confirme",
+  "Supervising Senior": "senior",
+  Manager: "senior",
+  "Super Manager": "senior",
+  Directeur: "expert",
+  Partner: "expert",
+  "Senior Partner": "expert",
+};
+
+const mapSeniorityToCategory = (value: string | null | undefined): (typeof SENIORITY_CATEGORY_ORDER)[number] => {
+  if (!value) {
+    return "junior";
+  }
+
+  if (SENIORITY_LEVELS.includes(value as SeniorityLevel)) {
+    return SENIORITY_CATEGORY_MAP[value as SeniorityLevel];
+  }
+
+  return "junior";
+};
+
+const normalizeRequiredSeniority = (value: string | null | undefined): (typeof SENIORITY_CATEGORY_ORDER)[number] => {
+  if (!value) {
+    return "junior";
+  }
+
+  return (SENIORITY_CATEGORY_ORDER as readonly string[]).includes(value)
+    ? (value as (typeof SENIORITY_CATEGORY_ORDER)[number])
+    : "junior";
 };
 
 export default function TrainingDetail({ currentUser: _currentUser }: TrainingDetailProps) {
@@ -430,9 +469,10 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
     );
   }
 
-  const seniorityLevels = ["junior", "confirme", "senior", "expert"];
-  const userSeniorityLevel = seniorityLevels.indexOf(currentUser.seniority || "junior");
-  const requiredSeniorityLevel = seniorityLevels.indexOf(formation.seniorityRequired || "junior");
+  const userSeniorityCategory = mapSeniorityToCategory(currentUser.seniority);
+  const userSeniorityLevel = SENIORITY_CATEGORY_ORDER.indexOf(userSeniorityCategory);
+  const requiredSeniorityCategory = normalizeRequiredSeniority(formation.seniorityRequired);
+  const requiredSeniorityLevel = SENIORITY_CATEGORY_ORDER.indexOf(requiredSeniorityCategory);
   const isSeniorityMismatch = userSeniorityLevel < requiredSeniorityLevel;
 
   const confirmExpressInterest = () => {

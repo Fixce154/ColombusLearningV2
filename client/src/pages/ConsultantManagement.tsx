@@ -67,6 +67,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import CreateCollaboratorDialog from "@/components/CreateCollaboratorDialog";
 import EditExternalInstructorDialog from "@/components/EditExternalInstructorDialog";
+import EditConsultantDialog from "@/components/EditConsultantDialog";
 import { formatRoles } from "@shared/roles";
 
 type BulkUploadResult = {
@@ -95,6 +96,7 @@ export default function ConsultantManagement() {
   const [deleteDialogUser, setDeleteDialogUser] = useState<User | null>(null);
   const [showCreateCollaboratorDialog, setShowCreateCollaboratorDialog] = useState(false);
   const [editExternalInstructorId, setEditExternalInstructorId] = useState<string | null>(null);
+  const [editConsultant, setEditConsultant] = useState<User | null>(null);
   const [coachToAssign, setCoachToAssign] = useState<User | null>(null);
   const [selectedCoacheeId, setSelectedCoacheeId] = useState<string | null>(null);
   const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null);
@@ -557,8 +559,8 @@ export default function ConsultantManagement() {
               <div>
                 <h3 className="text-lg font-semibold text-foreground">Import de collaborateurs</h3>
                 <p className="text-sm text-muted-foreground">
-                  Importez un fichier Excel (.xlsx) contenant les colonnes matricule, nom, prénom, email, date d’entrée, grade,
-                  rôle et type d’accès (RH, collaborateur, coach, formateur externe).
+                  Importez un fichier Excel (.xlsx) contenant les colonnes matricule, nom, prénom, email, date d’entrée,
+                  séniorité, rôle et type d’accès (RH, collaborateur, coach, formateur externe).
                 </p>
               </div>
               <ul className="space-y-2 text-sm text-muted-foreground">
@@ -760,7 +762,7 @@ export default function ConsultantManagement() {
                       <TableHead>Prénom</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Date d'entrée</TableHead>
-                      <TableHead>Grade</TableHead>
+                      <TableHead>Séniorité</TableHead>
                       <TableHead>Rôle</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -814,11 +816,21 @@ export default function ConsultantManagement() {
                                   : "-"}
                               </TableCell>
                               <TableCell>
-                                <Badge variant="secondary">{consultant.grade || "Non défini"}</Badge>
+                                <Badge variant="secondary">
+                                  {consultant.seniority || "Non définie"}
+                                </Badge>
                               </TableCell>
                               <TableCell>{formatRoles(consultant.roles)}</TableCell>
                               <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEditConsultant(consultant)}
+                                    data-testid={`button-edit-${consultant.id}`}
+                                  >
+                                    Modifier
+                                  </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -1057,6 +1069,16 @@ export default function ConsultantManagement() {
       <CreateCollaboratorDialog
         open={showCreateCollaboratorDialog}
         onOpenChange={setShowCreateCollaboratorDialog}
+      />
+
+      <EditConsultantDialog
+        user={editConsultant}
+        open={!!editConsultant}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditConsultant(null);
+          }
+        }}
       />
 
       <EditExternalInstructorDialog
