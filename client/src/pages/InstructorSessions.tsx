@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Calendar, MapPin, Users, Clock, QrCode, RefreshCcw, Loader2 } from "lucide-react";
+import { Calendar, MapPin, Users, Clock, QrCode, RefreshCcw, Loader2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { apiRequest } from "@/lib/queryClient";
@@ -46,6 +46,7 @@ export default function InstructorSessions() {
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [tokenData, setTokenData] = useState<AttendanceTokenResponse | null>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
 
   const { data: currentUser } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
@@ -76,19 +77,23 @@ export default function InstructorSessions() {
 
   const generateTokenMutation = useMutation({
     mutationFn: async (sessionId: string) => {
+      setTokenError(null);
       return apiRequest(`/api/sessions/${sessionId}/attendance-token`, "POST", {});
     },
     onSuccess: (response: AttendanceTokenResponse) => {
       setTokenData(response);
+      setTokenError(null);
       toast({
         title: "QR Code généré",
         description: "Partagez ce code avec vos stagiaires pour enregistrer leur présence.",
       });
     },
     onError: (error: any) => {
+      const errorMessage = error?.message || "Impossible de générer le QR Code";
+      setTokenError(errorMessage);
       toast({
         title: "Erreur",
-        description: error?.message || "Impossible de générer le QR Code",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -112,6 +117,7 @@ export default function InstructorSessions() {
     setSelectedSession(session);
     setIsDialogOpen(true);
     setTokenData(null);
+    setTokenError(null);
     generateTokenMutation.mutate(session.id);
   };
 
@@ -250,6 +256,7 @@ export default function InstructorSessions() {
           if (!open) {
             setSelectedSession(null);
             setTokenData(null);
+            setTokenError(null);
           }
         }}
       >
@@ -279,21 +286,40 @@ export default function InstructorSessions() {
                         </p>
                       </div>
                     </>
+                  ) : tokenError ? (
+                    <div className="flex h-[220px] w-full flex-col items-center justify-center gap-4 p-4">
+                      <div className="flex flex-col items-center gap-2 text-center">
+                        <AlertCircle className="w-12 h-12 text-destructive" />
+                        <p className="text-sm font-medium text-destructive">Impossible de générer le QR Code</p>
+                        <p className="text-xs text-muted-foreground">{tokenError}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => selectedSession && generateTokenMutation.mutate(selectedSession.id)}
+                        disabled={generateTokenMutation.isPending}
+                      >
+                        <RefreshCcw className="w-4 h-4" />
+                        Réessayer
+                      </Button>
+                    </div>
                   ) : (
                     <div className="flex h-[220px] w-full items-center justify-center">
                       <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                     </div>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => selectedSession && generateTokenMutation.mutate(selectedSession.id)}
-                    disabled={generateTokenMutation.isPending}
-                  >
-                    <RefreshCcw className="w-4 h-4" />
-                    Régénérer
-                  </Button>
+                  {tokenData && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => selectedSession && generateTokenMutation.mutate(selectedSession.id)}
+                      disabled={generateTokenMutation.isPending}
+                    >
+                      <RefreshCcw className="w-4 h-4" />
+                      Régénérer
+                    </Button>
+                  )}
                 </div>
 
                 <div className="space-y-4">
