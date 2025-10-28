@@ -276,6 +276,23 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
     }
   };
 
+  // Check if user has already expressed interest for this formation (must be before early returns)
+  const existingInterest = interests.find(i => formation?.id && i.formationId === formation.id && i.status !== "withdrawn");
+  const isMaterialsForbidden = (materialsError as MaterialsQueryError | undefined)?.status === 403;
+
+  const userHasCompletedFormation = useMemo(() => {
+    if (!formation) return false;
+    return allRegistrations.some(
+      (registration) =>
+        registration.userId === currentUser.id &&
+        registration.formationId === formation.id &&
+        registration.status === "completed"
+    );
+  }, [allRegistrations, currentUser.id, formation?.id]);
+
+  const p1Available = (currentUser.p1Used || 0) < 1;
+  const p2Available = (currentUser.p2Used || 0) < 1;
+
   // Express interest mutation
   const expressInterestMutation = useMutation({
     mutationFn: async (data: { formationId: string; priority: string }) => {
@@ -463,23 +480,6 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
       comment: trimmedComment.length > 0 ? trimmedComment : undefined,
     });
   };
-
-  const p1Available = (currentUser.p1Used || 0) < 1;
-  const p2Available = (currentUser.p2Used || 0) < 1;
-
-  // Check if user has already expressed interest for this formation
-  const existingInterest = interests.find(i => i.formationId === formation.id && i.status !== "withdrawn");
-  const isMaterialsForbidden = (materialsError as MaterialsQueryError | undefined)?.status === 403;
-
-  const userHasCompletedFormation = useMemo(() => {
-    if (!formation) return false;
-    return allRegistrations.some(
-      (registration) =>
-        registration.userId === currentUser.id &&
-        registration.formationId === formation.id &&
-        registration.status === "completed"
-    );
-  }, [allRegistrations, currentUser.id, formation.id]);
 
   const canLeaveReview = userHasCompletedFormation;
 
