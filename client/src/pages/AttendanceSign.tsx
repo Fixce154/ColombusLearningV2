@@ -15,12 +15,13 @@ interface AttendanceResponse {
 }
 
 export default function AttendanceSign() {
-  const [, params] = useRoute("/attendance/:token");
+  const [, fullRouteParams] = useRoute("/attendance/:token");
+  const [, shortRouteParams] = useRoute("/a/:token");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [success, setSuccess] = useState<AttendanceResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const token = params?.token ?? "";
+  const token = fullRouteParams?.token ?? shortRouteParams?.token ?? "";
 
   const signMutation = useMutation({
     mutationFn: async () => {

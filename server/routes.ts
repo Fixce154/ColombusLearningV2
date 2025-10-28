@@ -24,7 +24,7 @@ import {
 } from "@shared/schema";
 import { INSTRUCTOR_ROLES, InstructorRole, USER_ROLES, isInstructor } from "@shared/roles";
 import { z } from "zod";
-import { randomUUID } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 
 const PgSession = connectPgSimple(session);
 
@@ -1985,7 +1985,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { expiresInMinutes } = attendanceTokenRequestSchema.parse(req.body ?? {});
       const durationMinutes = expiresInMinutes ?? 60;
       const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000);
-      const tokenValue = randomUUID();
+      const tokenValue = randomBytes(9).toString("base64url");
 
       const token = await storage.createSessionAttendanceToken({
         sessionId: session.id,
@@ -2072,7 +2072,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Session not found" });
       }
 
-      const updated = await storage.updateSession(req.params.id, req.body);
+      const validationSchema = insertSessionSchema.partial();
+      const parsed = validationSchema.parse(req.body ?? {});
+      const updates = Object.fromEntries(
+        Object.entries(parsed).filter(([, value]) => value !== undefined)
+      );
+
+      const updated = await storage.updateSession(req.params.id, updates);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
