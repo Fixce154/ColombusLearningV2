@@ -12,7 +12,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Calendar, MapPin, Users, Clock, QrCode, RefreshCcw, Loader2, AlertCircle } from "lucide-react";
+import {
+  Calendar,
+  MapPin,
+  Users,
+  Clock,
+  QrCode,
+  RefreshCcw,
+  Loader2,
+  AlertCircle,
+  Copy,
+  Check,
+} from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { apiRequest } from "@/lib/queryClient";
@@ -47,6 +58,7 @@ export default function InstructorSessions() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [tokenData, setTokenData] = useState<AttendanceTokenResponse | null>(null);
   const [tokenError, setTokenError] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const { data: currentUser } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
@@ -105,20 +117,67 @@ export default function InstructorSessions() {
     [attendees]
   );
 
-  const qrValue = useMemo(() => {
+  const qrLink = useMemo(() => {
     if (!tokenData) return "";
-    if (typeof window !== "undefined") {
-      return `${window.location.origin}/attendance/${tokenData.token}`;
+
+    const buildUrl = (origin: string | undefined) => {
+      if (!origin) return "";
+      try {
+        return new URL(`/a/${tokenData.token}`, origin).toString();
+      } catch {
+        return "";
+      }
+    };
+
+    const browserOrigin = typeof window !== "undefined" ? window.location.origin : "";
+    const fromBrowser = buildUrl(browserOrigin);
+    if (fromBrowser) {
+      return fromBrowser;
     }
-    return tokenData.token;
+
+    const envOrigin = import.meta.env?.VITE_PUBLIC_APP_URL as string | undefined;
+    const fromEnv = buildUrl(envOrigin);
+    if (fromEnv) {
+      return fromEnv;
+    }
+
+    return `/a/${tokenData.token}`;
   }, [tokenData]);
+
+  const qrValue = qrLink || tokenData?.token || "";
+
+  const handleCopyLink = async () => {
+    if (!qrLink) return;
+    try {
+      await navigator.clipboard.writeText(qrLink);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+      toast({
+        title: "Lien copié",
+        description: "Le lien de présence a été copié dans le presse-papiers.",
+      });
+    } catch (error) {
+      console.error("Unable to copy attendance link", error);
+      toast({
+        title: "Impossible de copier",
+        description: "Copiez manuellement le lien affiché ci-dessous.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleOpenDialog = (session: Session) => {
     setSelectedSession(session);
     setIsDialogOpen(true);
     setTokenData(null);
     setTokenError(null);
+    setLinkCopied(false);
     generateTokenMutation.mutate(session.id);
+  };
+
+  const handleTokenRefresh = (sessionId: string) => {
+    setLinkCopied(false);
+    generateTokenMutation.mutate(sessionId);
   };
 
   // Filter sessions where I'm the instructor
@@ -257,6 +316,7 @@ export default function InstructorSessions() {
             setSelectedSession(null);
             setTokenData(null);
             setTokenError(null);
+            setLinkCopied(false);
           }
         }}
       >
@@ -278,10 +338,33 @@ export default function InstructorSessions() {
                   {tokenData ? (
                     <>
                       <QRCodeCanvas value={qrValue} size={220} />
-                      <div className="text-center text-sm">
-                        <p className="font-medium">Code manuel</p>
-                        <p className="font-mono text-muted-foreground break-all">{tokenData.token}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
+                      <div className="space-y-3 text-center text-sm">
+                        <div className="space-y-1">
+                          <p className="font-medium">Lien direct</p>
+                          <a
+                            href={qrLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block font-mono text-xs text-primary break-all hover:underline"
+                          >
+                            {qrLink}
+                          </a>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={handleCopyLink}
+                          disabled={!qrLink}
+                        >
+                          {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          {linkCopied ? "Lien copié" : "Copier le lien"}
+                        </Button>
+                        <div>
+                          <p className="font-medium">Code manuel</p>
+                          <p className="font-mono text-xs text-muted-foreground break-all">{tokenData.token}</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
                           Expire le {format(new Date(tokenData.expiresAt), "d MMMM yyyy 'à' HH:mm", { locale: fr })}
                         </p>
                       </div>
@@ -296,7 +379,7 @@ export default function InstructorSessions() {
                       <Button
                         size="sm"
                         className="gap-2"
-                        onClick={() => selectedSession && generateTokenMutation.mutate(selectedSession.id)}
+                        onClick={() => selectedSession && handleTokenRefresh(selectedSession.id)}
                         disabled={generateTokenMutation.isPending}
                       >
                         <RefreshCcw className="w-4 h-4" />
@@ -313,7 +396,7 @@ export default function InstructorSessions() {
                       variant="outline"
                       size="sm"
                       className="gap-2"
-                      onClick={() => selectedSession && generateTokenMutation.mutate(selectedSession.id)}
+                      onClick={() => selectedSession && handleTokenRefresh(selectedSession.id)}
                       disabled={generateTokenMutation.isPending}
                     >
                       <RefreshCcw className="w-4 h-4" />

@@ -61,6 +61,7 @@ function Router({ currentUser }: { currentUser: User }) {
       <Route path="/instructor-availability" component={InstructorAvailability} />
       <Route path="/instructor-sessions" component={InstructorSessions} />
       <Route path="/attendance/:token" component={AttendanceSign} />
+      <Route path="/a/:token" component={AttendanceSign} />
       <Route path="/coach" component={() => <CoachDashboard currentUser={currentUser} />} />
       <Route component={NotFound} />
     </Switch>
