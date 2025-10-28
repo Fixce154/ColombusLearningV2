@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -55,6 +55,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Formation } from "@shared/schema";
 import { insertFormationSchema } from "@shared/schema";
 import { z } from "zod";
+import RatingStars from "@/components/RatingStars";
 
 const formationFormSchema = insertFormationSchema.extend({
   tags: z.string().optional(),
@@ -62,6 +63,17 @@ const formationFormSchema = insertFormationSchema.extend({
 });
 
 type FormationFormData = z.infer<typeof formationFormSchema>;
+
+type FormationReviewAdminEntry = {
+  id: string;
+  formationId: string;
+  userId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  reviewerName: string;
+  formationTitle: string;
+};
 
 export default function FormationManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -80,6 +92,39 @@ export default function FormationManagement() {
     refetchOnWindowFocus: true,
     staleTime: 0,
   });
+
+  const { data: reviewSettings } = useQuery<{ reviewsVisible: boolean }>({
+    queryKey: ["/api/settings/reviews-visibility"],
+  });
+
+  const reviewsVisible = reviewSettings?.reviewsVisible ?? true;
+
+  const {
+    data: allReviews = [],
+    isLoading: isLoadingReviews,
+  } = useQuery<FormationReviewAdminEntry[]>({
+    queryKey: ["/api/admin/formation-reviews"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/formation-reviews", {
+        credentials: "include",
+      });
+      if (res.status === 403) {
+        return [];
+      }
+      if (!res.ok) {
+        throw new Error("Impossible de charger les avis");
+      }
+      return res.json();
+    },
+  });
+
+  const sortedReviews = useMemo(
+    () =>
+      [...allReviews].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [allReviews]
+  );
 
   const form = useForm<FormationFormData>({
     resolver: zodResolver(formationFormSchema),
@@ -170,6 +215,54 @@ export default function FormationManagement() {
         variant: "destructive",
         title: "Erreur",
         description: error.message || "Impossible de supprimer la formation",
+      });
+    },
+  });
+
+  const toggleReviewVisibilityMutation = useMutation({
+    mutationFn: async (visible: boolean) => {
+      return apiRequest("/api/admin/settings/reviews-visibility", "PATCH", { visible });
+    },
+    onSuccess: (data: { reviewsVisible: boolean }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/reviews-visibility"] });
+      toast({
+        title: data.reviewsVisible ? "Avis visibles" : "Avis masqués",
+        description: data.reviewsVisible
+          ? "Les avis seront désormais affichés sur le catalogue."
+          : "Les avis ont été masqués du catalogue.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de mettre à jour l'affichage des avis",
+      });
+    },
+  });
+
+  const deleteReviewMutation = useMutation({
+    mutationFn: async (payload: { id: string; formationId: string }) => {
+      await apiRequest(`/api/admin/formation-reviews/${payload.id}`, "DELETE");
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/formation-reviews"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/formations"] });
+      if (variables.formationId) {
+        queryClient.invalidateQueries({
+          queryKey: ["/api/formations", variables.formationId],
+        });
+      }
+      toast({
+        title: "Avis supprimé",
+        description: "Le retour du participant a été retiré du catalogue.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de supprimer l'avis",
       });
     },
   });
@@ -343,6 +436,104 @@ export default function FormationManagement() {
                   ))}
                 </TableBody>
               </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[1.75rem] border border-border/50 shadow-sm">
+          <CardHeader className="space-y-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Avis stagiaires</p>
+                <CardTitle className="text-foreground">Modération des avis</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Contrôlez l'affichage des avis dans le catalogue et intervenez en cas de besoin.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">
+                  {reviewsVisible ? "Avis visibles" : "Avis masqués"}
+                </span>
+                <Switch
+                  checked={reviewsVisible}
+                  onCheckedChange={(checked) => toggleReviewVisibilityMutation.mutate(checked)}
+                  disabled={toggleReviewVisibilityMutation.isPending}
+                  data-testid="switch-reviews-visibility"
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoadingReviews ? (
+              <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Chargement des avis...
+              </div>
+            ) : sortedReviews.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border/60 bg-muted/10 p-6 text-center text-sm text-muted-foreground">
+                Aucun avis n'est en attente de modération.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {sortedReviews.map((review) => (
+                  <div
+                    key={review.id}
+                    className="flex flex-col gap-4 rounded-2xl border border-border/60 bg-background/95 p-4 shadow-sm md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                        <span>{review.reviewerName}</span>
+                        <span className="text-muted-foreground/60">•</span>
+                        <span className="text-muted-foreground">{review.formationTitle}</span>
+                      </div>
+                      <RatingStars value={review.rating} />
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {review.comment || (
+                          <span className="italic text-muted-foreground/70">
+                            Aucun commentaire détaillé n'a été fourni.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-start gap-2 md:items-end">
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(review.createdAt).toLocaleString("fr-FR", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() =>
+                          deleteReviewMutation.mutate({
+                            id: review.id,
+                            formationId: review.formationId,
+                          })
+                        }
+                        disabled={deleteReviewMutation.isPending}
+                        data-testid={`button-delete-review-${review.id}`}
+                      >
+                        {deleteReviewMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Suppression...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Supprimer
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>

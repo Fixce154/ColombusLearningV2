@@ -133,6 +133,29 @@ export const registrations = pgTable("registrations", {
   attendanceSignedAt: timestamp("attendance_signed_at"),
 });
 
+export const formationReviews = pgTable(
+  "formation_reviews",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    formationId: varchar("formation_id")
+      .notNull()
+      .references(() => formations.id, { onDelete: "cascade" }),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    rating: integer("rating").notNull(),
+    comment: text("comment"),
+    createdAt: timestamp("created_at").default(sql`now()`),
+    updatedAt: timestamp("updated_at").default(sql`now()`),
+  },
+  (table) => ({
+    reviewerUnique: uniqueIndex("formation_reviews_unique_reviewer_idx").on(
+      table.formationId,
+      table.userId
+    ),
+  })
+);
+
 export const sessionAttendanceTokens = pgTable(
   "session_attendance_tokens",
   {
@@ -245,3 +268,5 @@ export type InstructorAvailability = typeof instructorAvailabilities.$inferSelec
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type SessionAttendanceToken = typeof sessionAttendanceTokens.$inferSelect;
+export type FormationReview = typeof formationReviews.$inferSelect;
+export type InsertFormationReview = typeof formationReviews.$inferInsert;

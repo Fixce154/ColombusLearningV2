@@ -12,6 +12,7 @@ import {
   appSettings,
   formationMaterials,
   sessionAttendanceTokens,
+  formationReviews,
   type User,
   type InsertUser,
   type Formation,
@@ -34,6 +35,8 @@ import {
   type FormationMaterial,
   type InsertFormationMaterial,
   type SessionAttendanceToken,
+  type FormationReview,
+  type InsertFormationReview,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, asc, ne, inArray } from "drizzle-orm";
@@ -113,6 +116,28 @@ export const ensureFormationContentInfrastructure = (() => {
         `);
 
         await db.execute(sql`
+          CREATE TABLE IF NOT EXISTS formation_reviews (
+            id varchar(255) PRIMARY KEY DEFAULT gen_random_uuid(),
+            formation_id varchar(255) NOT NULL REFERENCES formations(id) ON DELETE CASCADE,
+            user_id varchar(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            rating integer NOT NULL CHECK (rating >= 1 AND rating <= 5),
+            comment text,
+            created_at timestamp DEFAULT now(),
+            updated_at timestamp DEFAULT now()
+          )
+        `);
+
+        await db.execute(sql`
+          CREATE UNIQUE INDEX IF NOT EXISTS formation_reviews_unique_reviewer_idx
+            ON formation_reviews (formation_id, user_id)
+        `);
+
+        await db.execute(sql`
+          CREATE INDEX IF NOT EXISTS formation_reviews_formation_idx
+            ON formation_reviews (formation_id)
+        `);
+
+        await db.execute(sql`
           CREATE TABLE IF NOT EXISTS session_attendance_tokens (
             id varchar(255) PRIMARY KEY DEFAULT gen_random_uuid(),
             session_id varchar(255) NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
@@ -187,6 +212,24 @@ export interface IStorage {
     registrationId: string,
     attendance: { attended: boolean; attendanceSignedAt: Date }
   ): Promise<Registration | undefined>;
+
+  // Formation review methods
+  listFormationReviews(formationId: string): Promise<FormationReview[]>;
+  listFormationReviewsWithUsers(
+    formationId: string
+  ): Promise<Array<FormationReview & { reviewerName: string }>>;
+  listAllFormationReviewsWithDetails(): Promise<
+    Array<FormationReview & { reviewerName: string; formationTitle: string }>
+  >;
+  getFormationReviewForUser(
+    formationId: string,
+    userId: string
+  ): Promise<FormationReview | undefined>;
+  upsertFormationReview(review: InsertFormationReview): Promise<FormationReview>;
+  deleteFormationReview(id: string): Promise<boolean>;
+  getFormationReviewStats(
+    formationIds: string[]
+  ): Promise<Array<{ formationId: string; averageRating: number; reviewCount: number }>>;
 
   // Attendance tokens
   createSessionAttendanceToken(data: {
@@ -569,6 +612,134 @@ export class DatabaseStorage implements IStorage {
       .where(eq(registrations.id, registrationId))
       .returning();
     return registration || undefined;
+  }
+
+  async listFormationReviews(formationId: string): Promise<FormationReview[]> {
+    return await db
+      .select()
+      .from(formationReviews)
+      .where(eq(formationReviews.formationId, formationId))
+      .orderBy(desc(formationReviews.createdAt));
+  }
+
+  async listFormationReviewsWithUsers(
+    formationId: string
+  ): Promise<Array<FormationReview & { reviewerName: string }>> {
+    const rows = await db
+      .select({
+        id: formationReviews.id,
+        formationId: formationReviews.formationId,
+        userId: formationReviews.userId,
+        rating: formationReviews.rating,
+        comment: formationReviews.comment,
+        createdAt: formationReviews.createdAt,
+        updatedAt: formationReviews.updatedAt,
+        reviewerName: users.name,
+      })
+      .from(formationReviews)
+      .innerJoin(users, eq(formationReviews.userId, users.id))
+      .where(eq(formationReviews.formationId, formationId))
+      .orderBy(desc(formationReviews.createdAt));
+
+    return rows;
+  }
+
+  async listAllFormationReviewsWithDetails(): Promise<
+    Array<FormationReview & { reviewerName: string; formationTitle: string }>
+  > {
+    const rows = await db
+      .select({
+        id: formationReviews.id,
+        formationId: formationReviews.formationId,
+        userId: formationReviews.userId,
+        rating: formationReviews.rating,
+        comment: formationReviews.comment,
+        createdAt: formationReviews.createdAt,
+        updatedAt: formationReviews.updatedAt,
+        reviewerName: users.name,
+        formationTitle: formations.title,
+      })
+      .from(formationReviews)
+      .innerJoin(users, eq(formationReviews.userId, users.id))
+      .innerJoin(formations, eq(formationReviews.formationId, formations.id))
+      .orderBy(desc(formationReviews.createdAt));
+
+    return rows;
+  }
+
+  async getFormationReviewForUser(
+    formationId: string,
+    userId: string
+  ): Promise<FormationReview | undefined> {
+    const [review] = await db
+      .select()
+      .from(formationReviews)
+      .where(
+        and(
+          eq(formationReviews.formationId, formationId),
+          eq(formationReviews.userId, userId)
+        )
+      )
+      .limit(1);
+    return review || undefined;
+  }
+
+  async upsertFormationReview(review: InsertFormationReview): Promise<FormationReview> {
+    const payload: InsertFormationReview = {
+      ...review,
+      comment: review.comment ?? null,
+    };
+
+    const [stored] = await db
+      .insert(formationReviews)
+      .values(payload)
+      .onConflictDoUpdate({
+        target: [formationReviews.formationId, formationReviews.userId],
+        set: {
+          rating: payload.rating,
+          comment: payload.comment ?? null,
+          updatedAt: sql`now()`,
+        },
+      })
+      .returning();
+
+    if (!stored) {
+      throw new Error("Failed to save formation review");
+    }
+
+    return stored;
+  }
+
+  async deleteFormationReview(id: string): Promise<boolean> {
+    const result = await db
+      .delete(formationReviews)
+      .where(eq(formationReviews.id, id))
+      .returning({ id: formationReviews.id });
+    return result.length > 0;
+  }
+
+  async getFormationReviewStats(
+    formationIds: string[]
+  ): Promise<Array<{ formationId: string; averageRating: number; reviewCount: number }>> {
+    if (formationIds.length === 0) {
+      return [];
+    }
+
+    const rows = await db
+      .select({
+        formationId: formationReviews.formationId,
+        averageRating: sql<number>`avg(${formationReviews.rating})`,
+        reviewCount: sql<number>`count(${formationReviews.id})`,
+      })
+      .from(formationReviews)
+      .where(inArray(formationReviews.formationId, formationIds))
+      .groupBy(formationReviews.formationId);
+
+    return rows.map((row) => ({
+      formationId: row.formationId,
+      averageRating: Number(row.averageRating ?? 0),
+      reviewCount: Number(row.reviewCount ?? 0),
+    }));
   }
 
   async createSessionAttendanceToken(data: {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,8 @@ import ModalityBadge from "@/components/ModalityBadge";
 import SeniorityBadge from "@/components/SeniorityBadge";
 import SessionCard from "@/components/SessionCard";
 import PrioritySelector from "@/components/PrioritySelector";
+import RatingStars from "@/components/RatingStars";
+import type { FormationWithRating } from "@/components/TrainingCard";
 import {
   ArrowLeft,
   Clock,
@@ -42,8 +44,14 @@ import {
   Download,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { User, Formation, Session, Registration, FormationInterest } from "@shared/schema";
+import type {
+  User,
+  Session,
+  Registration,
+  FormationInterest,
+} from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
 
 interface TrainingDetailProps {
   currentUser: User;
@@ -63,6 +71,22 @@ interface FormationMaterialMetadata {
 
 type MaterialsQueryError = Error & { status?: number };
 
+type FormationReviewWithUser = {
+  id: string;
+  formationId: string;
+  userId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  updatedAt: string;
+  reviewerName: string;
+};
+
+type FormationReviewsResponse = {
+  reviewsVisible: boolean;
+  reviews: FormationReviewWithUser[];
+};
+
 export default function TrainingDetail({ currentUser: _currentUser }: TrainingDetailProps) {
   const [, params] = useRoute("/training/:id");
   const [, setLocation] = useLocation();
@@ -80,7 +104,7 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
   const currentUser = userData?.user || _currentUser;
 
   // Fetch formation
-  const { data: formation, isLoading: isLoadingFormation } = useQuery<Formation>({
+  const { data: formation, isLoading: isLoadingFormation } = useQuery<FormationWithRating>({
     queryKey: ["/api/formations", params?.id],
     queryFn: async () => {
       const res = await fetch(`/api/formations/${params?.id}`, { credentials: "include" });
@@ -122,6 +146,84 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
       return res.json();
     },
   });
+
+  const {
+    data: reviewData,
+    isLoading: isLoadingReviews,
+  } = useQuery<FormationReviewsResponse>({
+    queryKey: ["/api/formations", params?.id, "reviews"],
+    enabled: Boolean(params?.id),
+    queryFn: async () => {
+      const res = await fetch(`/api/formations/${params?.id}/reviews`, {
+        credentials: "include",
+      });
+      if (res.status === 404) {
+        return { reviewsVisible: true, reviews: [] } satisfies FormationReviewsResponse;
+      }
+      if (!res.ok) {
+        throw new Error("Impossible de charger les avis");
+      }
+      return res.json();
+    },
+  });
+
+  const reviews = reviewData?.reviews ?? [];
+  const reviewsVisible = reviewData?.reviewsVisible ?? true;
+  const hasReviews = reviews.length > 0;
+
+  const reviewsGrid = (
+    <div className="grid gap-4 md:grid-cols-2">
+      {reviews.map((review) => (
+        <Card
+          key={review.id}
+          className="rounded-3xl border border-border/60 bg-background/95 p-5 shadow-sm"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                {review.reviewerName}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(review.createdAt).toLocaleDateString("fr-FR", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </p>
+            </div>
+            <RatingStars value={review.rating} size="sm" />
+          </div>
+          <div className="mt-3 text-sm text-muted-foreground leading-relaxed">
+            {review.comment ? (
+              <p>{review.comment}</p>
+            ) : (
+              <p className="italic text-muted-foreground/80">
+                Le participant n'a pas laissé de commentaire détaillé.
+              </p>
+            )}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+
+  const userReview = useMemo(
+    () => reviews.find((review) => review.userId === currentUser.id),
+    [reviews, currentUser.id]
+  );
+
+  const [ratingValue, setRatingValue] = useState<number>(0);
+  const [commentValue, setCommentValue] = useState<string>("");
+
+  useEffect(() => {
+    if (userReview) {
+      setRatingValue(userReview.rating);
+      setCommentValue(userReview.comment ?? "");
+    } else {
+      setRatingValue(0);
+      setCommentValue("");
+    }
+  }, [userReview?.id, userReview?.updatedAt]);
 
   const {
     data: materials = [],
@@ -254,6 +356,35 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
     },
   });
 
+  const submitReviewMutation = useMutation({
+    mutationFn: async (payload: { rating: number; comment?: string }) => {
+      return apiRequest(`/api/formations/${params?.id}/reviews`, "POST", payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/formations"] });
+      if (params?.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/formations", params.id] });
+        queryClient.invalidateQueries({
+          queryKey: ["/api/formations", params.id, "reviews"],
+        });
+      }
+      toast({
+        title: userReview ? "Avis mis à jour" : "Merci pour votre avis !",
+        description: userReview
+          ? "Votre retour a été actualisé."
+          : "Votre avis a bien été enregistré et aidera les autres collaborateurs.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description:
+          error.message || "Impossible d'enregistrer votre avis pour le moment",
+      });
+    },
+  });
+
   if (isLoadingFormation || isLoadingSessions) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -304,12 +435,32 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
 
   const confirmEnrollment = () => {
     if (!selectedSession || !formation || !existingInterest) return;
-    
+
     enrollMutation.mutate({
       sessionId: selectedSession.id,
       formationId: formation.id,
       priority: existingInterest.priority,
       interestId: existingInterest.id,
+    });
+  };
+
+  const handleSubmitReview = () => {
+    if (!formation || !params?.id) return;
+
+    if (ratingValue < 1) {
+      toast({
+        variant: "destructive",
+        title: "Note requise",
+        description: "Merci de sélectionner une note avant de publier votre avis.",
+      });
+      return;
+    }
+
+    const trimmedComment = commentValue.trim();
+
+    submitReviewMutation.mutate({
+      rating: ratingValue,
+      comment: trimmedComment.length > 0 ? trimmedComment : undefined,
     });
   };
 
@@ -319,6 +470,18 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
   // Check if user has already expressed interest for this formation
   const existingInterest = interests.find(i => i.formationId === formation.id && i.status !== "withdrawn");
   const isMaterialsForbidden = (materialsError as MaterialsQueryError | undefined)?.status === 403;
+
+  const userHasCompletedFormation = useMemo(() => {
+    if (!formation) return false;
+    return allRegistrations.some(
+      (registration) =>
+        registration.userId === currentUser.id &&
+        registration.formationId === formation.id &&
+        registration.status === "completed"
+    );
+  }, [allRegistrations, currentUser.id, formation.id]);
+
+  const canLeaveReview = userHasCompletedFormation;
 
   return (
     <div className="space-y-10">
@@ -414,6 +577,17 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
                   {formation.description}
                 </p>
               </div>
+              {reviewsVisible && (formation.reviewCount ?? 0) > 0 && (
+                <div className="inline-flex items-center gap-3 rounded-full bg-white/80 px-5 py-2 text-sm font-medium text-muted-foreground shadow-sm ring-1 ring-black/5 backdrop-blur">
+                  <RatingStars value={formation.averageRating ?? 0} size="sm" />
+                  <span className="text-base font-semibold text-foreground">
+                    {formation.averageRating?.toFixed(1)}
+                  </span>
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {formation.reviewCount} avis
+                  </span>
+                </div>
+              )}
             </div>
 
             {!existingInterest && (
@@ -628,6 +802,141 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Reviews Section */}
+      <section className="space-y-6" id="formation-reviews">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1.5">
+            <h2 className="text-2xl font-semibold text-primary">Avis des participants</h2>
+            <p className="text-sm text-muted-foreground max-w-2xl">
+              Partagez votre expérience et découvrez les retours des autres collaborateurs ayant suivi cette formation.
+            </p>
+          </div>
+          {reviewsVisible && (formation.reviewCount ?? 0) > 0 && (
+            <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-background/95 px-4 py-2 shadow-sm">
+              <RatingStars value={formation.averageRating ?? 0} />
+              <div className="leading-none">
+                <p className="text-2xl font-semibold text-foreground">
+                  {formation.averageRating?.toFixed(1)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formation.reviewCount} avis publiés
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {canLeaveReview && (
+          <Card className="rounded-3xl border border-border/60 bg-background/95 p-6 shadow-md">
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-primary">
+                    {userReview ? "Mettre à jour votre avis" : "Donner votre avis"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Notez la formation sur 5 étoiles et partagez un retour pour aider vos collègues.
+                  </p>
+                </div>
+                <RatingStars
+                  value={ratingValue}
+                  onChange={setRatingValue}
+                  readOnly={false}
+                  size="lg"
+                />
+              </div>
+
+              <Textarea
+                value={commentValue}
+                onChange={(event) => setCommentValue(event.target.value)}
+                placeholder="Qu'avez-vous pensé de cette formation ? Mentionnez l'impact, l'animation, les points forts..."
+                rows={4}
+              />
+
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                {userReview ? (
+                  <p className="text-xs text-muted-foreground">
+                    Dernière mise à jour le {new Date(userReview.updatedAt).toLocaleDateString("fr-FR", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Votre avis sera visible par l'ensemble des collaborateurs une fois validé par les RH.
+                  </p>
+                )}
+                <Button
+                  onClick={handleSubmitReview}
+                  disabled={submitReviewMutation.isPending}
+                  className="md:w-auto"
+                >
+                  {submitReviewMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Enregistrement...
+                    </>
+                  ) : userReview ? (
+                    "Mettre à jour mon avis"
+                  ) : (
+                    "Publier mon avis"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {!canLeaveReview && (
+          <Card className="rounded-3xl border border-dashed border-border/60 bg-background/95 p-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-1 h-5 w-5 text-muted-foreground" />
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Avis disponible après la formation</h3>
+                <p className="text-sm text-muted-foreground">
+                  Terminez la formation pour pouvoir partager votre retour d'expérience.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {isLoadingReviews ? (
+          <Card className="rounded-3xl border border-border/60 bg-background/95 p-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Chargement des avis...
+            </div>
+          </Card>
+        ) : reviewsVisible ? (
+          hasReviews ? (
+            reviewsGrid
+          ) : (
+            <Card className="rounded-3xl border border-border/60 bg-background/95 p-8 text-center text-sm text-muted-foreground">
+              Aucun avis n'a encore été publié pour cette formation.
+            </Card>
+          )
+        ) : (
+          <div className="space-y-4">
+            <Alert className="border border-border/80 bg-background/90">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Les avis sont actuellement masqués par l'équipe RH. Ils resteront accessibles dès qu'ils seront réactivés.
+              </AlertDescription>
+            </Alert>
+            {hasReviews && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Vous pouvez toujours consulter et modifier votre propre avis.
+                </p>
+                {reviewsGrid}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
 
       {/* Express Interest Dialog */}
       <Dialog open={showInterestDialog} onOpenChange={setShowInterestDialog}>
