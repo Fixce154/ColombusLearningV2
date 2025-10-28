@@ -5,7 +5,6 @@ import {
   Calendar,
   Users,
   BarChart,
-  GraduationCap,
   Heart,
   Plus,
   Minus,
@@ -34,6 +33,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { formatRoles, isInstructor } from "@shared/roles";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import logoWhite from "@/assets/logo-white.png";
 
 interface AppSidebarProps {
   currentUser: User;
@@ -128,7 +128,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
     if (isInstructor(roles)) {
       sections.push({
         label: "Formation",
-        icon: GraduationCap,
+        icon: BookOpen,
         items: [
           { title: "Mes formations", url: "/instructor-formations", icon: BookOpen },
           { title: "Mes disponibilités", url: "/instructor-availability", icon: Calendar },
@@ -291,8 +291,12 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
   return (
     <Sidebar className="border-none bg-transparent p-0 text-white !w-[7rem]">
       <div className="flex h-full w-full flex-col items-center bg-[#00313F] px-4 py-8">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white">
-          <GraduationCap className="h-6 w-6" />
+        <div className="flex items-center justify-center">
+          <img 
+            src={logoWhite} 
+            alt="Colombus Consulting" 
+            className="h-14 w-auto"
+          />
         </div>
 
         <div className="mt-12 flex flex-1 flex-col items-center gap-5">

@@ -21,9 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { GraduationCap, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { SENIORITY_LEVELS, type SeniorityLevel, type User } from "@shared/schema";
+import logoWhite from "@/assets/logo-white.png";
+import logoBlue from "@/assets/logo-blue.png";
 
 const loginSchema = z.object({
   email: z.string().email("Email invalide"),
@@ -140,8 +142,17 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   return (
     <div className="flex min-h-screen items-center justify-center px-6 py-12">
       <Card className="surface-elevated relative w-full max-w-2xl space-y-8 rounded-[2.5rem] px-12 py-14">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <GraduationCap className="h-8 w-8" />
+        <div className="mx-auto flex items-center justify-center">
+          <img 
+            src={logoBlue} 
+            alt="Colombus Consulting" 
+            className="h-20 w-auto dark:hidden"
+          />
+          <img 
+            src={logoWhite} 
+            alt="Colombus Consulting" 
+            className="hidden h-20 w-auto dark:block"
+          />
         </div>
         <div className="space-y-3 text-center">
           <p className="eyebrow text-muted-foreground">Portail sécurisé</p>
