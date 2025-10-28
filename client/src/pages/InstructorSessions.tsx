@@ -1,12 +1,52 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useMemo } from "react";
 import type { Session, Formation, User } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Users, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Calendar, MapPin, Users, Clock, QrCode, RefreshCcw, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import QRCodeCanvas from "@/components/QRCodeCanvas";
+
+interface SessionAttendee {
+  registrationId: string;
+  userId: string;
+  status: string;
+  attended: boolean;
+  attendanceSignedAt?: string | null;
+  registeredAt: string;
+  priority: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    roles: string[];
+  } | null;
+}
+
+interface AttendanceTokenResponse {
+  token: string;
+  expiresAt: string;
+  sessionId: string;
+}
 
 export default function InstructorSessions() {
+  const { toast } = useToast();
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [tokenData, setTokenData] = useState<AttendanceTokenResponse | null>(null);
+
   const { data: currentUser } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
   });
@@ -18,6 +58,62 @@ export default function InstructorSessions() {
   const { data: formations = [] } = useQuery<Formation[]>({
     queryKey: ["/api/formations"],
   });
+
+  const attendeesQuery = useQuery<SessionAttendee[]>({
+    queryKey: ["/api/sessions", selectedSession?.id, "attendees"],
+    enabled: Boolean(isDialogOpen && selectedSession?.id),
+    queryFn: async () => {
+      if (!selectedSession?.id) return [];
+      const res = await fetch(`/api/sessions/${selectedSession.id}/attendees`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error("Impossible de récupérer les participants");
+      }
+      return res.json();
+    },
+  });
+
+  const generateTokenMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      return apiRequest(`/api/sessions/${sessionId}/attendance-token`, "POST", {});
+    },
+    onSuccess: (response: AttendanceTokenResponse) => {
+      setTokenData(response);
+      toast({
+        title: "QR Code généré",
+        description: "Partagez ce code avec vos stagiaires pour enregistrer leur présence.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error?.message || "Impossible de générer le QR Code",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const attendees = attendeesQuery.data ?? [];
+  const attendedCount = useMemo(
+    () => attendees.filter((attendee) => attendee.attended).length,
+    [attendees]
+  );
+
+  const qrValue = useMemo(() => {
+    if (!tokenData) return "";
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}/attendance/${tokenData.token}`;
+    }
+    return tokenData.token;
+  }, [tokenData]);
+
+  const handleOpenDialog = (session: Session) => {
+    setSelectedSession(session);
+    setIsDialogOpen(true);
+    setTokenData(null);
+    generateTokenMutation.mutate(session.id);
+  };
 
   // Filter sessions where I'm the instructor
   const mySessions = sessions.filter(
@@ -129,12 +225,137 @@ export default function InstructorSessions() {
                   <Users className="w-4 h-4" />
                   <span>Capacité: {session.capacity} participants</span>
                 </div>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => handleOpenDialog(session)}
+                    data-testid={`button-session-qrcode-${session.id}`}
+                  >
+                    <QrCode className="w-4 h-4" />
+                    Présence via QR Code
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
       </section>
+
+      <Dialog
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) {
+            setSelectedSession(null);
+            setTokenData(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="w-5 h-5" />
+              Signature de présence
+            </DialogTitle>
+            <DialogDescription>
+              Partagez ce QR Code avec les stagiaires pour enregistrer automatiquement leur présence.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedSession && (
+            <div className="space-y-8">
+              <div className="grid gap-6 md:grid-cols-[280px,1fr]">
+                <div className="flex flex-col items-center gap-4 rounded-xl border bg-muted/30 p-6">
+                  {tokenData ? (
+                    <>
+                      <QRCodeCanvas value={qrValue} size={220} />
+                      <div className="text-center text-sm">
+                        <p className="font-medium">Code manuel</p>
+                        <p className="font-mono text-muted-foreground break-all">{tokenData.token}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Expire le {format(new Date(tokenData.expiresAt), "d MMMM yyyy 'à' HH:mm", { locale: fr })}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex h-[220px] w-full items-center justify-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => selectedSession && generateTokenMutation.mutate(selectedSession.id)}
+                    disabled={generateTokenMutation.isPending}
+                  >
+                    <RefreshCcw className="w-4 h-4" />
+                    Régénérer
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-xl border bg-background p-5 shadow-sm">
+                    <h3 className="text-lg font-semibold text-foreground">
+                      {getFormationTitle(selectedSession.formationId)}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {format(new Date(selectedSession.startDate), "d MMMM yyyy", { locale: fr })} • {format(new Date(selectedSession.startDate), "HH:mm", { locale: fr })} - {format(new Date(selectedSession.endDate), "HH:mm", { locale: fr })}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-3 text-sm text-muted-foreground">
+                      <Badge variant="outline">Capacité {selectedSession.capacity}</Badge>
+                      <Badge variant="outline">Présents {attendedCount}/{attendees.length}</Badge>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-base font-semibold text-foreground mb-2">Participants inscrits</h4>
+                    {attendeesQuery.isLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Chargement des participants...
+                      </div>
+                    ) : attendees.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Aucun participant inscrit pour le moment.
+                      </p>
+                    ) : (
+                      <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                        {attendees.map((attendee) => (
+                          <div
+                            key={attendee.registrationId}
+                            className="flex items-center justify-between rounded-lg border bg-muted/40 p-3"
+                          >
+                            <div>
+                              <p className="text-sm font-medium">
+                                {attendee.user?.name || "Participant"}
+                              </p>
+                              {attendee.user?.email && (
+                                <p className="text-xs text-muted-foreground">{attendee.user.email}</p>
+                              )}
+                            </div>
+                            <Badge variant={attendee.attended ? "default" : "outline"}>
+                              {attendee.attended ? "Présent" : "En attente"}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

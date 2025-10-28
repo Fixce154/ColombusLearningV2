@@ -4,7 +4,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { inflateRawSync } from "zlib";
 import { pool } from "./db";
-import { storage } from "./storage";
+import { storage, ensureFormationContentInfrastructure } from "./storage";
 import { requireAuth, optionalAuth, type AuthRequest } from "./auth";
 import {
   insertUserSchema,
@@ -15,10 +15,16 @@ import {
   type InsertUser,
   type InsertNotification,
   type FormationInterest,
+  type User,
+  type Formation,
+  type Session,
+  type Registration,
+  type FormationMaterial,
   SENIORITY_LEVELS,
 } from "@shared/schema";
 import { INSTRUCTOR_ROLES, InstructorRole, USER_ROLES, isInstructor } from "@shared/roles";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 
 const PgSession = connectPgSimple(session);
 
@@ -28,6 +34,74 @@ const ZIP_LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;
 const ZIP_CENTRAL_DIR_SIGNATURE = 0x02014b50;
 const ZIP_END_OF_CENTRAL_DIR_SIGNATURE = 0x06054b50;
 const EXCEL_EPOCH = Date.UTC(1899, 11, 30);
+
+const TRAINING_MATERIAL_MAX_SIZE = 10 * 1024 * 1024; // 10 Mo
+
+const formationContentSchema = z.object({
+  content: z.string().optional(),
+});
+
+const formationMaterialUploadSchema = z.object({
+  title: z.string().min(1, "Le titre est obligatoire"),
+  description: z.string().optional(),
+  requiresEnrollment: z.boolean().optional(),
+  fileName: z.string().min(1, "Le nom du fichier est obligatoire"),
+  fileType: z.string().min(1, "Le type du fichier est obligatoire"),
+  fileSize: z.number().min(1, "Le fichier est obligatoire"),
+  fileData: z.string().min(1, "Le contenu du fichier est obligatoire"),
+});
+
+const attendanceTokenRequestSchema = z.object({
+  expiresInMinutes: z.number().min(5).max(480).optional(),
+});
+
+const attendanceSignSchema = z.object({
+  token: z.string().min(1, "Le jeton est obligatoire"),
+});
+
+const sanitizeMaterial = (material: FormationMaterial) => ({
+  id: material.id,
+  formationId: material.formationId,
+  title: material.title,
+  description: material.description,
+  fileName: material.fileName,
+  fileType: material.fileType,
+  fileSize: material.fileSize,
+  requiresEnrollment: material.requiresEnrollment ?? true,
+  createdAt: material.createdAt,
+  createdBy: material.createdBy,
+});
+
+const canManageFormation = async (user: User | undefined, formationId: string) => {
+  if (!user) return false;
+  if (user.roles.includes("rh")) return true;
+  if (!isInstructor(user.roles)) return false;
+
+  const instructorFormations = await storage.getInstructorFormations(user.id);
+  if (instructorFormations.includes(formationId)) {
+    return true;
+  }
+
+  const instructorSessions = await storage.getSessionsByInstructor(user.id);
+  return instructorSessions.some((session) => session.formationId === formationId);
+};
+
+const canManageSession = async (user: User | undefined, session: Session | undefined) => {
+  if (!user || !session) return false;
+  if (user.roles.includes("rh")) return true;
+  if (!isInstructor(user.roles)) return false;
+  if (session.instructorId === user.id) return true;
+  return canManageFormation(user, session.formationId);
+};
+
+const userHasActiveRegistration = async (userId: string, formationId: string) => {
+  const registrations = await storage.listRegistrations(userId);
+  return registrations.some(
+    (registration) =>
+      registration.formationId === formationId &&
+      registration.status !== "cancelled"
+  );
+};
 
 const decodeXmlEntities = (value: string): string =>
   value
@@ -320,6 +394,8 @@ type BulkUploadSummary = {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  await ensureFormationContentInfrastructure();
+
   // Session configuration
   app.use(
     session({
@@ -1520,7 +1596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
-      
+
       if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
@@ -1536,6 +1612,208 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message });
     }
   });
+
+  app.patch("/api/formations/:id/content", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(401).json({ message: "Utilisateur introuvable" });
+      }
+
+      const formation = await storage.getFormation(req.params.id);
+      if (!formation) {
+        return res.status(404).json({ message: "Formation non trouvée" });
+      }
+
+      const canManage = await canManageFormation(user, formation.id);
+      if (!canManage) {
+        return res.status(403).json({ message: "Action réservée au formateur ou aux RH" });
+      }
+
+      const data = formationContentSchema.parse(req.body ?? {});
+
+      const updated = await storage.updateFormation(formation.id, {
+        content: data.content ?? null,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Données invalides", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/formations/:id/materials", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(401).json({ message: "Utilisateur introuvable" });
+      }
+
+      const formation = await storage.getFormation(req.params.id);
+      if (!formation) {
+        return res.status(404).json({ message: "Formation non trouvée" });
+      }
+
+      const managesFormation = await canManageFormation(user, formation.id);
+
+      if (!managesFormation) {
+        const hasRegistration = await userHasActiveRegistration(user.id, formation.id);
+        if (!hasRegistration) {
+          return res
+            .status(403)
+            .json({ message: "L'accès aux ressources est réservé aux inscrits" });
+        }
+      }
+
+      const materials = await storage.listFormationMaterials(formation.id);
+      res.json(materials.map(sanitizeMaterial));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/formations/:id/materials", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(401).json({ message: "Utilisateur introuvable" });
+      }
+
+      const formation = await storage.getFormation(req.params.id);
+      if (!formation) {
+        return res.status(404).json({ message: "Formation non trouvée" });
+      }
+
+      const canManage = await canManageFormation(user, formation.id);
+      if (!canManage) {
+        return res.status(403).json({ message: "Action réservée au formateur ou aux RH" });
+      }
+
+      const data = formationMaterialUploadSchema.parse(req.body ?? {});
+
+      if (data.fileSize > TRAINING_MATERIAL_MAX_SIZE) {
+        return res
+          .status(400)
+          .json({ message: "Le fichier dépasse la taille maximale autorisée (10 Mo)" });
+      }
+
+      let fileBuffer: Buffer;
+      try {
+        fileBuffer = Buffer.from(data.fileData, "base64");
+      } catch (_error) {
+        return res.status(400).json({ message: "Le contenu du fichier est invalide" });
+      }
+
+      if (fileBuffer.length === 0) {
+        return res.status(400).json({ message: "Le fichier est vide" });
+      }
+
+      if (fileBuffer.length > TRAINING_MATERIAL_MAX_SIZE) {
+        return res
+          .status(400)
+          .json({ message: "Le fichier dépasse la taille maximale autorisée (10 Mo)" });
+      }
+
+      const material = await storage.createFormationMaterial({
+        formationId: formation.id,
+        title: data.title,
+        description: data.description,
+        fileName: data.fileName,
+        fileType: data.fileType,
+        fileSize: fileBuffer.length,
+        fileData: fileBuffer,
+        requiresEnrollment: data.requiresEnrollment ?? true,
+        createdBy: user.id,
+      });
+
+      res.status(201).json(sanitizeMaterial(material));
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Données invalides", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/formations/:id/materials/:materialId", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(401).json({ message: "Utilisateur introuvable" });
+      }
+
+      const material = await storage.getFormationMaterial(req.params.materialId);
+      if (!material || material.formationId !== req.params.id) {
+        return res.status(404).json({ message: "Ressource introuvable" });
+      }
+
+      const canManage = await canManageFormation(user, material.formationId);
+      if (!canManage) {
+        return res.status(403).json({ message: "Action réservée au formateur ou aux RH" });
+      }
+
+      await storage.deleteFormationMaterial(material.id);
+      res.json({ message: "Ressource supprimée" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get(
+    "/api/formations/:id/materials/:materialId/download",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const userId = (req as AuthRequest).userId!;
+        const user = await storage.getUser(userId);
+
+        if (!user) {
+          return res.status(401).json({ message: "Utilisateur introuvable" });
+        }
+
+        const material = await storage.getFormationMaterial(req.params.materialId);
+        if (!material || material.formationId !== req.params.id) {
+          return res.status(404).json({ message: "Ressource introuvable" });
+        }
+
+        const formation = await storage.getFormation(material.formationId);
+        if (!formation) {
+          return res.status(404).json({ message: "Formation non trouvée" });
+        }
+
+        const managesFormation = await canManageFormation(user, formation.id);
+
+        if (!managesFormation) {
+          const hasRegistration = await userHasActiveRegistration(user.id, formation.id);
+          if (!hasRegistration) {
+            return res
+              .status(403)
+              .json({ message: "Téléchargement réservé aux stagiaires inscrits" });
+          }
+        }
+
+        res.setHeader("Content-Type", material.fileType || "application/octet-stream");
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${encodeURI(material.fileName)}"`
+        );
+        res.send(material.fileData);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
 
   app.delete("/api/formations/:id", requireAuth, async (req, res) => {
     try {
@@ -1586,11 +1864,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/sessions/:id/attendees", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(401).json({ message: "Utilisateur introuvable" });
+      }
+
+      const session = await storage.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ message: "Session non trouvée" });
+      }
+
+      const canManage = await canManageSession(user, session);
+      if (!canManage) {
+        return res.status(403).json({ message: "Accès réservé au formateur ou aux RH" });
+      }
+
+      const registrations = await storage.listRegistrations(undefined, session.id);
+      const userIds = Array.from(new Set(registrations.map((registration) => registration.userId)));
+      const attendees = await storage.listUsersByIds(userIds);
+      const attendeesById = new Map(attendees.map((attendee) => [attendee.id, attendee]));
+
+      const payload = registrations.map((registration) => {
+        const attendee = attendeesById.get(registration.userId);
+        return {
+          registrationId: registration.id,
+          userId: registration.userId,
+          status: registration.status,
+          attended: registration.attended,
+          attendanceSignedAt: registration.attendanceSignedAt,
+          registeredAt: registration.registeredAt,
+          priority: registration.priority,
+          formationId: registration.formationId,
+          sessionId: registration.sessionId,
+          user: attendee
+            ? {
+                id: attendee.id,
+                name: attendee.name,
+                email: attendee.email,
+                roles: attendee.roles,
+              }
+            : null,
+        };
+      });
+
+      res.json(payload);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/sessions", requireAuth, async (req, res) => {
     try {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
-      
+
       if (!user || !user.roles.includes("rh")) {
         return res.status(403).json({ message: "Unauthorized" });
       }
@@ -1626,6 +1957,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.status(201).json(session);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/sessions/:id/attendance-token", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(401).json({ message: "Utilisateur introuvable" });
+      }
+
+      const session = await storage.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ message: "Session non trouvée" });
+      }
+
+      const canManage = await canManageSession(user, session);
+      if (!canManage) {
+        return res.status(403).json({ message: "Action réservée au formateur ou aux RH" });
+      }
+
+      await storage.cleanupExpiredAttendanceTokens(new Date());
+
+      const { expiresInMinutes } = attendanceTokenRequestSchema.parse(req.body ?? {});
+      const durationMinutes = expiresInMinutes ?? 60;
+      const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000);
+      const tokenValue = randomUUID();
+
+      const token = await storage.createSessionAttendanceToken({
+        sessionId: session.id,
+        token: tokenValue,
+        expiresAt,
+        createdBy: user.id,
+      });
+
+      res.status(201).json({
+        token: token.token,
+        expiresAt: token.expiresAt,
+        sessionId: token.sessionId,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Données invalides", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/attendance/sign", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(401).json({ message: "Utilisateur introuvable" });
+      }
+
+      const data = attendanceSignSchema.parse(req.body ?? {});
+      const token = await storage.getSessionAttendanceToken(data.token);
+
+      if (!token) {
+        return res.status(404).json({ message: "Jeton de présence invalide" });
+      }
+
+      if (token.expiresAt.getTime() < Date.now()) {
+        await storage.deleteSessionAttendanceToken(token.id);
+        return res.status(410).json({ message: "Le QR Code a expiré" });
+      }
+
+      const session = await storage.getSession(token.sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Session non trouvée" });
+      }
+
+      const registration = await storage.getRegistrationByUserAndSession(user.id, session.id);
+
+      if (!registration || registration.status === "cancelled") {
+        return res.status(403).json({ message: "Vous n'êtes pas inscrit à cette session" });
+      }
+
+      const now = new Date();
+      await storage.markRegistrationAttendance(registration.id, {
+        attended: true,
+        attendanceSignedAt: now,
+      });
+
+      res.json({
+        message: "Présence enregistrée",
+        sessionId: session.id,
+        attendanceSignedAt: now,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Données invalides", errors: error.errors });
+      }
       res.status(500).json({ message: error.message });
     }
   });

@@ -8,9 +8,15 @@ import {
   boolean,
   uniqueIndex,
   jsonb,
+  customType,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import type { Buffer } from "buffer";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
 
 export const SENIORITY_LEVELS = [
   "Stagiaire",
@@ -56,6 +62,23 @@ export const formations = pgTable("formations", {
   theme: text("theme").notNull(),
   tags: text("tags").array(),
   active: boolean("active").default(true),
+  content: text("content"),
+});
+
+export const formationMaterials = pgTable("formation_materials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formationId: varchar("formation_id")
+    .notNull()
+    .references(() => formations.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  fileName: text("file_name").notNull(),
+  fileType: text("file_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  fileData: bytea("file_data").notNull(),
+  requiresEnrollment: boolean("requires_enrollment").default(true),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  createdBy: varchar("created_by"),
 });
 
 export const sessions = pgTable("sessions", {
@@ -107,7 +130,26 @@ export const registrations = pgTable("registrations", {
   status: text("status").notNull(), // pending, validated, completed, cancelled
   registeredAt: timestamp("registered_at").default(sql`now()`),
   attended: boolean("attended").default(false),
+  attendanceSignedAt: timestamp("attendance_signed_at"),
 });
+
+export const sessionAttendanceTokens = pgTable(
+  "session_attendance_tokens",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    sessionId: varchar("session_id")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    token: varchar("token").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").default(sql`now()`),
+    createdBy: varchar("created_by").notNull(),
+  },
+  (table) => ({
+    tokenUnique: uniqueIndex("session_attendance_tokens_token_idx").on(table.token),
+    sessionIndex: uniqueIndex("session_attendance_tokens_session_idx").on(table.sessionId, table.token),
+  })
+);
 
 export const instructorFormations = pgTable("instructor_formations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -163,6 +205,12 @@ export const insertFormationInterestSchema = createInsertSchema(formationInteres
   coachValidatedAt: true,
 });
 export const insertRegistrationSchema = createInsertSchema(registrations).omit({ id: true, registeredAt: true, status: true });
+export const insertFormationMaterialSchema = createInsertSchema(formationMaterials).omit({
+  id: true,
+  fileData: true,
+  createdAt: true,
+  createdBy: true,
+});
 export const insertInstructorFormationSchema = createInsertSchema(instructorFormations).omit({ id: true, assignedAt: true });
 export const insertInstructorAvailabilitySchema = createInsertSchema(instructorAvailabilities).omit({ id: true, createdAt: true }).extend({
   slots: z.array(availabilitySlotSchema),
@@ -182,6 +230,8 @@ export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Session = typeof sessions.$inferSelect;
 export type InsertFormationInterest = z.infer<typeof insertFormationInterestSchema>;
 export type FormationInterest = typeof formationInterests.$inferSelect;
+export type InsertFormationMaterial = typeof formationMaterials.$inferInsert;
+export type FormationMaterial = typeof formationMaterials.$inferSelect;
 export type CoachAssignment = typeof coachAssignments.$inferSelect;
 export type InsertCoachAssignment = typeof coachAssignments.$inferInsert;
 export type AppSetting = typeof appSettings.$inferSelect;
@@ -194,3 +244,4 @@ export type InsertInstructorAvailability = z.infer<typeof insertInstructorAvaila
 export type InstructorAvailability = typeof instructorAvailabilities.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+export type SessionAttendanceToken = typeof sessionAttendanceTokens.$inferSelect;

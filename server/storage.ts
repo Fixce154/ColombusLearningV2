@@ -10,6 +10,8 @@ import {
   notifications,
   coachAssignments,
   appSettings,
+  formationMaterials,
+  sessionAttendanceTokens,
   type User,
   type InsertUser,
   type Formation,
@@ -29,6 +31,9 @@ import {
   type CoachAssignment,
   type InsertCoachAssignment,
   type AppSetting,
+  type FormationMaterial,
+  type InsertFormationMaterial,
+  type SessionAttendanceToken,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, asc, ne, inArray } from "drizzle-orm";
@@ -75,6 +80,60 @@ export const ensureNotificationsTable = (() => {
   };
 })();
 
+export const ensureFormationContentInfrastructure = (() => {
+  let ensurePromise: Promise<void> | null = null;
+
+  return async () => {
+    if (!ensurePromise) {
+      ensurePromise = (async () => {
+        await db.execute(sql`ALTER TABLE formations ADD COLUMN IF NOT EXISTS content text`);
+        await db.execute(
+          sql`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS attendance_signed_at timestamp`
+        );
+
+        await db.execute(sql`
+          CREATE TABLE IF NOT EXISTS formation_materials (
+            id varchar(255) PRIMARY KEY DEFAULT gen_random_uuid(),
+            formation_id varchar(255) NOT NULL REFERENCES formations(id) ON DELETE CASCADE,
+            title text NOT NULL,
+            description text,
+            file_name text NOT NULL,
+            file_type text NOT NULL,
+            file_size integer NOT NULL,
+            file_data bytea NOT NULL,
+            requires_enrollment boolean DEFAULT true,
+            created_at timestamp DEFAULT now(),
+            created_by varchar(255)
+          )
+        `);
+
+        await db.execute(sql`
+          CREATE INDEX IF NOT EXISTS formation_materials_formation_idx
+            ON formation_materials (formation_id)
+        `);
+
+        await db.execute(sql`
+          CREATE TABLE IF NOT EXISTS session_attendance_tokens (
+            id varchar(255) PRIMARY KEY DEFAULT gen_random_uuid(),
+            session_id varchar(255) NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+            token varchar(255) NOT NULL UNIQUE,
+            expires_at timestamp NOT NULL,
+            created_at timestamp DEFAULT now(),
+            created_by varchar(255) NOT NULL
+          )
+        `);
+
+        await db.execute(sql`
+          CREATE INDEX IF NOT EXISTS session_attendance_tokens_session_idx
+            ON session_attendance_tokens (session_id)
+        `);
+      })();
+    }
+
+    return ensurePromise;
+  };
+})();
+
 export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
@@ -91,6 +150,12 @@ export interface IStorage {
   createFormation(formation: InsertFormation): Promise<Formation>;
   updateFormation(id: string, updates: Partial<InsertFormation>): Promise<Formation | undefined>;
   deleteFormation(id: string): Promise<boolean>;
+
+  // Formation material methods
+  listFormationMaterials(formationId: string): Promise<FormationMaterial[]>;
+  getFormationMaterial(id: string): Promise<FormationMaterial | undefined>;
+  createFormationMaterial(material: InsertFormationMaterial): Promise<FormationMaterial>;
+  deleteFormationMaterial(id: string): Promise<boolean>;
 
   // Session methods
   getSession(id: string): Promise<Session | undefined>;
@@ -117,6 +182,22 @@ export interface IStorage {
   updateRegistration(id: string, updates: Partial<InsertRegistration>): Promise<Registration | undefined>;
   deleteRegistration(id: string): Promise<boolean>;
   getRegistrationCount(sessionId: string): Promise<number>;
+  getRegistrationByUserAndSession(userId: string, sessionId: string): Promise<Registration | undefined>;
+  markRegistrationAttendance(
+    registrationId: string,
+    attendance: { attended: boolean; attendanceSignedAt: Date }
+  ): Promise<Registration | undefined>;
+
+  // Attendance tokens
+  createSessionAttendanceToken(data: {
+    sessionId: string;
+    token: string;
+    expiresAt: Date;
+    createdBy: string;
+  }): Promise<SessionAttendanceToken>;
+  getSessionAttendanceToken(token: string): Promise<SessionAttendanceToken | undefined>;
+  deleteSessionAttendanceToken(id: string): Promise<boolean>;
+  cleanupExpiredAttendanceTokens(referenceDate?: Date): Promise<number>;
 
   // Instructor Formation methods
   getInstructorFormations(instructorId: string): Promise<string[]>;
@@ -227,6 +308,37 @@ export class DatabaseStorage implements IStorage {
   async deleteFormation(id: string): Promise<boolean> {
     const result = await db.delete(formations).where(eq(formations.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async listFormationMaterials(formationId: string): Promise<FormationMaterial[]> {
+    return await db
+      .select()
+      .from(formationMaterials)
+      .where(eq(formationMaterials.formationId, formationId))
+      .orderBy(desc(formationMaterials.createdAt));
+  }
+
+  async getFormationMaterial(id: string): Promise<FormationMaterial | undefined> {
+    const [material] = await db
+      .select()
+      .from(formationMaterials)
+      .where(eq(formationMaterials.id, id));
+    return material || undefined;
+  }
+
+  async createFormationMaterial(
+    material: InsertFormationMaterial
+  ): Promise<FormationMaterial> {
+    const [created] = await db.insert(formationMaterials).values(material).returning();
+    return created;
+  }
+
+  async deleteFormationMaterial(id: string): Promise<boolean> {
+    const result = await db
+      .delete(formationMaterials)
+      .where(eq(formationMaterials.id, id))
+      .returning({ id: formationMaterials.id });
+    return result.length > 0;
   }
 
   // Session methods
@@ -430,6 +542,75 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return result[0]?.count || 0;
+  }
+
+  async getRegistrationByUserAndSession(
+    userId: string,
+    sessionId: string
+  ): Promise<Registration | undefined> {
+    const [registration] = await db
+      .select()
+      .from(registrations)
+      .where(and(eq(registrations.userId, userId), eq(registrations.sessionId, sessionId)))
+      .limit(1);
+    return registration || undefined;
+  }
+
+  async markRegistrationAttendance(
+    registrationId: string,
+    attendance: { attended: boolean; attendanceSignedAt: Date }
+  ): Promise<Registration | undefined> {
+    const [registration] = await db
+      .update(registrations)
+      .set({
+        attended: attendance.attended,
+        attendanceSignedAt: attendance.attendanceSignedAt,
+      })
+      .where(eq(registrations.id, registrationId))
+      .returning();
+    return registration || undefined;
+  }
+
+  async createSessionAttendanceToken(data: {
+    sessionId: string;
+    token: string;
+    expiresAt: Date;
+    createdBy: string;
+  }): Promise<SessionAttendanceToken> {
+    const [token] = await db
+      .insert(sessionAttendanceTokens)
+      .values({
+        sessionId: data.sessionId,
+        token: data.token,
+        expiresAt: data.expiresAt,
+        createdBy: data.createdBy,
+      })
+      .returning();
+    return token;
+  }
+
+  async getSessionAttendanceToken(tokenValue: string): Promise<SessionAttendanceToken | undefined> {
+    const [token] = await db
+      .select()
+      .from(sessionAttendanceTokens)
+      .where(eq(sessionAttendanceTokens.token, tokenValue));
+    return token || undefined;
+  }
+
+  async deleteSessionAttendanceToken(id: string): Promise<boolean> {
+    const result = await db
+      .delete(sessionAttendanceTokens)
+      .where(eq(sessionAttendanceTokens.id, id))
+      .returning({ id: sessionAttendanceTokens.id });
+    return result.length > 0;
+  }
+
+  async cleanupExpiredAttendanceTokens(referenceDate: Date = new Date()): Promise<number> {
+    const result = await db
+      .delete(sessionAttendanceTokens)
+      .where(sql`${sessionAttendanceTokens.expiresAt} < ${referenceDate}`)
+      .returning({ id: sessionAttendanceTokens.id });
+    return result.length;
   }
 
   // Instructor Formation methods

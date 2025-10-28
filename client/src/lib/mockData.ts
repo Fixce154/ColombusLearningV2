@@ -98,6 +98,7 @@ export const mockFormations: Formation[] = [
     theme: "Gestion de projet",
     tags: ["agile", "scrum", "gestion projet"],
     active: true,
+    content: null,
   },
   {
     id: "f2",
@@ -111,6 +112,7 @@ export const mockFormations: Formation[] = [
     theme: "Management",
     tags: ["leadership", "management", "soft skills"],
     active: true,
+    content: null,
   },
   {
     id: "f3",
@@ -124,6 +126,7 @@ export const mockFormations: Formation[] = [
     theme: "Technique",
     tags: ["python", "data science", "machine learning"],
     active: true,
+    content: null,
   },
   {
     id: "f4",
@@ -137,6 +140,7 @@ export const mockFormations: Formation[] = [
     theme: "Soft Skills",
     tags: ["communication", "soft skills"],
     active: true,
+    content: null,
   },
   {
     id: "f5",
@@ -150,6 +154,7 @@ export const mockFormations: Formation[] = [
     theme: "Technique",
     tags: ["aws", "cloud", "architecture"],
     active: true,
+    content: null,
   },
   {
     id: "f6",
@@ -163,6 +168,7 @@ export const mockFormations: Formation[] = [
     theme: "Stratégie",
     tags: ["digital", "transformation", "stratégie"],
     active: true,
+    content: null,
   },
 ];
 
@@ -231,6 +237,7 @@ export const mockRegistrations: Registration[] = [
     status: "validated",
     registeredAt: new Date("2025-10-15T10:30:00"),
     attended: false,
+    attendanceSignedAt: null,
   },
   {
     id: "r2",
@@ -241,5 +248,6 @@ export const mockRegistrations: Registration[] = [
     status: "pending",
     registeredAt: new Date("2025-10-20T14:00:00"),
     attended: false,
+    attendanceSignedAt: null,
   },
 ];
