@@ -15,11 +15,13 @@ import SessionManagement from "@/pages/SessionManagement";
 import InstructorFormations from "@/pages/InstructorFormations";
 import InstructorAvailability from "@/pages/InstructorAvailability";
 import InstructorSessions from "@/pages/InstructorSessions";
+import InstructorFormationContent from "@/pages/InstructorFormationContent";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/not-found";
 import DataVisualization from "@/pages/DataVisualization";
 import CoachDashboard from "@/pages/CoachDashboard";
 import AccountSettings from "@/pages/AccountSettings";
+import AttendanceSign from "@/pages/AttendanceSign";
 import type { User } from "@shared/schema";
 import { Loader2, LogOut } from "lucide-react";
 import { useEffect } from "react";
@@ -55,8 +57,10 @@ function Router({ currentUser }: { currentUser: User }) {
       <Route path="/sessions" component={SessionManagement} />
       <Route path="/data-visualisation" component={DataVisualization} />
       <Route path="/instructor-formations" component={InstructorFormations} />
+      <Route path="/instructor-formations/:id" component={InstructorFormationContent} />
       <Route path="/instructor-availability" component={InstructorAvailability} />
       <Route path="/instructor-sessions" component={InstructorSessions} />
+      <Route path="/attendance/:token" component={AttendanceSign} />
       <Route path="/coach" component={() => <CoachDashboard currentUser={currentUser} />} />
       <Route component={NotFound} />
     </Switch>

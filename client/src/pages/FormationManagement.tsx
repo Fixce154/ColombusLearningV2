@@ -58,6 +58,7 @@ import { z } from "zod";
 
 const formationFormSchema = insertFormationSchema.extend({
   tags: z.string().optional(),
+  content: z.string().optional(),
 });
 
 type FormationFormData = z.infer<typeof formationFormSchema>;
@@ -87,6 +88,7 @@ export default function FormationManagement() {
       description: "",
       objectives: "",
       prerequisites: "",
+      content: "",
       duration: "",
       modality: "presentiel",
       seniorityRequired: undefined,
@@ -101,6 +103,7 @@ export default function FormationManagement() {
       const payload = {
         ...data,
         tags: data.tags ? data.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+        content: data.content || "",
       };
       return apiRequest("/api/formations", "POST", payload);
     },
@@ -127,6 +130,7 @@ export default function FormationManagement() {
       const payload = {
         ...data,
         tags: data.tags ? data.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+        content: data.content || "",
       };
       return apiRequest(`/api/formations/${id}`, "PATCH", payload);
     },
@@ -177,6 +181,7 @@ export default function FormationManagement() {
       description: "",
       objectives: "",
       prerequisites: "",
+      content: "",
       duration: "",
       modality: "presentiel",
       seniorityRequired: undefined,
@@ -194,6 +199,7 @@ export default function FormationManagement() {
       description: formation.description,
       objectives: formation.objectives,
       prerequisites: formation.prerequisites || "",
+      content: formation.content || "",
       duration: formation.duration,
       modality: formation.modality,
       seniorityRequired: formation.seniorityRequired || undefined,
@@ -488,6 +494,25 @@ export default function FormationManagement() {
                       <FormLabel>Prérequis</FormLabel>
                       <FormControl>
                         <Textarea {...field} value={field.value ?? ""} rows={2} data-testid="textarea-formation-prerequisites" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="content"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contenu détaillé</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          value={field.value ?? ""}
+                          rows={6}
+                          placeholder="Décrivez le programme, les activités, les points clés..."
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

@@ -28,7 +28,19 @@ import ModalityBadge from "@/components/ModalityBadge";
 import SeniorityBadge from "@/components/SeniorityBadge";
 import SessionCard from "@/components/SessionCard";
 import PrioritySelector from "@/components/PrioritySelector";
-import { ArrowLeft, Clock, Target, BookOpen, Calendar, AlertCircle, CheckCircle, Loader2, XCircle, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  Target,
+  BookOpen,
+  Calendar,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  XCircle,
+  Trash2,
+  Download,
+} from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { User, Formation, Session, Registration, FormationInterest } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +48,20 @@ import { useToast } from "@/hooks/use-toast";
 interface TrainingDetailProps {
   currentUser: User;
 }
+
+interface FormationMaterialMetadata {
+  id: string;
+  formationId: string;
+  title: string;
+  description?: string | null;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  requiresEnrollment: boolean;
+  createdAt: string;
+}
+
+type MaterialsQueryError = Error & { status?: number };
 
 export default function TrainingDetail({ currentUser: _currentUser }: TrainingDetailProps) {
   const [, params] = useRoute("/training/:id");
@@ -96,6 +122,57 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
       return res.json();
     },
   });
+
+  const {
+    data: materials = [],
+    isLoading: isLoadingMaterials,
+    error: materialsError,
+  } = useQuery<FormationMaterialMetadata[], MaterialsQueryError>({
+    queryKey: ["/api/formations", params?.id, "materials"],
+    enabled: Boolean(params?.id),
+    queryFn: async () => {
+      const res = await fetch(`/api/formations/${params?.id}/materials`, {
+        credentials: "include",
+      });
+      if (res.status === 403) {
+        const error = new Error("Accès réservé aux participants") as MaterialsQueryError;
+        error.status = 403;
+        throw error;
+      }
+      if (res.status === 404) {
+        return [];
+      }
+      if (!res.ok) {
+        throw new Error("Impossible de charger les ressources");
+      }
+      return res.json();
+    },
+  });
+
+  const handleMaterialDownload = async (material: FormationMaterialMetadata) => {
+    try {
+      const res = await fetch(
+        `/api/formations/${material.formationId}/materials/${material.id}/download`,
+        {
+          credentials: "include",
+        }
+      );
+      if (!res.ok) {
+        throw new Error("Téléchargement impossible");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = material.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to download material", error);
+    }
+  };
 
   // Express interest mutation
   const expressInterestMutation = useMutation({
@@ -241,6 +318,7 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
 
   // Check if user has already expressed interest for this formation
   const existingInterest = interests.find(i => i.formationId === formation.id && i.status !== "withdrawn");
+  const isMaterialsForbidden = (materialsError as MaterialsQueryError | undefined)?.status === 403;
 
   return (
     <div className="space-y-10">
@@ -363,10 +441,12 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
       <Tabs defaultValue="description" className="w-full">
         <TabsList className="h-12 bg-muted p-1 shadow-sm rounded-2xl">
           <TabsTrigger value="description" className="px-6 font-medium">Description</TabsTrigger>
+          <TabsTrigger value="content" className="px-6 font-medium">Contenu</TabsTrigger>
           <TabsTrigger value="sessions" className="px-6 font-medium gap-2">
             <Calendar className="w-4 h-4" />
             Sessions ({sessions.length})
           </TabsTrigger>
+          <TabsTrigger value="resources" className="px-6 font-medium">Ressources</TabsTrigger>
         </TabsList>
 
         <TabsContent value="description" className="space-y-6 mt-8">
@@ -408,6 +488,78 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
                 ))}
               </div>
             </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="content" className="mt-8">
+          <Card className="p-8 shadow-md rounded-3xl border border-border/60 bg-background/95">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-blue-500/10 p-2.5 rounded-lg">
+                <Target className="w-5 h-5 text-blue-500" />
+              </div>
+              <h2 className="text-2xl font-semibold text-primary">Programme détaillé</h2>
+            </div>
+            {formation.content ? (
+              <div className="text-muted-foreground leading-relaxed whitespace-pre-wrap text-base">
+                {formation.content}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Le formateur complétera prochainement le contenu de cette formation.
+              </p>
+            )}
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="resources" className="mt-8 space-y-4">
+          {isMaterialsForbidden ? (
+            <Card className="p-8 shadow-md rounded-3xl border border-border/60 bg-background/95">
+              <p className="text-sm text-muted-foreground">
+                Les ressources sont réservées aux collaborateurs inscrits à une session.
+              </p>
+            </Card>
+          ) : isLoadingMaterials ? (
+            <Card className="p-8 shadow-md rounded-3xl border border-border/60 bg-background/95">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Chargement des documents...
+              </div>
+            </Card>
+          ) : materials.length === 0 ? (
+            <Card className="p-8 shadow-md rounded-3xl border border-border/60 bg-background/95">
+              <p className="text-sm text-muted-foreground">
+                Aucun document n'est disponible pour le moment.
+              </p>
+            </Card>
+          ) : (
+            materials.map((material) => (
+              <Card
+                key={material.id}
+                className="p-6 shadow-md rounded-3xl border border-border/60 bg-background/95 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+              >
+                <div>
+                  <h3 className="text-lg font-semibold">{material.title}</h3>
+                  {material.description && (
+                    <p className="text-sm text-muted-foreground mt-1">{material.description}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {new Date(material.createdAt).toLocaleString("fr-FR", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                    {" • "}
+                    {(material.fileSize / 1024).toFixed(1)} Ko
+                  </p>
+                </div>
+                <Button onClick={() => handleMaterialDownload(material)} variant="secondary" className="self-start">
+                  <Download className="w-4 h-4 mr-2" />
+                  Télécharger
+                </Button>
+              </Card>
+            ))
           )}
         </TabsContent>
 

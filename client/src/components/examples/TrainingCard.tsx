@@ -13,6 +13,7 @@ export default function TrainingCardExample() {
     theme: "Gestion de projet",
     tags: ["agile", "scrum", "gestion projet"],
     active: true,
+    content: null,
   };
 
   return (

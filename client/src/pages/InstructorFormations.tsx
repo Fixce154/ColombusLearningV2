@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import type { Formation, User } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function InstructorFormations() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const { data: currentUserData, isLoading: isLoadingCurrentUser } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
@@ -131,18 +133,31 @@ export default function InstructorFormations() {
           </Badge>
         )}
 
-        {isSelected && onRemove ? (
-          <Button
-            variant="destructive"
-            size="sm"
-            className="w-full"
-            onClick={() => onRemove(formation.id)}
-            disabled={removeFormationMutation.isPending}
-            data-testid={`button-remove-formation-${formation.id}`}
-          >
-            <X className="w-4 h-4 mr-2" />
-            Retirer
-          </Button>
+        {isSelected ? (
+          <div className="space-y-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-full"
+              onClick={() => navigate(`/instructor-formations/${formation.id}`)}
+            >
+              <BookOpen className="w-4 h-4 mr-2" />
+              Gérer le contenu
+            </Button>
+            {onRemove && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="w-full"
+                onClick={() => onRemove(formation.id)}
+                disabled={removeFormationMutation.isPending}
+                data-testid={`button-remove-formation-${formation.id}`}
+              >
+                <X className="w-4 h-4 mr-2" />
+                Retirer
+              </Button>
+            )}
+          </div>
         ) : onAdd ? (
           <Button
             variant="default"
