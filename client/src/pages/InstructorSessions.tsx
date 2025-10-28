@@ -108,7 +108,7 @@ export default function InstructorSessions() {
   const qrValue = useMemo(() => {
     if (!tokenData) return "";
     if (typeof window !== "undefined") {
-      return `${window.location.origin}/attendance/${tokenData.token}`;
+      return new URL(`/a/${tokenData.token}`, window.location.origin).toString();
     }
     return tokenData.token;
   }, [tokenData]);
