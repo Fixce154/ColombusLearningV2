@@ -507,6 +507,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      if (typeof inputData.employeeId === "string" && inputData.employeeId.trim() === "") {
+        delete inputData.employeeId;
+      }
+
+      if (typeof inputData.seniority === "string" && inputData.seniority.trim() === "") {
+        delete inputData.seniority;
+      }
+
+      if (typeof inputData.hireDate === "string" && inputData.hireDate.trim() !== "") {
+        const parsedDate = new Date(inputData.hireDate);
+        if (!Number.isNaN(parsedDate.getTime())) {
+          inputData.hireDate = parsedDate;
+        } else {
+          delete inputData.hireDate;
+        }
+      }
+
       const validationSchema = insertUserSchema.extend({
         password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
       });
@@ -992,9 +1009,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       email: z.string().email("Email invalide"),
       employeeId: z.string().optional(),
       hireDate: z.string().optional(),
-      grade: z.string().optional(),
-      jobRole: z.string().optional(),
-      businessUnit: z.string().optional(),
+      role: z.enum(["consultant", "rh"]),
+      seniority: z.enum(SENIORITY_LEVELS).optional(),
       currentPassword: z.string().optional(),
       newPassword: z
         .string()
@@ -1002,6 +1018,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .optional(),
     })
     .superRefine((data, ctx) => {
+      if (data.role === "consultant" && !data.seniority) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["seniority"],
+          message: "La séniorité est requise pour les consultants",
+        });
+      }
+
+      if (data.role !== "consultant" && data.seniority) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["seniority"],
+          message: "La séniorité ne concerne que les consultants",
+        });
+      }
+
       if (data.newPassword && !data.currentPassword) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -1133,11 +1165,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       updates.employeeId = parsed.employeeId?.trim()
         ? parsed.employeeId.trim()
         : (null as any);
-      updates.grade = parsed.grade?.trim() ? parsed.grade.trim() : (null as any);
-      updates.jobRole = parsed.jobRole?.trim() ? parsed.jobRole.trim() : (null as any);
-      updates.businessUnit = parsed.businessUnit?.trim()
-        ? parsed.businessUnit.trim()
-        : (null as any);
+      updates.seniority = parsed.seniority ?? (null as any);
+
+      const normalizedRoles = new Set(user.roles);
+      if (parsed.role === "rh") {
+        normalizedRoles.add("rh");
+        normalizedRoles.add("consultant");
+      } else {
+        normalizedRoles.delete("rh");
+        normalizedRoles.add("consultant");
+      }
+
+      updates.roles = Array.from(normalizedRoles);
 
       if (parsed.hireDate?.trim()) {
         const parsedDate = new Date(parsed.hireDate.trim());
@@ -1453,6 +1492,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (hadCoachRole && !wantsCoachRole) {
           await storage.deleteCoachAssignmentsForCoach(targetUser.id);
         }
+      }
+
+      if (typeof updateData.employeeId === "string") {
+        const trimmed = updateData.employeeId.trim();
+        updateData.employeeId = trimmed.length > 0 ? trimmed : (null as any);
+      }
+
+      if (typeof updateData.hireDate === "string") {
+        const parsedDate = new Date(updateData.hireDate);
+        updateData.hireDate = Number.isNaN(parsedDate.getTime()) ? (null as any) : parsedDate;
+      }
+
+      if (updateData.hireDate === null) {
+        updateData.hireDate = null as any;
       }
 
       // Update user basic info

@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { User } from "@shared/schema";
+import { SENIORITY_LEVELS, type SeniorityLevel, type User } from "@shared/schema";
 import {
   Card,
   CardContent,
@@ -13,6 +13,13 @@ import {
 } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -40,14 +47,29 @@ const profileSchema = z
     email: z.string().email("Email invalide"),
     employeeId: optionalTextField,
     hireDate: optionalTextField,
-    grade: optionalTextField,
-    jobRole: optionalTextField,
-    businessUnit: optionalTextField,
+    role: z.enum(["consultant", "rh"]),
+    seniority: z.enum(SENIORITY_LEVELS).optional(),
     currentPassword: optionalTextField,
     newPassword: optionalPasswordField,
     confirmPassword: optionalTextField,
   })
   .superRefine((data, ctx) => {
+    if (data.role === "consultant" && !data.seniority) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "La séniorité est requise pour les consultants",
+        path: ["seniority"],
+      });
+    }
+
+    if (data.role !== "consultant" && data.seniority) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "La séniorité ne concerne que les consultants",
+        path: ["seniority"],
+      });
+    }
+
     if (data.newPassword) {
       if (!data.currentPassword) {
         ctx.addIssue({
@@ -90,9 +112,27 @@ const extractNameParts = (name: string) => {
   return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
 };
 
+const derivePrimaryRole = (roles: string[]): "consultant" | "rh" => {
+  return roles.includes("rh") ? "rh" : "consultant";
+};
+
+const resolveSeniority = (value: string | null | undefined): SeniorityLevel | undefined => {
+  return value && SENIORITY_LEVELS.includes(value as SeniorityLevel)
+    ? (value as SeniorityLevel)
+    : undefined;
+};
+
 export default function AccountSettings({ currentUser }: AccountSettingsProps) {
   const { toast } = useToast();
   const nameParts = useMemo(() => extractNameParts(currentUser.name), [currentUser.name]);
+  const primaryRole = useMemo(() => derivePrimaryRole(currentUser.roles), [currentUser.roles]);
+  const defaultSeniority = useMemo(() => {
+    const resolved = resolveSeniority(currentUser.seniority);
+    if (resolved) {
+      return resolved;
+    }
+    return primaryRole === "consultant" ? SENIORITY_LEVELS[0] : undefined;
+  }, [currentUser.seniority, primaryRole]);
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -102,14 +142,26 @@ export default function AccountSettings({ currentUser }: AccountSettingsProps) {
       email: currentUser.email,
       employeeId: currentUser.employeeId ?? "",
       hireDate: currentUser.hireDate ? format(new Date(currentUser.hireDate), "yyyy-MM-dd") : "",
-      grade: currentUser.grade ?? "",
-      jobRole: currentUser.jobRole ?? "",
-      businessUnit: currentUser.businessUnit ?? "",
+      role: primaryRole,
+      seniority: defaultSeniority,
       currentPassword: "",
       newPassword: "",
       confirmPassword: "",
     },
   });
+
+  const selectedRole = form.watch("role");
+
+  useEffect(() => {
+    if (selectedRole !== "consultant") {
+      form.setValue("seniority", undefined);
+    } else {
+      const currentSeniority = form.getValues("seniority");
+      if (!currentSeniority) {
+        form.setValue("seniority", defaultSeniority ?? SENIORITY_LEVELS[0]);
+      }
+    }
+  }, [selectedRole, form, defaultSeniority]);
 
   useEffect(() => {
     form.reset({
@@ -118,14 +170,13 @@ export default function AccountSettings({ currentUser }: AccountSettingsProps) {
       email: currentUser.email,
       employeeId: currentUser.employeeId ?? "",
       hireDate: currentUser.hireDate ? format(new Date(currentUser.hireDate), "yyyy-MM-dd") : "",
-      grade: currentUser.grade ?? "",
-      jobRole: currentUser.jobRole ?? "",
-      businessUnit: currentUser.businessUnit ?? "",
+      role: primaryRole,
+      seniority: defaultSeniority,
       currentPassword: "",
       newPassword: "",
       confirmPassword: "",
     });
-  }, [currentUser, form, nameParts.firstName, nameParts.lastName]);
+  }, [currentUser, form, nameParts.firstName, nameParts.lastName, primaryRole, defaultSeniority]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: ProfileFormData) => {
@@ -133,12 +184,14 @@ export default function AccountSettings({ currentUser }: AccountSettingsProps) {
         firstName: data.firstName.trim(),
         lastName: data.lastName.trim(),
         email: data.email.trim(),
+        role: data.role,
         employeeId: data.employeeId ?? "",
         hireDate: data.hireDate ?? "",
-        grade: data.grade ?? "",
-        jobRole: data.jobRole ?? "",
-        businessUnit: data.businessUnit ?? "",
       };
+
+      if (data.role === "consultant" && data.seniority) {
+        payload.seniority = data.seniority;
+      }
 
       if (data.newPassword) {
         payload.currentPassword = data.currentPassword ?? "";
@@ -157,15 +210,17 @@ export default function AccountSettings({ currentUser }: AccountSettingsProps) {
       const updatedUser: User | undefined = response?.user;
       if (updatedUser) {
         const parts = extractNameParts(updatedUser.name);
+        const updatedRole = derivePrimaryRole(updatedUser.roles);
+        const updatedSeniority = resolveSeniority(updatedUser.seniority);
         form.reset({
           firstName: parts.firstName,
           lastName: parts.lastName,
           email: updatedUser.email,
           employeeId: updatedUser.employeeId ?? "",
           hireDate: updatedUser.hireDate ? format(new Date(updatedUser.hireDate), "yyyy-MM-dd") : "",
-          grade: updatedUser.grade ?? "",
-          jobRole: updatedUser.jobRole ?? "",
-          businessUnit: updatedUser.businessUnit ?? "",
+          role: updatedRole,
+          seniority:
+            updatedSeniority ?? (updatedRole === "consultant" ? SENIORITY_LEVELS[0] : undefined),
           currentPassword: "",
           newPassword: "",
           confirmPassword: "",
@@ -287,27 +342,25 @@ export default function AccountSettings({ currentUser }: AccountSettingsProps) {
 
               <FormField
                 control={form.control}
-                name="grade"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Grade</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Consultant confirmé" {...field} disabled={updateProfileMutation.isPending} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="jobRole"
+                name="role"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Rôle</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Product Owner" {...field} disabled={updateProfileMutation.isPending} />
-                    </FormControl>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => field.onChange(value as ProfileFormData["role"])}
+                      disabled={updateProfileMutation.isPending}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionnez un rôle" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="consultant">Consultant</SelectItem>
+                        <SelectItem value="rh">Fonction transverse</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -315,13 +368,28 @@ export default function AccountSettings({ currentUser }: AccountSettingsProps) {
 
               <FormField
                 control={form.control}
-                name="businessUnit"
+                name="seniority"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Unité d'affaires</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Digital Factory" {...field} disabled={updateProfileMutation.isPending} />
-                    </FormControl>
+                    <FormLabel>Séniorité</FormLabel>
+                    <Select
+                      value={field.value ?? undefined}
+                      onValueChange={(value) => field.onChange(value as SeniorityLevel)}
+                      disabled={updateProfileMutation.isPending || selectedRole !== "consultant"}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionnez votre séniorité" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {SENIORITY_LEVELS.map((level) => (
+                          <SelectItem key={level} value={level}>
+                            {level}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
