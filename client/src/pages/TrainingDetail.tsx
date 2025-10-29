@@ -145,7 +145,68 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false);
   const [showCancelInterestDialog, setShowCancelInterestDialog] = useState(false);
+  const [showCalendarPrompt, setShowCalendarPrompt] = useState(false);
+  const [calendarRegistration, setCalendarRegistration] = useState<Registration | null>(null);
+  const [calendarSession, setCalendarSession] = useState<Session | null>(null);
+  const [isSendingCalendarInvite, setIsSendingCalendarInvite] = useState(false);
   const { toast } = useToast();
+
+  const closeCalendarPrompt = () => {
+    setShowCalendarPrompt(false);
+    setCalendarRegistration(null);
+    setCalendarSession(null);
+    setIsSendingCalendarInvite(false);
+  };
+
+  const formatSessionWindow = (session: Session) => {
+    const start = new Date(session.startDate);
+    const end = new Date(session.endDate);
+    const dateFormatter = new Intl.DateTimeFormat("fr-FR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+    const timeFormatter = new Intl.DateTimeFormat("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+
+    const sameDay =
+      start.getFullYear() === end.getFullYear() &&
+      start.getMonth() === end.getMonth() &&
+      start.getDate() === end.getDate();
+
+    if (sameDay) {
+      return `${dateFormatter.format(start)} • ${timeFormatter.format(start)} → ${timeFormatter.format(end)}`;
+    }
+
+    return `${dateFormatter.format(start)} • ${timeFormatter.format(start)} → ${dateFormatter.format(end)} • ${timeFormatter.format(end)}`;
+  };
+
+  const handleSendCalendarInvite = async () => {
+    if (!calendarRegistration) {
+      return;
+    }
+
+    try {
+      setIsSendingCalendarInvite(true);
+      await apiRequest(`/api/registrations/${calendarRegistration.id}/invite`, "POST");
+      toast({
+        title: "Invitation envoyée",
+        description: "Un email avec l'invitation calendrier vient d'être généré.",
+      });
+      closeCalendarPrompt();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Impossible d'envoyer l'invitation",
+        description: error?.message || "Merci de réessayer dans quelques instants.",
+      });
+    } finally {
+      setIsSendingCalendarInvite(false);
+    }
+  };
 
   // Fetch current user (to get updated quotas)
   const { data: userData } = useQuery<{ user: User }>({
@@ -381,7 +442,7 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
       
       return registration;
     },
-    onSuccess: () => {
+    onSuccess: (registration) => {
       queryClient.invalidateQueries({ queryKey: ["/api/interests"] });
       queryClient.invalidateQueries({ queryKey: ["/api/registrations"] });
       toast({
@@ -390,6 +451,12 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
       });
       setShowEnrollmentDialog(false);
       setSelectedSession(null);
+      if (registration) {
+        setCalendarRegistration(registration);
+        const matchingSession = sessions.find((s) => s.id === registration.sessionId) || null;
+        setCalendarSession(matchingSession);
+        setShowCalendarPrompt(true);
+      }
     },
     onError: (error: any) => {
       toast({
@@ -1090,6 +1157,57 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={showCalendarPrompt}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeCalendarPrompt();
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ajouter à votre agenda</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-base">
+              <span>
+                Souhaitez-vous recevoir l'invitation calendrier pour bloquer cette session "{formation?.title ?? "cette formation"}" dans votre agenda ?
+              </span>
+              {calendarSession && (
+                <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+                  <div className="font-semibold text-primary">{formatSessionWindow(calendarSession)}</div>
+                  {calendarSession.location && (
+                    <div className="text-muted-foreground mt-1">Lieu : {calendarSession.location}</div>
+                  )}
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogCancel onClick={closeCalendarPrompt} disabled={isSendingCalendarInvite}>
+              Plus tard
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                handleSendCalendarInvite();
+              }}
+              disabled={isSendingCalendarInvite}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              type="button"
+            >
+              {isSendingCalendarInvite ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Envoi en cours...
+                </>
+              ) : (
+                "Oui, envoyer l'invitation"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Cancel Interest Confirmation Dialog */}
       <Dialog open={showCancelInterestDialog} onOpenChange={setShowCancelInterestDialog}>

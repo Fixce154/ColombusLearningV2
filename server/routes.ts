@@ -5,6 +5,7 @@ import connectPgSimple from "connect-pg-simple";
 import { inflateRawSync } from "zlib";
 import { pool } from "./db";
 import { storage, ensureFormationContentInfrastructure } from "./storage";
+import { sendSessionInvitationEmail } from "./invitations";
 import { requireAuth, optionalAuth, type AuthRequest } from "./auth";
 import {
   insertUserSchema,
@@ -2215,32 +2216,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const data = validationSchema.parse(req.body);
 
       const session = await storage.createSession(data);
-
-      try {
-        const formation = await storage.getFormation(data.formationId);
-        const interests = await storage.listFormationInterests({ formationId: data.formationId });
-        const interestedUsers = interests.filter(
-          (interest) => interest.status === "approved" || interest.status === "converted"
-        );
-
-        if (interestedUsers.length > 0) {
-          const message = `Une nouvelle session pour ${formation?.title ?? "votre formation"} est disponible.`;
-          await Promise.all(
-            interestedUsers.map((interest) =>
-              createNotification({
-                userId: interest.userId,
-                route: "/",
-                title: "Nouvelle session disponible",
-                message,
-              })
-            )
-          );
-        }
-      } catch (notificationError) {
-        console.error("Failed to notify consultants about new session", notificationError);
-      }
+      const formation = await storage.getFormation(data.formationId);
 
       res.status(201).json(session);
+
+      void (async () => {
+        try {
+          const interests = await storage.listFormationInterests({ formationId: data.formationId });
+          const interestedUsers = interests.filter(
+            (interest) => interest.status === "approved" || interest.status === "converted"
+          );
+
+          if (interestedUsers.length > 0) {
+            const message = `Une nouvelle session pour ${formation?.title ?? "votre formation"} est disponible.`;
+            await Promise.all(
+              interestedUsers.map((interest) =>
+                createNotification({
+                  userId: interest.userId,
+                  route: "/",
+                  title: "Nouvelle session disponible",
+                  message,
+                })
+              )
+            );
+          }
+        } catch (notificationError) {
+          console.error("Failed to notify consultants about new session", notificationError);
+        }
+      })();
+
+      if (formation && session.instructorId) {
+        void (async () => {
+          try {
+            const instructor = await storage.getUser(session.instructorId!);
+            if (instructor?.email) {
+              await sendSessionInvitationEmail({
+                recipients: [{ email: instructor.email, name: instructor.name }],
+                session,
+                formation,
+                sequence: Math.floor(new Date(session.startDate).getTime() / 1000),
+                reason: "Vous intervenez en tant que formateur sur cette session.",
+              });
+            }
+          } catch (inviteError) {
+            console.error("Failed to send instructor invitation", inviteError);
+          }
+        })();
+      }
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -2365,6 +2387,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.updateSession(req.params.id, updates);
       res.json(updated);
+
+      if (!updated) {
+        return;
+      }
+
+      void (async () => {
+        try {
+          const formation = await storage.getFormation(updated.formationId);
+          if (!formation) {
+            return;
+          }
+
+          const sequence = Math.floor(Date.now() / 1000);
+
+          if (session.instructorId && session.instructorId !== updated.instructorId) {
+            const previousInstructor = await storage.getUser(session.instructorId);
+            if (previousInstructor?.email) {
+              await sendSessionInvitationEmail({
+                recipients: [{ email: previousInstructor.email, name: previousInstructor.name }],
+                session: updated,
+                formation,
+                method: "CANCEL",
+                sequence,
+                reason: "Cette session ne nécessite plus votre intervention.",
+              });
+            }
+          }
+
+          if (updated.instructorId) {
+            const instructor = await storage.getUser(updated.instructorId);
+            if (instructor?.email) {
+              await sendSessionInvitationEmail({
+                recipients: [{ email: instructor.email, name: instructor.name }],
+                session: updated,
+                formation,
+                sequence,
+                reason: "La session a été mise à jour. Merci de vérifier les nouvelles informations.",
+              });
+            }
+          }
+
+          const registrations = await storage.listRegistrations(undefined, updated.id);
+          const activeRegistrations = registrations.filter(
+            (registration) => registration.status !== "cancelled"
+          );
+
+          if (activeRegistrations.length > 0) {
+            const userIds = Array.from(new Set(activeRegistrations.map((registration) => registration.userId)));
+            const users = await storage.listUsersByIds(userIds);
+
+            await Promise.all(
+              users
+                .filter((participant) => participant.email)
+                .map((participant) =>
+                  sendSessionInvitationEmail({
+                    recipients: [{ email: participant.email, name: participant.name }],
+                    session: updated,
+                    formation,
+                    sequence,
+                    reason: "Les informations de votre session de formation ont été mises à jour.",
+                  })
+                )
+            );
+          }
+        } catch (inviteError) {
+          console.error("Failed to send updated session invitations", inviteError);
+        }
+      })();
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -3313,6 +3403,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.status(201).json(registration);
+
+      if (registrationStatus === "validated" && formation && targetUser.email) {
+        void (async () => {
+          try {
+            await sendSessionInvitationEmail({
+              recipients: [{ email: targetUser.email, name: targetUser.name }],
+              session,
+              formation,
+              sequence: Math.floor(Date.now() / 1000),
+              reason:
+                targetUserId === userId
+                  ? "Votre demande a été validée. L'invitation est prête pour votre agenda."
+                  : "Les RH vous ont inscrit à cette session. L'invitation ci-jointe vous permet de la bloquer dans votre agenda.",
+            });
+          } catch (inviteError) {
+            console.error("Failed to send registration invitation", inviteError);
+          }
+        })();
+      }
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid request data", errors: error.errors });
@@ -3325,7 +3434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -3367,6 +3476,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.updateRegistration(req.params.id, req.body);
       res.json(updated);
+
+      if (
+        updated &&
+        req.body.status === "validated" &&
+        registration.status !== "validated"
+      ) {
+        const attendee = await storage.getUser(registration.userId);
+        const session = await storage.getSession(registration.sessionId);
+        const formation = await storage.getFormation(registration.formationId);
+
+        if (attendee && attendee.email && session && formation) {
+          void (async () => {
+            try {
+              await sendSessionInvitationEmail({
+                recipients: [{ email: attendee.email, name: attendee.name }],
+                session,
+                formation,
+                sequence: Math.floor(Date.now() / 1000),
+                reason: "Votre inscription a été validée. Ajoutez la session à votre agenda.",
+              });
+            } catch (inviteError) {
+              console.error("Failed to send validation invitation", inviteError);
+            }
+          })();
+        }
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/registrations/:id/invite", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const registration = await storage.getRegistration(req.params.id);
+      if (!registration) {
+        return res.status(404).json({ message: "Registration not found" });
+      }
+
+      if (registration.userId !== userId && !user.roles.includes("rh")) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const attendee = await storage.getUser(registration.userId);
+      const session = await storage.getSession(registration.sessionId);
+      const formation = await storage.getFormation(registration.formationId);
+
+      if (!attendee || !session || !formation) {
+        return res.status(404).json({ message: "Associated resources not found" });
+      }
+
+      if (!attendee.email) {
+        return res.status(400).json({ message: "L'adresse email du collaborateur est manquante" });
+      }
+
+      res.status(202).json({ message: "Invitation en cours d'envoi" });
+
+      void (async () => {
+        try {
+          await sendSessionInvitationEmail({
+            recipients: [{ email: attendee.email, name: attendee.name }],
+            session,
+            formation,
+            sequence: Math.floor(Date.now() / 1000),
+            reason: "Voici votre invitation pour ajouter la session à votre agenda.",
+          });
+        } catch (inviteError) {
+          console.error("Failed to send manual invitation", inviteError);
+        }
+      })();
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
