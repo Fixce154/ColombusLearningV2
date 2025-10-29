@@ -1070,10 +1070,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     );
 
-  const rhValidationSettingSchema = z.object({
-    rhValidationOnly: z.boolean(),
-  });
-
   // Get all users (RH only)
   app.get("/api/users", requireAuth, async (req, res) => {
     try {
@@ -1661,26 +1657,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  app.get(
-    "/api/admin/settings/rh-validation",
-    requireAuth,
-    async (req, res) => {
-      try {
-        const userId = (req as AuthRequest).userId!;
-        const user = await storage.getUser(userId);
-
-        if (!user || !user.roles.includes("rh")) {
-          return res.status(403).json({ message: "Unauthorized" });
-        }
-
-        const value = await storage.getSetting<boolean>(RH_VALIDATION_SETTING_KEY);
-        res.json({ rhValidationOnly: Boolean(value) });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
-      }
-    }
-  );
-
   app.patch(
     "/api/admin/settings/coach-validation",
     requireAuth,
@@ -1726,31 +1702,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           coachValidationOnly: nextCoachValue,
           rhValidationOnly: nextRhValue,
         });
-      } catch (error: any) {
-        if (error instanceof z.ZodError) {
-          return res.status(400).json({ message: "Données invalides", errors: error.errors });
-        }
-        res.status(500).json({ message: error.message });
-      }
-    }
-  );
-
-  app.patch(
-    "/api/admin/settings/rh-validation",
-    requireAuth,
-    async (req, res) => {
-      try {
-        const userId = (req as AuthRequest).userId!;
-        const user = await storage.getUser(userId);
-
-        if (!user || !user.roles.includes("rh")) {
-          return res.status(403).json({ message: "Unauthorized" });
-        }
-
-        const data = rhValidationSettingSchema.parse(req.body);
-        await storage.setSetting(RH_VALIDATION_SETTING_KEY, data.rhValidationOnly);
-
-        res.json({ rhValidationOnly: data.rhValidationOnly });
       } catch (error: any) {
         if (error instanceof z.ZodError) {
           return res.status(400).json({ message: "Données invalides", errors: error.errors });
@@ -2711,13 +2662,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
-      const coachValidationOnly = Boolean(
-        await storage.getSetting<boolean>(COACH_VALIDATION_SETTING_KEY)
-      );
+      const [coachValidationSetting, rhValidationSetting] = await Promise.all([
+        storage.getSetting<boolean>(COACH_VALIDATION_SETTING_KEY),
+        storage.getSetting<boolean>(RH_VALIDATION_SETTING_KEY),
+      ]);
+      const coachValidationOnly = Boolean(coachValidationSetting);
+      const rhValidationOnly = Boolean(rhValidationSetting);
 
       const updates: Partial<FormationInterest> = { ...req.body };
 
-      if (updates.status === "approved" && !coachValidationOnly) {
+      if (updates.status === "approved" && !coachValidationOnly && !rhValidationOnly) {
         if (interest.coachStatus !== "approved") {
           return res.status(400).json({
             message: "L'intention doit être validée par le coach avant la validation RH",

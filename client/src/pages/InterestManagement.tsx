@@ -103,6 +103,7 @@ export default function InterestManagement() {
 
   const coachValidationOnly = validationSettings?.coachValidationOnly ?? false;
   const rhValidationOnly = validationSettings?.rhValidationOnly ?? false;
+  const canSkipCoachApproval = rhValidationOnly;
 
   // Fetch formations
   const { data: formations = [] } = useQuery<Formation[]>({
@@ -343,9 +344,11 @@ export default function InterestManagement() {
   const rejectedInterests = interests.filter(i => i.status === "rejected");
   const withdrawnInterests = interests.filter(i => i.status === "withdrawn");
   const pendingCoachValidation = pendingInterests.filter(i => i.coachStatus !== "approved");
-  const pendingRhValidation = pendingInterests.filter(i => i.coachStatus === "approved");
+  const pendingRhValidation = canSkipCoachApproval
+    ? pendingInterests
+    : pendingInterests.filter(i => i.coachStatus === "approved");
   const approvablePendingInterests = pendingInterests.filter(
-    (interest) => coachValidationOnly || interest.coachStatus === "approved"
+    (interest) => canSkipCoachApproval || interest.coachStatus === "approved"
   );
 
   if (isLoadingInterests) {
@@ -364,13 +367,11 @@ export default function InterestManagement() {
     showActions = false,
     showDeleteAction = false,
     showCancelAction = false,
-    coachValidationOnly = false,
   }: {
     data: FormationInterest[];
     showActions?: boolean;
     showDeleteAction?: boolean;
     showCancelAction?: boolean;
-    coachValidationOnly?: boolean;
   }) => {
     const hasActions = showActions || showDeleteAction || showCancelAction;
 
@@ -399,7 +400,11 @@ export default function InterestManagement() {
               data.map((interest) => {
                 const formation = getFormation(interest.formationId);
                 const user = getUser(interest.userId);
-                const canApprove = coachValidationOnly || interest.coachStatus === "approved";
+                const canApprove = canSkipCoachApproval || interest.coachStatus === "approved";
+                const approveDisabledReason =
+                  canApprove || canSkipCoachApproval
+                    ? undefined
+                    : "En attente de validation coach";
                 const canCancel = interest.status === "approved" || interest.status === "converted";
 
                 return (
@@ -487,7 +492,7 @@ export default function InterestManagement() {
                                 onClick={() => handleAction(interest, "approve")}
                                 data-testid={`button-approve-interest-${interest.id}`}
                                 disabled={!canApprove || updateStatusMutation.isPending}
-                                title={!canApprove ? "En attente de validation coach" : undefined}
+                                title={!canApprove ? approveDisabledReason : undefined}
                               >
                                 <CheckCircle className="w-4 h-4 mr-1" />
                                 Approuver
@@ -777,20 +782,20 @@ export default function InterestManagement() {
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-3 text-sm">
-                <Badge variant="outline" className="border-dashed">
-                  À valider par le coach: {pendingCoachValidation.length}
-                </Badge>
+                {!canSkipCoachApproval && (
+                  <Badge variant="outline" className="border-dashed">
+                    À valider par le coach: {pendingCoachValidation.length}
+                  </Badge>
+                )}
                 {!coachValidationOnly && (
                   <Badge variant="secondary" className="bg-blue-500/10 text-blue-700 border-blue-500/20">
-                    En attente RH: {pendingRhValidation.length}
+                    {canSkipCoachApproval
+                      ? `Validations RH possibles: ${pendingRhValidation.length}`
+                      : `En attente RH: ${pendingRhValidation.length}`}
                   </Badge>
                 )}
               </div>
-              <InterestTable
-                data={pendingInterests}
-                showActions={true}
-                coachValidationOnly={coachValidationOnly}
-              />
+              <InterestTable data={pendingInterests} showActions={true} />
             </div>
           </Card>
         </TabsContent>
