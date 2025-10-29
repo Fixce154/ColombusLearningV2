@@ -23,7 +23,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Heart, CheckCircle, XCircle, Clock, Loader2, TrendingUp, RefreshCw, Undo2 } from "lucide-react";
+import {
+  Heart,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Loader2,
+  TrendingUp,
+  RefreshCw,
+  Undo2,
+  Settings,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { FormationInterest, Formation, User } from "@shared/schema";
@@ -53,6 +73,7 @@ export default function InterestManagement() {
   const [selectedInterest, setSelectedInterest] = useState<FormationInterest | null>(null);
   const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
   const [cancelInterestTarget, setCancelInterestTarget] = useState<FormationInterest | null>(null);
+  const [isValidationDialogOpen, setIsValidationDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Fetch all interests (RH access)
@@ -81,6 +102,17 @@ export default function InterestManagement() {
   });
 
   const coachValidationOnly = coachValidationSettings?.coachValidationOnly ?? false;
+
+  const { data: rhValidationSettings } = useQuery<{ rhValidationOnly: boolean }>({
+    queryKey: ["/api/admin/settings/rh-validation"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/settings/rh-validation", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch RH validation setting");
+      return res.json();
+    },
+  });
+
+  const rhValidationOnly = rhValidationSettings?.rhValidationOnly ?? false;
 
   // Fetch formations
   const { data: formations = [] } = useQuery<Formation[]>({
@@ -193,6 +225,30 @@ export default function InterestManagement() {
     },
   });
 
+  const updateRhValidationMutation = useMutation({
+    mutationFn: async (value: boolean) => {
+      return apiRequest("/api/admin/settings/rh-validation", "PATCH", {
+        rhValidationOnly: value,
+      });
+    },
+    onSuccess: (_, value) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/rh-validation"] });
+      toast({
+        title: "Préférence mise à jour",
+        description: value
+          ? "Les validations RH finalisent désormais l'intention sans étape manager."
+          : "La validation manager reste requise après l'étape RH.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de mettre à jour la préférence",
+      });
+    },
+  });
+
   // Delete interest mutation
   const deleteInterestMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -281,6 +337,11 @@ export default function InterestManagement() {
   const handleCoachValidationToggle = (checked: boolean | "indeterminate") => {
     const value = checked === true;
     updateCoachValidationMutation.mutate(value);
+  };
+
+  const handleRhValidationToggle = (checked: boolean | "indeterminate") => {
+    const value = checked === true;
+    updateRhValidationMutation.mutate(value);
   };
 
   const getFormation = (id: string) => formations.find(f => f.id === id);
@@ -521,19 +582,81 @@ export default function InterestManagement() {
                   : "Données à jour"}
               </p>
             </div>
-            <Button
-              className="h-12 rounded-xl text-sm font-semibold"
-              onClick={() => refetch()}
-              disabled={isFetching}
-              data-testid="button-refresh-interests"
-            >
-              {isFetching ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              Rafraîchir
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                className="h-12 flex-1 rounded-xl text-sm font-semibold"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                data-testid="button-refresh-interests"
+              >
+                {isFetching ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                Rafraîchir
+              </Button>
+              <Dialog open={isValidationDialogOpen} onOpenChange={setIsValidationDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-12 w-12 rounded-xl"
+                    aria-label="Configurer les règles de validation"
+                    data-testid="button-open-validation-settings"
+                  >
+                    <Settings className="h-5 w-5" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle>Règles de validation</DialogTitle>
+                    <DialogDescription>
+                      Définissez l'enchaînement des validations pour accélérer le traitement des intentions de formation.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-6">
+                    <div className="flex items-start gap-3 rounded-2xl border border-border/50 p-4">
+                      <Checkbox
+                        id="coach-validation-toggle"
+                        checked={coachValidationOnly}
+                        onCheckedChange={handleCoachValidationToggle}
+                        disabled={updateCoachValidationMutation.isPending}
+                      />
+                      <label htmlFor="coach-validation-toggle" className="space-y-1 text-sm">
+                        <span className="block font-medium text-foreground">La validation du coach suffit</span>
+                        <span className="block text-muted-foreground">
+                          {coachValidationOnly
+                            ? "Une intention validée par un coach passe automatiquement en statut approuvé."
+                            : "Une validation RH reste nécessaire après celle du coach."}
+                        </span>
+                      </label>
+                    </div>
+                    <div className="flex items-start gap-3 rounded-2xl border border-border/50 p-4">
+                      <Checkbox
+                        id="rh-validation-toggle"
+                        checked={rhValidationOnly}
+                        onCheckedChange={handleRhValidationToggle}
+                        disabled={updateRhValidationMutation.isPending}
+                      />
+                      <label htmlFor="rh-validation-toggle" className="space-y-1 text-sm">
+                        <span className="block font-medium text-foreground">La validation RH suffit</span>
+                        <span className="block text-muted-foreground">
+                          {rhValidationOnly
+                            ? "Une intention validée par les RH est finalisée sans validation manager."
+                            : "Une validation manager reste nécessaire après l'approbation RH."}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="outline">Fermer</Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
       </section>
@@ -610,33 +733,6 @@ export default function InterestManagement() {
             </div>
           </Card>
         </div>
-
-        <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-primary">Règle de validation</h2>
-              <p className="text-sm text-muted-foreground">
-                Contrôlez si la validation des coachs suffit pour approuver une intention.
-              </p>
-            </div>
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="coach-validation-toggle"
-                checked={coachValidationOnly}
-                onCheckedChange={handleCoachValidationToggle}
-                disabled={updateCoachValidationMutation.isPending}
-              />
-              <label htmlFor="coach-validation-toggle" className="space-y-1 text-sm">
-                <span className="block font-medium text-foreground">La validation du coach suffit</span>
-                <span className="block text-muted-foreground">
-                  {coachValidationOnly
-                    ? "Une intention validée par un coach passe automatiquement en statut approuvé."
-                    : "Une validation RH reste nécessaire après celle du coach."}
-                </span>
-              </label>
-            </div>
-          </div>
-        </Card>
 
         <Tabs defaultValue="pending" className="space-y-6">
         <TabsList className="grid w-full max-w-2xl grid-cols-5">
