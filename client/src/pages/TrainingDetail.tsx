@@ -46,6 +46,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   SENIORITY_LEVELS,
+  resolveSeniorityLevel,
   type SeniorityLevel,
   type User,
   type Session,
@@ -92,16 +93,23 @@ type FormationReviewsResponse = {
 const SENIORITY_CATEGORY_ORDER = ["junior", "confirme", "senior", "expert"] as const;
 
 const SENIORITY_CATEGORY_MAP: Record<SeniorityLevel, (typeof SENIORITY_CATEGORY_ORDER)[number]> = {
-  Stagiaire: "junior",
   Alternant: "junior",
   Junior: "junior",
   Senior: "confirme",
   "Supervising Senior": "senior",
   Manager: "senior",
-  "Super Manager": "senior",
+  "Senior Manager": "senior",
   Directeur: "expert",
   Partner: "expert",
   "Senior Partner": "expert",
+};
+
+const LEGACY_SENIORITY_CATEGORY_MAP: Record<string, (typeof SENIORITY_CATEGORY_ORDER)[number]> = {
+  junior: "junior",
+  confirme: "confirme",
+  confirmé: "confirme",
+  senior: "senior",
+  expert: "expert",
 };
 
 const mapSeniorityToCategory = (value: string | null | undefined): (typeof SENIORITY_CATEGORY_ORDER)[number] => {
@@ -109,22 +117,25 @@ const mapSeniorityToCategory = (value: string | null | undefined): (typeof SENIO
     return "junior";
   }
 
-  if (SENIORITY_LEVELS.includes(value as SeniorityLevel)) {
-    return SENIORITY_CATEGORY_MAP[value as SeniorityLevel];
+  if ((SENIORITY_CATEGORY_ORDER as readonly string[]).includes(value)) {
+    return value as (typeof SENIORITY_CATEGORY_ORDER)[number];
+  }
+
+  const resolved = resolveSeniorityLevel(value);
+  if (resolved) {
+    return SENIORITY_CATEGORY_MAP[resolved];
+  }
+
+  const legacyCategory = LEGACY_SENIORITY_CATEGORY_MAP[value.trim().toLowerCase()];
+  if (legacyCategory) {
+    return legacyCategory;
   }
 
   return "junior";
 };
 
-const normalizeRequiredSeniority = (value: string | null | undefined): (typeof SENIORITY_CATEGORY_ORDER)[number] => {
-  if (!value) {
-    return "junior";
-  }
-
-  return (SENIORITY_CATEGORY_ORDER as readonly string[]).includes(value)
-    ? (value as (typeof SENIORITY_CATEGORY_ORDER)[number])
-    : "junior";
-};
+const normalizeRequiredSeniority = (value: string | null | undefined): (typeof SENIORITY_CATEGORY_ORDER)[number] =>
+  mapSeniorityToCategory(value);
 
 export default function TrainingDetail({ currentUser: _currentUser }: TrainingDetailProps) {
   const [, params] = useRoute("/training/:id");

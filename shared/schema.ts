@@ -19,17 +19,43 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 });
 
 export const SENIORITY_LEVELS = [
-  "Stagiaire",
   "Alternant",
   "Junior",
   "Senior",
   "Supervising Senior",
   "Manager",
-  "Super Manager",
+  "Senior Manager",
   "Directeur",
   "Partner",
   "Senior Partner",
 ] as const;
+
+export const LEGACY_SENIORITY_MAPPING: Record<string, (typeof SENIORITY_LEVELS)[number]> = {
+  stagiaire: "Alternant",
+  alternant: "Alternant",
+  junior: "Junior",
+  confirme: "Senior",
+  confirmé: "Senior",
+  senior: "Supervising Senior",
+  expert: "Directeur",
+  "super manager": "Senior Manager",
+};
+
+export const resolveSeniorityLevel = (
+  value: string | null | undefined
+): (typeof SENIORITY_LEVELS)[number] | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  if (SENIORITY_LEVELS.includes(value as (typeof SENIORITY_LEVELS)[number])) {
+    return value as (typeof SENIORITY_LEVELS)[number];
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  return LEGACY_SENIORITY_MAPPING[normalized];
+};
 
 export type SeniorityLevel = (typeof SENIORITY_LEVELS)[number];
 
@@ -43,7 +69,7 @@ export const users = pgTable("users", {
   grade: text("grade"),
   jobRole: text("job_role"),
   roles: text("roles").array().notNull(), // consultant, rh, formateur, formateur_externe, manager
-  seniority: text("seniority"), // e.g. Stagiaire, Alternant, Junior, Senior...
+  seniority: text("seniority"), // e.g. Alternant, Junior, Senior...
   businessUnit: text("business_unit"),
   p1Used: integer("p1_used").default(0),
   p2Used: integer("p2_used").default(0),
@@ -58,7 +84,7 @@ export const formations = pgTable("formations", {
   prerequisites: text("prerequisites"),
   duration: text("duration").notNull(), // "2 jours", "3h30"
   modality: text("modality").notNull(), // presentiel, distanciel, hybride
-  seniorityRequired: text("seniority_required"), // junior, confirme, senior, expert
+  seniorityRequired: text("seniority_required"), // Alternant, Junior, Senior...
   theme: text("theme").notNull(),
   tags: text("tags").array(),
   active: boolean("active").default(true),

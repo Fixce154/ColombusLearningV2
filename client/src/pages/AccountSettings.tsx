@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { SENIORITY_LEVELS, type SeniorityLevel, type User } from "@shared/schema";
+import { SENIORITY_LEVELS, resolveSeniorityLevel, type SeniorityLevel, type User } from "@shared/schema";
 import {
   Card,
   CardContent,
@@ -116,11 +116,8 @@ const derivePrimaryRole = (roles: string[]): "consultant" | "rh" => {
   return roles.includes("rh") ? "rh" : "consultant";
 };
 
-const resolveSeniority = (value: string | null | undefined): SeniorityLevel | undefined => {
-  return value && SENIORITY_LEVELS.includes(value as SeniorityLevel)
-    ? (value as SeniorityLevel)
-    : undefined;
-};
+const resolveSeniority = (value: string | null | undefined): SeniorityLevel | undefined =>
+  resolveSeniorityLevel(value);
 
 export default function AccountSettings({ currentUser }: AccountSettingsProps) {
   const { toast } = useToast();

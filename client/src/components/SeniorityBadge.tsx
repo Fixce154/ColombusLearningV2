@@ -21,8 +21,13 @@ export default function SeniorityBadge({ seniority }: SeniorityBadgeProps) {
     }
   };
 
+  const testId = `badge-seniority-${seniority.toLowerCase().replace(/\s+/g, "-")}`;
+
   return (
-    <Badge className="bg-secondary text-secondary-foreground font-medium text-xs px-3 py-1.5 gap-1.5" data-testid={`badge-seniority-${seniority}`}>
+    <Badge
+      className="bg-secondary text-secondary-foreground font-medium text-xs px-3 py-1.5 gap-1.5"
+      data-testid={testId}
+    >
       <GraduationCap className="w-3.5 h-3.5" />
       {getLabel()}
     </Badge>

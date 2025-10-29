@@ -6,6 +6,7 @@ import TrainingCard, { FormationWithRating } from "@/components/TrainingCard";
 import { Card } from "@/components/ui/card";
 import { BookOpen, Calendar, CheckCircle, Layers, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { resolveSeniorityLevel } from "@shared/schema";
 import type { Session, Registration } from "@shared/schema";
 
 export default function Catalog() {
@@ -57,11 +58,16 @@ export default function Catalog() {
         return false;
       }
 
-      if (
-        selectedSeniority.length > 0 &&
-        formation.seniorityRequired &&
-        !selectedSeniority.includes(formation.seniorityRequired)
-      ) {
+      if (selectedSeniority.length > 0 && formation.seniorityRequired) {
+        const normalizedSeniority = resolveSeniorityLevel(formation.seniorityRequired);
+        const comparisonValue = normalizedSeniority ?? formation.seniorityRequired;
+
+        if (!selectedSeniority.includes(comparisonValue)) {
+          return false;
+        }
+      }
+
+      if (selectedSeniority.length > 0 && !formation.seniorityRequired) {
         return false;
       }
 
