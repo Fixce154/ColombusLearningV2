@@ -104,17 +104,6 @@ export default function InterestManagement() {
   const coachValidationOnly = validationSettings?.coachValidationOnly ?? false;
   const rhValidationOnly = validationSettings?.rhValidationOnly ?? false;
 
-  const { data: rhValidationSettings } = useQuery<{ rhValidationOnly: boolean }>({
-    queryKey: ["/api/admin/settings/rh-validation"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/settings/rh-validation", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch RH validation setting");
-      return res.json();
-    },
-  });
-
-  const rhValidationOnly = rhValidationSettings?.rhValidationOnly ?? false;
-
   // Fetch formations
   const { data: formations = [] } = useQuery<Formation[]>({
     queryKey: ["/api/formations"],
