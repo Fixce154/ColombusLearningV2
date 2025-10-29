@@ -92,16 +92,17 @@ export default function InterestManagement() {
   const interests = interestsData?.interests || [];
   const aggregated = interestsData?.aggregated || [];
 
-  const { data: coachValidationSettings } = useQuery<{ coachValidationOnly: boolean }>({
+  const { data: validationSettings } = useQuery<{ coachValidationOnly: boolean; rhValidationOnly: boolean }>({
     queryKey: ["/api/admin/settings/coach-validation"],
     queryFn: async () => {
       const res = await fetch("/api/admin/settings/coach-validation", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch coach validation setting");
+      if (!res.ok) throw new Error("Failed to fetch validation settings");
       return res.json();
     },
   });
 
-  const coachValidationOnly = coachValidationSettings?.coachValidationOnly ?? false;
+  const coachValidationOnly = validationSettings?.coachValidationOnly ?? false;
+  const rhValidationOnly = validationSettings?.rhValidationOnly ?? false;
 
   const { data: rhValidationSettings } = useQuery<{ rhValidationOnly: boolean }>({
     queryKey: ["/api/admin/settings/rh-validation"],
@@ -227,12 +228,12 @@ export default function InterestManagement() {
 
   const updateRhValidationMutation = useMutation({
     mutationFn: async (value: boolean) => {
-      return apiRequest("/api/admin/settings/rh-validation", "PATCH", {
+      return apiRequest("/api/admin/settings/coach-validation", "PATCH", {
         rhValidationOnly: value,
       });
     },
     onSuccess: (_, value) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/rh-validation"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/coach-validation"] });
       toast({
         title: "Préférence mise à jour",
         description: value
