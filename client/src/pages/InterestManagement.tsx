@@ -33,6 +33,7 @@ import {
   RefreshCw,
   Undo2,
   Settings,
+  UserX,
 } from "lucide-react";
 import {
   Dialog,
@@ -46,7 +47,7 @@ import {
 } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { FormationInterest, Formation, User } from "@shared/schema";
+import type { FormationInterest, Formation, User, CoachAssignment } from "@shared/schema";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PriorityBadge from "@/components/PriorityBadge";
@@ -101,9 +102,25 @@ export default function InterestManagement() {
     },
   });
 
+  const { data: coachAssignments = [] } = useQuery<CoachAssignment[]>({
+    queryKey: ["/api/admin/coach-assignments"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/coach-assignments", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch coach assignments");
+      return res.json();
+    },
+  });
+
   const coachValidationOnly = validationSettings?.coachValidationOnly ?? false;
   const rhValidationOnly = validationSettings?.rhValidationOnly ?? false;
   const canSkipCoachApproval = rhValidationOnly;
+
+  const coacheesWithCoach = useMemo(
+    () => new Set(coachAssignments.map((assignment) => assignment.coacheeId)),
+    [coachAssignments]
+  );
+
+  const hasAssignedCoach = (interest: FormationInterest) => coacheesWithCoach.has(interest.userId);
 
   // Fetch formations
   const { data: formations = [] } = useQuery<Formation[]>({
@@ -343,12 +360,23 @@ export default function InterestManagement() {
   const convertedInterests = interests.filter(i => i.status === "converted");
   const rejectedInterests = interests.filter(i => i.status === "rejected");
   const withdrawnInterests = interests.filter(i => i.status === "withdrawn");
-  const pendingCoachValidation = pendingInterests.filter(i => i.coachStatus !== "approved");
-  const pendingRhValidation = canSkipCoachApproval
-    ? pendingInterests
-    : pendingInterests.filter(i => i.coachStatus === "approved");
+  const pendingCoachValidation = pendingInterests.filter(
+    (interest) => interest.coachStatus !== "approved" && hasAssignedCoach(interest)
+  );
+  const pendingRhValidation = pendingInterests.filter((interest) => {
+    if (canSkipCoachApproval) {
+      return true;
+    }
+
+    if (!hasAssignedCoach(interest)) {
+      return true;
+    }
+
+    return interest.coachStatus === "approved";
+  });
   const approvablePendingInterests = pendingInterests.filter(
-    (interest) => canSkipCoachApproval || interest.coachStatus === "approved"
+    (interest) =>
+      canSkipCoachApproval || interest.coachStatus === "approved" || !hasAssignedCoach(interest)
   );
 
   if (isLoadingInterests) {
@@ -400,11 +428,11 @@ export default function InterestManagement() {
               data.map((interest) => {
                 const formation = getFormation(interest.formationId);
                 const user = getUser(interest.userId);
-                const canApprove = canSkipCoachApproval || interest.coachStatus === "approved";
+                const coachAssigned = hasAssignedCoach(interest);
+                const canApprove =
+                  canSkipCoachApproval || interest.coachStatus === "approved" || !coachAssigned;
                 const approveDisabledReason =
-                  canApprove || canSkipCoachApproval
-                    ? undefined
-                    : "En attente de validation coach";
+                  !canApprove && coachAssigned ? "En attente de validation coach" : undefined;
                 const canCancel = interest.status === "approved" || interest.status === "converted";
 
                 return (
@@ -462,19 +490,25 @@ export default function InterestManagement() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {interest.coachStatus === "approved" && (
+                      {!coachAssigned ? (
+                        <Badge variant="outline" className="border-dashed text-muted-foreground">
+                          <UserX className="w-3 h-3 mr-1" />
+                          Aucun coach
+                        </Badge>
+                      ) : null}
+                      {coachAssigned && interest.coachStatus === "approved" && (
                         <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-700 border-emerald-500/20">
                           <CheckCircle className="w-3 h-3 mr-1" />
                           Validée
                         </Badge>
                       )}
-                      {interest.coachStatus === "rejected" && (
+                      {coachAssigned && interest.coachStatus === "rejected" && (
                         <Badge variant="destructive">
                           <XCircle className="w-3 h-3 mr-1" />
                           Refusée
                         </Badge>
                       )}
-                      {interest.coachStatus === "pending" && (
+                      {coachAssigned && interest.coachStatus === "pending" && (
                         <Badge variant="outline" className="text-muted-foreground border-dashed">
                           <Clock className="w-3 h-3 mr-1" />
                           En attente

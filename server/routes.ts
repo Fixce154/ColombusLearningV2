@@ -2671,7 +2671,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updates: Partial<FormationInterest> = { ...req.body };
 
-      if (updates.status === "approved" && !coachValidationOnly && !rhValidationOnly) {
+      let hasAssignedCoach = false;
+      if (updates.status === "approved") {
+        const assignments = await storage.listCoachAssignmentsForCoachee(interest.userId);
+        hasAssignedCoach = assignments.length > 0;
+      }
+
+      if (updates.status === "approved" && !coachValidationOnly && !rhValidationOnly && hasAssignedCoach) {
         if (interest.coachStatus !== "approved") {
           return res.status(400).json({
             message: "L'intention doit être validée par le coach avant la validation RH",
