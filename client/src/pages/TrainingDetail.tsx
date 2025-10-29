@@ -436,9 +436,7 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
         priority: data.priority,
       });
       
-      await apiRequest(`/api/interests/${data.interestId}`, "PATCH", {
-        status: "converted",
-      });
+      // Backend automatically updates interest status to "converted"
       
       return registration;
     },
