@@ -53,7 +53,7 @@ import { Plus, Pencil, Trash2, Loader2, BookOpen } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Formation } from "@shared/schema";
-import { insertFormationSchema } from "@shared/schema";
+import { insertFormationSchema, SENIORITY_LEVELS, resolveSeniorityLevel } from "@shared/schema";
 import { z } from "zod";
 import RatingStars from "@/components/RatingStars";
 
@@ -287,6 +287,8 @@ export default function FormationManagement() {
 
   const handleEdit = (formation: Formation) => {
     setEditingFormation(formation);
+    const normalizedSeniority = resolveSeniorityLevel(formation.seniorityRequired);
+
     form.reset({
       title: formation.title,
       description: formation.description,
@@ -295,7 +297,7 @@ export default function FormationManagement() {
       content: formation.content || "",
       duration: formation.duration,
       modality: formation.modality,
-      seniorityRequired: formation.seniorityRequired || undefined,
+      seniorityRequired: normalizedSeniority ?? formation.seniorityRequired ?? undefined,
       theme: formation.theme,
       tags: formation.tags?.join(", ") || "",
       active: formation.active ?? true,
@@ -380,15 +382,18 @@ export default function FormationManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {formations.map((formation) => (
-                    <TableRow key={formation.id} data-testid={`row-formation-${formation.id}`}>
-                      <TableCell className="font-medium">{formation.title}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{formation.theme}</Badge>
-                      </TableCell>
-                      <TableCell>{formation.duration}</TableCell>
-                      <TableCell>
-                        <Badge
+                  {formations.map((formation) => {
+                    const seniorityLabel = resolveSeniorityLevel(formation.seniorityRequired);
+
+                    return (
+                      <TableRow key={formation.id} data-testid={`row-formation-${formation.id}`}>
+                        <TableCell className="font-medium">{formation.title}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{formation.theme}</Badge>
+                        </TableCell>
+                        <TableCell>{formation.duration}</TableCell>
+                        <TableCell>
+                          <Badge
                           variant={
                             formation.modality === "presentiel"
                               ? "default"
@@ -405,7 +410,13 @@ export default function FormationManagement() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {formation.seniorityRequired || <span className="text-muted-foreground">Tous niveaux</span>}
+                        {seniorityLabel ? (
+                          seniorityLabel
+                        ) : formation.seniorityRequired ? (
+                          formation.seniorityRequired
+                        ) : (
+                          <span className="text-muted-foreground">Tous niveaux</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={formation.active ? "default" : "secondary"}>
@@ -432,8 +443,9 @@ export default function FormationManagement() {
                           </Button>
                         </div>
                       </TableCell>
-                    </TableRow>
-                  ))}
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
@@ -627,8 +639,8 @@ export default function FormationManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Niveau requis</FormLabel>
-                      <Select 
-                        onValueChange={(value) => field.onChange(value === "__NONE__" ? undefined : value)} 
+                      <Select
+                        onValueChange={(value) => field.onChange(value === "__NONE__" ? undefined : value)}
                         value={field.value ?? "__NONE__"}
                       >
                         <FormControl>
@@ -638,10 +650,11 @@ export default function FormationManagement() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="__NONE__">Tous niveaux</SelectItem>
-                          <SelectItem value="junior">Junior</SelectItem>
-                          <SelectItem value="confirme">Confirmé</SelectItem>
-                          <SelectItem value="senior">Senior</SelectItem>
-                          <SelectItem value="expert">Expert</SelectItem>
+                          {SENIORITY_LEVELS.map((level) => (
+                            <SelectItem key={level} value={level}>
+                              {level}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />

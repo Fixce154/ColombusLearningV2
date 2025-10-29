@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useMutation } from "@tanstack/react-query";
-import { SENIORITY_LEVELS, type SeniorityLevel, type User } from "@shared/schema";
+import { SENIORITY_LEVELS, resolveSeniorityLevel, type SeniorityLevel, type User } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -76,11 +76,8 @@ const derivePrimaryRole = (roles: string[]): "consultant" | "rh" => {
   return roles.includes("rh") ? "rh" : "consultant";
 };
 
-const resolveSeniority = (value: string | null | undefined): SeniorityLevel | undefined => {
-  return value && SENIORITY_LEVELS.includes(value as SeniorityLevel)
-    ? (value as SeniorityLevel)
-    : undefined;
-};
+const resolveSeniority = (value: string | null | undefined): SeniorityLevel | undefined =>
+  resolveSeniorityLevel(value);
 
 const computeRoles = (roles: string[], selectedRole: "consultant" | "rh") => {
   const normalized = new Set(roles);

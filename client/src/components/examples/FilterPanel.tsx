@@ -4,7 +4,7 @@ import FilterPanel from "../FilterPanel";
 export default function FilterPanelExample() {
   const [themes, setThemes] = useState<string[]>(["Technique"]);
   const [modalities, setModalities] = useState<string[]>([]);
-  const [seniority, setSeniority] = useState<string[]>(["confirme"]);
+  const [seniority, setSeniority] = useState<string[]>(["Senior"]);
 
   return (
     <div className="max-w-xs">

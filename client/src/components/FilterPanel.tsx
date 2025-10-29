@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Filter, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SENIORITY_LEVELS } from "@shared/schema";
 
 interface FilterPanelProps {
   selectedThemes: string[];
@@ -29,7 +30,9 @@ export default function FilterPanel({
 }: FilterPanelProps) {
   const themes = ["Gestion de projet", "Management", "Technique", "Soft Skills", "Stratégie"];
   const modalities = ["presentiel", "distanciel", "hybride"];
-  const seniority = ["junior", "confirme", "senior", "expert"];
+  const seniority = SENIORITY_LEVELS;
+
+  const getSeniorityId = (level: string) => level.toLowerCase().replace(/\s+/g, "-");
 
   const totalFilters = selectedThemes.length + selectedModalities.length + selectedSeniority.length;
 
@@ -148,22 +151,26 @@ export default function FilterPanel({
         >
           <Label className="eyebrow mb-4 block text-muted-foreground">Niveau</Label>
           <div className="space-y-3">
-            {seniority.map((level) => (
-              <div key={level} className="flex items-center gap-3">
-                <Checkbox
-                  id={`seniority-${level}`}
+            {seniority.map((level) => {
+              const id = getSeniorityId(level);
+
+              return (
+                <div key={level} className="flex items-center gap-3">
+                  <Checkbox
+                  id={`seniority-${id}`}
                   checked={selectedSeniority.includes(level)}
                   onCheckedChange={(checked) => handleCheckboxChange(checked as boolean, level, selectedSeniority, onSeniorityChange)}
-                  data-testid={`checkbox-seniority-${level}`}
+                  data-testid={`checkbox-seniority-${id}`}
                 />
                 <label
-                  htmlFor={`seniority-${level}`}
+                  htmlFor={`seniority-${id}`}
                   className="flex-1 cursor-pointer text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
                 >
-                  {level === "junior" ? "Junior" : level === "confirme" ? "Confirmé" : level === "senior" ? "Senior" : "Expert"}
+                  {level}
                 </label>
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -198,7 +205,7 @@ export default function FilterPanel({
                 variant="outline"
                 className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-medium text-muted-foreground"
               >
-                {level === "junior" ? "Junior" : level === "confirme" ? "Confirmé" : level === "senior" ? "Senior" : "Expert"}
+                {level}
               </Badge>
             ))}
           </div>

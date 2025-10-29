@@ -9,7 +9,7 @@ export default function TrainingCardExample() {
     prerequisites: "Aucun",
     duration: "2 jours",
     modality: "presentiel",
-    seniorityRequired: "junior",
+    seniorityRequired: "Junior",
     theme: "Gestion de projet",
     tags: ["agile", "scrum", "gestion projet"],
     active: true,
