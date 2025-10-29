@@ -254,7 +254,31 @@ export const sendSessionInvitationEmail = async (options: SessionInviteOptions) 
     method,
   };
 
-  console.info("[invitation]", JSON.stringify(payload));
+  // Send email via Resend
+  try {
+    const { getUncachableResendClient } = await import("./resend");
+    const { client, fromEmail } = await getUncachableResendClient();
+    
+    await client.emails.send({
+      from: fromEmail,
+      to: payload.to,
+      subject: payload.subject,
+      text: payload.text,
+      html: payload.html,
+      attachments: [
+        {
+          filename: 'invitation.ics',
+          content: Buffer.from(payload.calendar).toString('base64'),
+        }
+      ],
+    });
+    
+    console.info("[invitation] Email sent successfully to:", payload.to);
+  } catch (error) {
+    console.error("[invitation] Failed to send email:", error);
+    // Log the payload for debugging
+    console.info("[invitation]", JSON.stringify(payload));
+  }
 };
 
 export type { SessionSegment };
