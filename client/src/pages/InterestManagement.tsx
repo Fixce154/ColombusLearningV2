@@ -23,10 +23,31 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Heart, CheckCircle, XCircle, Clock, Loader2, TrendingUp, RefreshCw, Undo2 } from "lucide-react";
+import {
+  Heart,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Loader2,
+  TrendingUp,
+  RefreshCw,
+  Undo2,
+  Settings,
+  UserX,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { FormationInterest, Formation, User } from "@shared/schema";
+import type { FormationInterest, Formation, User, CoachAssignment } from "@shared/schema";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PriorityBadge from "@/components/PriorityBadge";
@@ -53,6 +74,7 @@ export default function InterestManagement() {
   const [selectedInterest, setSelectedInterest] = useState<FormationInterest | null>(null);
   const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
   const [cancelInterestTarget, setCancelInterestTarget] = useState<FormationInterest | null>(null);
+  const [isValidationDialogOpen, setIsValidationDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Fetch all interests (RH access)
@@ -71,16 +93,34 @@ export default function InterestManagement() {
   const interests = interestsData?.interests || [];
   const aggregated = interestsData?.aggregated || [];
 
-  const { data: coachValidationSettings } = useQuery<{ coachValidationOnly: boolean }>({
+  const { data: validationSettings } = useQuery<{ coachValidationOnly: boolean; rhValidationOnly: boolean }>({
     queryKey: ["/api/admin/settings/coach-validation"],
     queryFn: async () => {
       const res = await fetch("/api/admin/settings/coach-validation", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch coach validation setting");
+      if (!res.ok) throw new Error("Failed to fetch validation settings");
       return res.json();
     },
   });
 
-  const coachValidationOnly = coachValidationSettings?.coachValidationOnly ?? false;
+  const { data: coachAssignments = [] } = useQuery<CoachAssignment[]>({
+    queryKey: ["/api/admin/coach-assignments"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/coach-assignments", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch coach assignments");
+      return res.json();
+    },
+  });
+
+  const coachValidationOnly = validationSettings?.coachValidationOnly ?? false;
+  const rhValidationOnly = validationSettings?.rhValidationOnly ?? false;
+  const canSkipCoachApproval = rhValidationOnly;
+
+  const coacheesWithCoach = useMemo(
+    () => new Set(coachAssignments.map((assignment) => assignment.coacheeId)),
+    [coachAssignments]
+  );
+
+  const hasAssignedCoach = (interest: FormationInterest) => coacheesWithCoach.has(interest.userId);
 
   // Fetch formations
   const { data: formations = [] } = useQuery<Formation[]>({
@@ -193,6 +233,30 @@ export default function InterestManagement() {
     },
   });
 
+  const updateRhValidationMutation = useMutation({
+    mutationFn: async (value: boolean) => {
+      return apiRequest("/api/admin/settings/coach-validation", "PATCH", {
+        rhValidationOnly: value,
+      });
+    },
+    onSuccess: (_, value) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/coach-validation"] });
+      toast({
+        title: "Préférence mise à jour",
+        description: value
+          ? "Les validations RH finalisent désormais l'intention sans étape manager."
+          : "La validation manager reste requise après l'étape RH.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de mettre à jour la préférence",
+      });
+    },
+  });
+
   // Delete interest mutation
   const deleteInterestMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -283,6 +347,11 @@ export default function InterestManagement() {
     updateCoachValidationMutation.mutate(value);
   };
 
+  const handleRhValidationToggle = (checked: boolean | "indeterminate") => {
+    const value = checked === true;
+    updateRhValidationMutation.mutate(value);
+  };
+
   const getFormation = (id: string) => formations.find(f => f.id === id);
   const getUser = (id: string) => users.find(u => u.id === id);
 
@@ -291,10 +360,23 @@ export default function InterestManagement() {
   const convertedInterests = interests.filter(i => i.status === "converted");
   const rejectedInterests = interests.filter(i => i.status === "rejected");
   const withdrawnInterests = interests.filter(i => i.status === "withdrawn");
-  const pendingCoachValidation = pendingInterests.filter(i => i.coachStatus !== "approved");
-  const pendingRhValidation = pendingInterests.filter(i => i.coachStatus === "approved");
+  const pendingCoachValidation = pendingInterests.filter(
+    (interest) => interest.coachStatus !== "approved" && hasAssignedCoach(interest)
+  );
+  const pendingRhValidation = pendingInterests.filter((interest) => {
+    if (canSkipCoachApproval) {
+      return true;
+    }
+
+    if (!hasAssignedCoach(interest)) {
+      return true;
+    }
+
+    return interest.coachStatus === "approved";
+  });
   const approvablePendingInterests = pendingInterests.filter(
-    (interest) => coachValidationOnly || interest.coachStatus === "approved"
+    (interest) =>
+      canSkipCoachApproval || interest.coachStatus === "approved" || !hasAssignedCoach(interest)
   );
 
   if (isLoadingInterests) {
@@ -313,13 +395,11 @@ export default function InterestManagement() {
     showActions = false,
     showDeleteAction = false,
     showCancelAction = false,
-    coachValidationOnly = false,
   }: {
     data: FormationInterest[];
     showActions?: boolean;
     showDeleteAction?: boolean;
     showCancelAction?: boolean;
-    coachValidationOnly?: boolean;
   }) => {
     const hasActions = showActions || showDeleteAction || showCancelAction;
 
@@ -348,7 +428,11 @@ export default function InterestManagement() {
               data.map((interest) => {
                 const formation = getFormation(interest.formationId);
                 const user = getUser(interest.userId);
-                const canApprove = coachValidationOnly || interest.coachStatus === "approved";
+                const coachAssigned = hasAssignedCoach(interest);
+                const canApprove =
+                  canSkipCoachApproval || interest.coachStatus === "approved" || !coachAssigned;
+                const approveDisabledReason =
+                  !canApprove && coachAssigned ? "En attente de validation coach" : undefined;
                 const canCancel = interest.status === "approved" || interest.status === "converted";
 
                 return (
@@ -406,19 +490,25 @@ export default function InterestManagement() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {interest.coachStatus === "approved" && (
+                      {!coachAssigned ? (
+                        <Badge variant="outline" className="border-dashed text-muted-foreground">
+                          <UserX className="w-3 h-3 mr-1" />
+                          Aucun coach
+                        </Badge>
+                      ) : null}
+                      {coachAssigned && interest.coachStatus === "approved" && (
                         <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-700 border-emerald-500/20">
                           <CheckCircle className="w-3 h-3 mr-1" />
                           Validée
                         </Badge>
                       )}
-                      {interest.coachStatus === "rejected" && (
+                      {coachAssigned && interest.coachStatus === "rejected" && (
                         <Badge variant="destructive">
                           <XCircle className="w-3 h-3 mr-1" />
                           Refusée
                         </Badge>
                       )}
-                      {interest.coachStatus === "pending" && (
+                      {coachAssigned && interest.coachStatus === "pending" && (
                         <Badge variant="outline" className="text-muted-foreground border-dashed">
                           <Clock className="w-3 h-3 mr-1" />
                           En attente
@@ -436,7 +526,7 @@ export default function InterestManagement() {
                                 onClick={() => handleAction(interest, "approve")}
                                 data-testid={`button-approve-interest-${interest.id}`}
                                 disabled={!canApprove || updateStatusMutation.isPending}
-                                title={!canApprove ? "En attente de validation coach" : undefined}
+                                title={!canApprove ? approveDisabledReason : undefined}
                               >
                                 <CheckCircle className="w-4 h-4 mr-1" />
                                 Approuver
@@ -521,19 +611,81 @@ export default function InterestManagement() {
                   : "Données à jour"}
               </p>
             </div>
-            <Button
-              className="h-12 rounded-xl text-sm font-semibold"
-              onClick={() => refetch()}
-              disabled={isFetching}
-              data-testid="button-refresh-interests"
-            >
-              {isFetching ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              Rafraîchir
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                className="h-12 flex-1 rounded-xl text-sm font-semibold"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                data-testid="button-refresh-interests"
+              >
+                {isFetching ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                Rafraîchir
+              </Button>
+              <Dialog open={isValidationDialogOpen} onOpenChange={setIsValidationDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-12 w-12 rounded-xl"
+                    aria-label="Configurer les règles de validation"
+                    data-testid="button-open-validation-settings"
+                  >
+                    <Settings className="h-5 w-5" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle>Règles de validation</DialogTitle>
+                    <DialogDescription>
+                      Définissez l'enchaînement des validations pour accélérer le traitement des intentions de formation.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-6">
+                    <div className="flex items-start gap-3 rounded-2xl border border-border/50 p-4">
+                      <Checkbox
+                        id="coach-validation-toggle"
+                        checked={coachValidationOnly}
+                        onCheckedChange={handleCoachValidationToggle}
+                        disabled={updateCoachValidationMutation.isPending}
+                      />
+                      <label htmlFor="coach-validation-toggle" className="space-y-1 text-sm">
+                        <span className="block font-medium text-foreground">La validation du coach suffit</span>
+                        <span className="block text-muted-foreground">
+                          {coachValidationOnly
+                            ? "Une intention validée par un coach passe automatiquement en statut approuvé."
+                            : "Une validation RH reste nécessaire après celle du coach."}
+                        </span>
+                      </label>
+                    </div>
+                    <div className="flex items-start gap-3 rounded-2xl border border-border/50 p-4">
+                      <Checkbox
+                        id="rh-validation-toggle"
+                        checked={rhValidationOnly}
+                        onCheckedChange={handleRhValidationToggle}
+                        disabled={updateRhValidationMutation.isPending}
+                      />
+                      <label htmlFor="rh-validation-toggle" className="space-y-1 text-sm">
+                        <span className="block font-medium text-foreground">La validation RH suffit</span>
+                        <span className="block text-muted-foreground">
+                          {rhValidationOnly
+                            ? "Une intention validée par les RH est finalisée sans validation manager."
+                            : "Une validation manager reste nécessaire après l'approbation RH."}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="outline">Fermer</Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
       </section>
@@ -611,33 +763,6 @@ export default function InterestManagement() {
           </Card>
         </div>
 
-        <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-primary">Règle de validation</h2>
-              <p className="text-sm text-muted-foreground">
-                Contrôlez si la validation des coachs suffit pour approuver une intention.
-              </p>
-            </div>
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="coach-validation-toggle"
-                checked={coachValidationOnly}
-                onCheckedChange={handleCoachValidationToggle}
-                disabled={updateCoachValidationMutation.isPending}
-              />
-              <label htmlFor="coach-validation-toggle" className="space-y-1 text-sm">
-                <span className="block font-medium text-foreground">La validation du coach suffit</span>
-                <span className="block text-muted-foreground">
-                  {coachValidationOnly
-                    ? "Une intention validée par un coach passe automatiquement en statut approuvé."
-                    : "Une validation RH reste nécessaire après celle du coach."}
-                </span>
-              </label>
-            </div>
-          </div>
-        </Card>
-
         <Tabs defaultValue="pending" className="space-y-6">
         <TabsList className="grid w-full max-w-2xl grid-cols-5">
           <TabsTrigger value="pending" data-testid="tab-pending-interests">
@@ -691,20 +816,20 @@ export default function InterestManagement() {
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-3 text-sm">
-                <Badge variant="outline" className="border-dashed">
-                  À valider par le coach: {pendingCoachValidation.length}
-                </Badge>
+                {!canSkipCoachApproval && (
+                  <Badge variant="outline" className="border-dashed">
+                    À valider par le coach: {pendingCoachValidation.length}
+                  </Badge>
+                )}
                 {!coachValidationOnly && (
                   <Badge variant="secondary" className="bg-blue-500/10 text-blue-700 border-blue-500/20">
-                    En attente RH: {pendingRhValidation.length}
+                    {canSkipCoachApproval
+                      ? `Validations RH possibles: ${pendingRhValidation.length}`
+                      : `En attente RH: ${pendingRhValidation.length}`}
                   </Badge>
                 )}
               </div>
-              <InterestTable
-                data={pendingInterests}
-                showActions={true}
-                coachValidationOnly={coachValidationOnly}
-              />
+              <InterestTable data={pendingInterests} showActions={true} />
             </div>
           </Card>
         </TabsContent>
