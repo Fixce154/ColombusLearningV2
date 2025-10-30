@@ -21,6 +21,9 @@ import {
   type Session,
   type Registration,
   type FormationMaterial,
+  type DashboardInformationSettings,
+  DEFAULT_DASHBOARD_INFORMATION,
+  dashboardInformationSettingsSchema,
   SENIORITY_LEVELS,
 } from "@shared/schema";
 import { INSTRUCTOR_ROLES, InstructorRole, USER_ROLES, isInstructor } from "@shared/roles";
@@ -32,6 +35,7 @@ const PgSession = connectPgSimple(session);
 const COACH_VALIDATION_SETTING_KEY = "coach_validation_only";
 const RH_VALIDATION_SETTING_KEY = "rh_validation_only";
 const FORMATION_REVIEWS_VISIBILITY_SETTING_KEY = "formation_reviews_visible";
+const DASHBOARD_INFORMATION_SETTING_KEY = "dashboard_information";
 
 const ZIP_LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;
 const ZIP_CENTRAL_DIR_SIGNATURE = 0x02014b50;
@@ -39,6 +43,9 @@ const ZIP_END_OF_CENTRAL_DIR_SIGNATURE = 0x06054b50;
 const EXCEL_EPOCH = Date.UTC(1899, 11, 30);
 
 const TRAINING_MATERIAL_MAX_SIZE = 10 * 1024 * 1024; // 10 Mo
+
+const DEFAULT_DASHBOARD_INFORMATION_SETTINGS: DashboardInformationSettings =
+  DEFAULT_DASHBOARD_INFORMATION;
 
 const formationContentSchema = z.object({
   content: z.string().optional(),
@@ -1645,6 +1652,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/dashboard-information", async (_req, res) => {
+    try {
+      const stored = await storage.getSetting<DashboardInformationSettings>(
+        DASHBOARD_INFORMATION_SETTING_KEY
+      );
+      const settings = dashboardInformationSettingsSchema.parse(
+        stored ?? DEFAULT_DASHBOARD_INFORMATION_SETTINGS
+      );
+      res.json(settings);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get(
     "/api/admin/settings/coach-validation",
     requireAuth,
@@ -1745,6 +1766,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         res.json({ reviewsVisible: data.visible });
+      } catch (error: any) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({
+            message: "Données invalides",
+            errors: error.errors,
+          });
+        }
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  app.patch(
+    "/api/admin/settings/dashboard-information",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const userId = (req as AuthRequest).userId!;
+        const user = await storage.getUser(userId);
+
+        if (!user || !user.roles.includes("rh")) {
+          return res.status(403).json({ message: "Unauthorized" });
+        }
+
+        const parsed = dashboardInformationSettingsSchema.parse(req.body ?? {});
+        const payload: DashboardInformationSettings = {
+          ...DEFAULT_DASHBOARD_INFORMATION_SETTINGS,
+          ...parsed,
+          imageUrl: parsed.imageUrl?.trim?.() ?? "",
+        };
+
+        await storage.setSetting(DASHBOARD_INFORMATION_SETTING_KEY, payload);
+
+        res.json(payload);
       } catch (error: any) {
         if (error instanceof z.ZodError) {
           return res.status(400).json({

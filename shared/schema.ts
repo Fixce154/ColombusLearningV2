@@ -285,6 +285,80 @@ export type CoachAssignment = typeof coachAssignments.$inferSelect;
 export type InsertCoachAssignment = typeof coachAssignments.$inferInsert;
 export type AppSetting = typeof appSettings.$inferSelect;
 export type InsertAppSetting = typeof appSettings.$inferInsert;
+
+export const DASHBOARD_INFORMATION_LAYOUTS = [
+  "text-only",
+  "image-right",
+  "image-left",
+  "image-top",
+] as const;
+
+export const DASHBOARD_INFORMATION_TONES = [
+  "neutral",
+  "accent",
+  "highlight",
+] as const;
+
+const dashboardImageUrlSchema = z
+  .string()
+  .trim()
+  .max(500, { message: "L'URL de l'image est trop longue" })
+  .refine(
+    (value) =>
+      value.length === 0 ||
+      value.startsWith("http://") ||
+      value.startsWith("https://") ||
+      value.startsWith("/"),
+    {
+      message:
+        "L'URL doit commencer par http://, https:// ou / pour une ressource interne",
+    }
+  )
+  .default("");
+
+export const dashboardInformationSettingsSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    title: z
+      .string()
+      .trim()
+      .max(120, { message: "Le titre ne doit pas dépasser 120 caractères" })
+      .default(""),
+    body: z
+      .string()
+      .trim()
+      .max(1200, { message: "Le texte ne doit pas dépasser 1200 caractères" })
+      .default(""),
+    imageUrl: dashboardImageUrlSchema,
+    layout: z.enum(DASHBOARD_INFORMATION_LAYOUTS).default("text-only"),
+    tone: z.enum(DASHBOARD_INFORMATION_TONES).default("neutral"),
+  })
+  .superRefine((data, ctx) => {
+    if (data.enabled) {
+      if (!data.title || data.title.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Le titre est obligatoire lorsque la section est activée",
+          path: ["title"],
+        });
+      }
+
+      if (!data.body || data.body.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Le texte est obligatoire lorsque la section est activée",
+          path: ["body"],
+        });
+      }
+    }
+  });
+
+export type DashboardInformationSettings = z.infer<
+  typeof dashboardInformationSettingsSchema
+>;
+
+export const DEFAULT_DASHBOARD_INFORMATION: DashboardInformationSettings =
+  dashboardInformationSettingsSchema.parse({});
 export type InsertRegistration = z.infer<typeof insertRegistrationSchema>;
 export type Registration = typeof registrations.$inferSelect;
 export type InsertInstructorFormation = z.infer<typeof insertInstructorFormationSchema>;
