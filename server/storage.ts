@@ -474,23 +474,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFormationInterest(insertInterest: InsertFormationInterest & { status: string }): Promise<FormationInterest> {
-    const existingInterest = await db
-      .select()
-      .from(formationInterests)
-      .where(
-        and(
-          eq(formationInterests.userId, insertInterest.userId),
-          eq(formationInterests.formationId, insertInterest.formationId),
-          ne(formationInterests.status, "withdrawn")
+    if (insertInterest.formationId) {
+      const existingInterest = await db
+        .select()
+        .from(formationInterests)
+        .where(
+          and(
+            eq(formationInterests.userId, insertInterest.userId),
+            eq(formationInterests.formationId, insertInterest.formationId),
+            ne(formationInterests.status, "withdrawn")
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (existingInterest.length > 0) {
-      throw new Error("Vous avez déjà manifesté votre intérêt pour cette formation");
+      if (existingInterest.length > 0) {
+        throw new Error("Vous avez déjà manifesté votre intérêt pour cette formation");
+      }
     }
 
-    const [interest] = await db.insert(formationInterests).values(insertInterest).returning();
+    const { customPlannedDate, completedAt, ...rest } = insertInterest;
+    const normalizedInsert = {
+      ...rest,
+      customPlannedDate:
+        typeof customPlannedDate === "string"
+          ? new Date(customPlannedDate)
+          : customPlannedDate ?? undefined,
+      completedAt:
+        typeof completedAt === "string" ? new Date(completedAt) : completedAt ?? undefined,
+    } satisfies InsertFormationInterest & { status: string };
+
+    const [interest] = await db.insert(formationInterests).values(normalizedInsert).returning();
     return interest;
   }
 
@@ -498,9 +511,35 @@ export class DatabaseStorage implements IStorage {
     id: string,
     updates: Partial<FormationInterest>
   ): Promise<FormationInterest | undefined> {
+    const normalizedUpdates: Partial<FormationInterest> = { ...updates };
+
+    const normalizeDateField = (
+      key: "customPlannedDate" | "completedAt" | "coachValidatedAt" | "expressedAt",
+      value: unknown
+    ) => {
+      if (value === undefined) {
+        return;
+      }
+
+      if (value === null) {
+        normalizedUpdates[key] = null as FormationInterest[typeof key];
+        return;
+      }
+
+      const date = value instanceof Date ? value : new Date(value as string | number);
+      if (!Number.isNaN(date.getTime())) {
+        normalizedUpdates[key] = date as FormationInterest[typeof key];
+      }
+    };
+
+    normalizeDateField("customPlannedDate", updates.customPlannedDate);
+    normalizeDateField("completedAt", updates.completedAt);
+    normalizeDateField("coachValidatedAt", updates.coachValidatedAt);
+    normalizeDateField("expressedAt", updates.expressedAt);
+
     const [interest] = await db
       .update(formationInterests)
-      .set(updates)
+      .set(normalizedUpdates)
       .where(eq(formationInterests.id, id))
       .returning();
     return interest || undefined;

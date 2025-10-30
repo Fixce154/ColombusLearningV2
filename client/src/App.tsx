@@ -10,6 +10,7 @@ import Catalog from "@/pages/Catalog";
 import TrainingDetail from "@/pages/TrainingDetail";
 import ConsultantManagement from "@/pages/ConsultantManagement";
 import InterestManagement from "@/pages/InterestManagement";
+import OffCatalogArchive from "@/pages/OffCatalogArchive";
 import FormationManagement from "@/pages/FormationManagement";
 import SessionManagement from "@/pages/SessionManagement";
 import CommunicationManagement from "@/pages/CommunicationManagement";
@@ -68,6 +69,7 @@ function Router({
       <Route path="/formations" component={FormationManagement} />
       <Route path="/sessions" component={SessionManagement} />
       <Route path="/communication" component={CommunicationManagement} />
+      <Route path="/off-catalog" component={OffCatalogArchive} />
       <Route path="/data-visualisation" component={DataVisualization} />
       <Route path="/instructor-formations" component={InstructorFormations} />
       <Route path="/instructor-formations/:id" component={InstructorFormationContent} />

@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import RatingStars from "@/components/RatingStars";
 import {
   Table,
   TableBody,
@@ -66,28 +67,14 @@ import type {
   Formation,
   User,
   CoachAssignment,
+  DashboardInformationSettings,
 } from "@shared/schema";
+import { DEFAULT_DASHBOARD_INFORMATION } from "@shared/schema";
+import type { AdminInterestsResponse } from "@/types/admin";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PriorityBadge from "@/components/PriorityBadge";
 import { useRouteNotifications, useMarkNotificationsRead } from "@/hooks/use-notifications";
-
-interface AdminInterestsResponse {
-  interests: FormationInterest[];
-  aggregated: {
-    formationId: string;
-    pending: number;
-    approved: number;
-    converted: number;
-    withdrawn: number;
-    p1Count: number;
-    p2Count: number;
-    p3Count: number;
-    coachPending: number;
-    coachApproved: number;
-    coachRejected: number;
-  }[];
-}
 
 const INFORMATION_LAYOUT_OPTIONS: {
   value: DashboardInformationSettings["layout"];
@@ -326,28 +313,28 @@ export default function InterestManagement() {
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = event.target;
-    setInformationForm((prev) => ({
+    setInformationForm((prev: DashboardInformationSettings) => ({
       ...prev,
       [name as keyof DashboardInformationSettings]: value,
     }));
   };
 
   const handleInformationEnabledChange = (checked: boolean) => {
-    setInformationForm((prev) => ({
+    setInformationForm((prev: DashboardInformationSettings) => ({
       ...prev,
       enabled: Boolean(checked),
     }));
   };
 
   const handleInformationLayoutChange = (value: string) => {
-    setInformationForm((prev) => ({
+    setInformationForm((prev: DashboardInformationSettings) => ({
       ...prev,
       layout: value as DashboardInformationSettings["layout"],
     }));
   };
 
   const handleInformationToneChange = (value: string) => {
-    setInformationForm((prev) => ({
+    setInformationForm((prev: DashboardInformationSettings) => ({
       ...prev,
       tone: value as DashboardInformationSettings["tone"],
     }));
@@ -524,6 +511,8 @@ export default function InterestManagement() {
   const convertedInterests = interests.filter(i => i.status === "converted");
   const rejectedInterests = interests.filter(i => i.status === "rejected");
   const withdrawnInterests = interests.filter(i => i.status === "withdrawn");
+  const offCatalogInterestsOnly = interests.filter(i => !i.formationId);
+  const offCatalogCompleted = offCatalogInterestsOnly.filter(i => i.status === "converted");
   const pendingCoachValidation = pendingInterests.filter(
     (interest) => interest.coachStatus !== "approved" && hasAssignedCoach(interest)
   );
@@ -590,7 +579,7 @@ export default function InterestManagement() {
               </TableRow>
             ) : (
               data.map((interest) => {
-                const formation = getFormation(interest.formationId);
+                const formation = interest.formationId ? getFormation(interest.formationId) : undefined;
                 const user = getUser(interest.userId);
                 const coachAssigned = hasAssignedCoach(interest);
                 const canApprove =
@@ -598,6 +587,18 @@ export default function InterestManagement() {
                 const approveDisabledReason =
                   !canApprove && coachAssigned ? "En attente de validation coach" : undefined;
                 const canCancel = interest.status === "approved" || interest.status === "converted";
+                const isOffCatalog = !interest.formationId;
+                const formationTitle = isOffCatalog
+                  ? interest.customTitle ?? "Formation hors catalogue"
+                  : formation?.title ?? "Formation inconnue";
+                const formationDescription = isOffCatalog
+                  ? interest.customDescription ?? ""
+                  : formation?.description ?? "";
+                const extraDetails = [
+                  interest.customPrice ? `Budget : ${interest.customPrice}` : null,
+                  interest.customFitnetNumber ? `Fitnet : ${interest.customFitnetNumber}` : null,
+                  interest.customMissionManager ? `Resp. mission : ${interest.customMissionManager}` : null,
+                ].filter(Boolean);
 
                 return (
                   <TableRow key={interest.id}>
@@ -610,9 +611,33 @@ export default function InterestManagement() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="max-w-md">
-                        <div className="font-medium">{formation?.title || "Formation inconnue"}</div>
-                        <div className="text-sm text-muted-foreground line-clamp-1">{formation?.description}</div>
+                      <div className="max-w-md space-y-1">
+                        <div className="flex items-center gap-2">
+                          <div className="font-medium">{formationTitle}</div>
+                          {isOffCatalog ? (
+                            <Badge variant="outline" className="border-dashed text-xs">
+                              Hors catalogue
+                            </Badge>
+                          ) : null}
+                        </div>
+                        {formationDescription && (
+                          <div className="text-sm text-muted-foreground line-clamp-1">{formationDescription}</div>
+                        )}
+                        {isOffCatalog && extraDetails.length > 0 && (
+                          <div className="text-xs text-muted-foreground line-clamp-2">
+                            {extraDetails.join(" • ")}
+                          </div>
+                        )}
+                        {isOffCatalog && interest.customLink && (
+                          <a
+                            href={interest.customLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                          >
+                            Consulter le lien externe
+                          </a>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -1088,23 +1113,26 @@ export default function InterestManagement() {
         </div>
 
         <Tabs defaultValue="pending" className="space-y-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-5">
-          <TabsTrigger value="pending" data-testid="tab-pending-interests">
-            En attente ({pendingInterests.length})
-          </TabsTrigger>
-          <TabsTrigger value="approved" data-testid="tab-approved-interests">
-            Approuvées ({approvedInterests.length})
-          </TabsTrigger>
-          <TabsTrigger value="converted" data-testid="tab-converted-interests">
-            Converties ({convertedInterests.length})
-          </TabsTrigger>
-          <TabsTrigger value="rejected" data-testid="tab-rejected-interests">
-            Refusées ({rejectedInterests.length})
-          </TabsTrigger>
-          <TabsTrigger value="withdrawn" data-testid="tab-withdrawn-interests">
-            Annulées ({withdrawnInterests.length})
-          </TabsTrigger>
-        </TabsList>
+          <TabsList className="grid w-full max-w-3xl grid-cols-6">
+            <TabsTrigger value="pending" data-testid="tab-pending-interests">
+              En attente ({pendingInterests.length})
+            </TabsTrigger>
+            <TabsTrigger value="approved" data-testid="tab-approved-interests">
+              Approuvées ({approvedInterests.length})
+            </TabsTrigger>
+            <TabsTrigger value="converted" data-testid="tab-converted-interests">
+              Converties ({convertedInterests.length})
+            </TabsTrigger>
+            <TabsTrigger value="rejected" data-testid="tab-rejected-interests">
+              Refusées ({rejectedInterests.length})
+            </TabsTrigger>
+            <TabsTrigger value="withdrawn" data-testid="tab-withdrawn-interests">
+              Annulées ({withdrawnInterests.length})
+            </TabsTrigger>
+            <TabsTrigger value="off-catalog" data-testid="tab-off-catalog-interests">
+              Hors catalogue ({offCatalogInterestsOnly.length})
+            </TabsTrigger>
+          </TabsList>
 
         <TabsContent value="pending" className="space-y-4">
           <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
@@ -1240,6 +1268,142 @@ export default function InterestManagement() {
             </div>
           </Card>
         </TabsContent>
+
+        <TabsContent value="off-catalog" className="space-y-4">
+          <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Megaphone className="w-5 h-5 text-primary" />
+                  <h2 className="text-xl font-semibold text-primary">Demandes hors catalogue</h2>
+                </div>
+                <p className="text-sm text-muted-foreground max-w-xl">
+                  Suivez les demandes personnalisées : statut, date prévue et retours des collaborateurs.
+                </p>
+              </div>
+              <div className="overflow-hidden rounded-2xl border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Consultant</TableHead>
+                      <TableHead>Formation</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Date clé</TableHead>
+                      <TableHead>Avis</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {offCatalogInterestsOnly.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                          Aucune demande hors catalogue pour le moment.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      offCatalogInterestsOnly.map((interest) => {
+                        const consultant = getUser(interest.userId);
+                        const status = interest.status;
+                        const statusLabel = {
+                          pending: "En attente",
+                          approved: "Validée",
+                          converted: "Réalisée",
+                          rejected: "Refusée",
+                          withdrawn: "Annulée",
+                        } as const;
+                        const statusVariant = {
+                          pending: "secondary",
+                          approved: "default",
+                          converted: "default",
+                          rejected: "destructive",
+                          withdrawn: "outline",
+                        } as const;
+                        const statusKey = (Object.prototype.hasOwnProperty.call(statusLabel, status)
+                          ? (status as keyof typeof statusLabel)
+                          : "pending") as keyof typeof statusLabel;
+                        const badgeVariant = statusVariant[statusKey];
+                        const keyDate =
+                          interest.completedAt || interest.customPlannedDate || interest.expressedAt || null;
+                        const formattedDate = keyDate ? format(new Date(keyDate), "dd MMM yyyy", { locale: fr }) : "-";
+                        const formationTitle = interest.customTitle ?? "Formation hors catalogue";
+                        const extraDetails = [
+                          interest.customPrice ? `Budget : ${interest.customPrice}` : null,
+                          interest.customMissionManager ? `Resp. mission : ${interest.customMissionManager}` : null,
+                          interest.customFitnetNumber ? `Fitnet : ${interest.customFitnetNumber}` : null,
+                        ].filter(Boolean);
+
+                        return (
+                          <TableRow key={interest.id}>
+                            <TableCell>
+                              <div className="font-medium">{consultant?.name ?? "Consultant inconnu"}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {consultant?.businessUnit || ""}
+                                {consultant?.seniority ? ` • ${consultant.seniority}` : ""}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <div className="font-medium">{formationTitle}</div>
+                                {interest.customDescription && (
+                                  <div className="text-xs text-muted-foreground line-clamp-2">
+                                    {interest.customDescription}
+                                  </div>
+                                )}
+                                {extraDetails.length > 0 && (
+                                  <div className="text-xs text-muted-foreground">{extraDetails.join(" • ")}</div>
+                                )}
+                                {interest.customLink && (
+                                  <a
+                                    href={interest.customLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                  >
+                                    Voir la formation
+                                  </a>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={badgeVariant}
+                                className={
+                                  statusKey === "converted"
+                                    ? "bg-green-500/10 text-green-700 border-green-500/20"
+                                    : statusKey === "pending"
+                                    ? "bg-yellow-500/10 text-yellow-700 border-yellow-500/20"
+                                    : undefined
+                                }
+                              >
+                                {statusLabel[statusKey]}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{formattedDate}</TableCell>
+                            <TableCell>
+                              {interest.customReviewRating && statusKey === "converted" ? (
+                                <div className="flex flex-col gap-1">
+                                  <RatingStars value={interest.customReviewRating} size="sm" />
+                                  {interest.customReviewComment && (
+                                    <span className="text-xs text-muted-foreground line-clamp-2">
+                                      {interest.customReviewComment}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  {statusKey === "converted" ? "Avis en attente" : "-"}
+                                </span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </Card>
+        </TabsContent>
       </Tabs>
 
         {/* Aggregated View by Formation */}
@@ -1270,6 +1434,9 @@ export default function InterestManagement() {
                   </TableHeader>
                   <TableBody>
                     {aggregated.map((agg) => {
+                      if (!agg.formationId) {
+                        return null;
+                      }
                       const formation = getFormation(agg.formationId);
                       const total = agg.pending + agg.approved + agg.converted;
                       return (
@@ -1344,7 +1511,10 @@ export default function InterestManagement() {
                       <strong>Consultant :</strong> {getUser(selectedInterest.userId)?.name}
                     </p>
                     <p>
-                      <strong>Formation :</strong> {getFormation(selectedInterest.formationId)?.title}
+                      <strong>Formation :</strong>{" "}
+                      {selectedInterest.formationId
+                        ? getFormation(selectedInterest.formationId)?.title
+                        : selectedInterest.customTitle || "Formation hors catalogue"}
                     </p>
                     <p>
                       <strong>Priorité :</strong> {selectedInterest.priority}
@@ -1401,7 +1571,10 @@ export default function InterestManagement() {
                       <strong>Consultant :</strong> {getUser(cancelInterestTarget.userId)?.name}
                     </p>
                     <p>
-                      <strong>Formation :</strong> {getFormation(cancelInterestTarget.formationId)?.title}
+                      <strong>Formation :</strong>{" "}
+                      {cancelInterestTarget.formationId
+                        ? getFormation(cancelInterestTarget.formationId)?.title
+                        : cancelInterestTarget.customTitle || "Formation hors catalogue"}
                     </p>
                     <p className="mt-4 text-muted-foreground">
                       Les inscriptions à venir pour cette formation seront supprimées pour ce consultant.
