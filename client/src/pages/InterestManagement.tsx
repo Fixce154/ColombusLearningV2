@@ -70,27 +70,11 @@ import type {
   DashboardInformationSettings,
 } from "@shared/schema";
 import { DEFAULT_DASHBOARD_INFORMATION } from "@shared/schema";
+import type { AdminInterestsResponse } from "@/types/admin";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PriorityBadge from "@/components/PriorityBadge";
 import { useRouteNotifications, useMarkNotificationsRead } from "@/hooks/use-notifications";
-
-interface AdminInterestsResponse {
-  interests: FormationInterest[];
-  aggregated: {
-    formationId: string;
-    pending: number;
-    approved: number;
-    converted: number;
-    withdrawn: number;
-    p1Count: number;
-    p2Count: number;
-    p3Count: number;
-    coachPending: number;
-    coachApproved: number;
-    coachRejected: number;
-  }[];
-}
 
 const INFORMATION_LAYOUT_OPTIONS: {
   value: DashboardInformationSettings["layout"];
