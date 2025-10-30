@@ -29,6 +29,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouteNotifications, useMarkNotificationsRead } from "@/hooks/use-notifications";
 import type { User, Registration, Formation, Session, FormationInterest } from "@shared/schema";
 
+type CoachInfo = Omit<User, "password">;
+
 interface DashboardProps {
   currentUser: User;
 }
