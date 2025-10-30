@@ -1041,54 +1041,51 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
       )}
 
       <section className="space-y-6">
-        <Card className="relative overflow-hidden rounded-[2rem] border border-primary/10 bg-gradient-to-br from-white via-white to-primary/5 p-8 shadow-sm">
-          <div
-            className="pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary/10 blur-3xl -z-10"
-            aria-hidden
-          />
-          <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-            <div className="max-w-2xl space-y-3">
-              <p className="eyebrow text-primary/80">Formation hors catalogue</p>
-              <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-                Vous souhaitez vous inscrire à une formation hors catalogue ?
-              </h2>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                Décrivez-nous la formation identifiée (contenu, organisme, prix, lien...). Votre demande suivra le workflow
-                classique de validation coach puis RH.
-              </p>
-            </div>
-            <div className="flex flex-col items-start gap-2 md:items-end">
-              <Button onClick={() => setShowOffCatalogDialog(true)} size="lg" className="rounded-xl px-6">
-                Faire une demande
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                {offCatalogInterests.length > 0
-                  ? `${offCatalogInterests.length} demande${offCatalogInterests.length > 1 ? "s" : ""} suivie${
-                      offCatalogInterests.length > 1 ? "s" : ""
-                    }`
-                  : "Aucune demande en cours"}
-              </p>
-            </div>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <p className="eyebrow text-muted-foreground">Demandes hors catalogue</p>
+            <h3 className="text-xl font-semibold text-foreground">Vos formations personnalisées</h3>
+            <p className="max-w-xl text-sm text-muted-foreground">
+              Retrouvez ici l'avancement de vos demandes hors catalogue : validations, dates prévues, avis laissés...
+            </p>
           </div>
-        </Card>
+          <div className="flex flex-col items-end gap-2">
+            <Button onClick={() => setShowOffCatalogDialog(true)} className="rounded-xl px-5">
+              Faire une demande
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              {offCatalogInterests.length > 0
+                ? `${offCatalogInterests.length} demande${offCatalogInterests.length > 1 ? "s" : ""} suivie${
+                    offCatalogInterests.length > 1 ? "s" : ""
+                  }`
+                : "Aucune demande en cours"}
+            </p>
+          </div>
+        </div>
 
-        {offCatalogInterests.length > 0 && (
-          <div className="space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="eyebrow text-muted-foreground">Demandes hors catalogue</p>
-                <h3 className="text-xl font-semibold text-foreground">Vos formations personnalisées</h3>
-              </div>
-              <p className="max-w-xl text-sm text-muted-foreground">
-                Retrouvez ici l'avancement de vos demandes hors catalogue : validations, dates prévues, avis laissés...
-              </p>
-            </div>
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {offCatalogInterests.map((interest) => (
-                <OffCatalogInterestCard key={interest.id} interest={interest} />
-              ))}
-            </div>
+        {offCatalogInterests.length > 0 ? (
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {offCatalogInterests.map((interest) => (
+              <OffCatalogInterestCard key={interest.id} interest={interest} />
+            ))}
           </div>
+        ) : (
+          <Card className="surface-soft rounded-2xl p-10 text-center">
+            <div className="mx-auto flex max-w-md flex-col items-center gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <CalendarCheck className="h-8 w-8" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-lg font-semibold text-foreground">Aucune demande en cours</p>
+                <p className="text-sm text-muted-foreground">
+                  Identifiez une formation hors catalogue et soumettez-la pour validation en un clic.
+                </p>
+              </div>
+              <Button onClick={() => setShowOffCatalogDialog(true)} className="rounded-xl px-6">
+                Proposer une formation
+              </Button>
+            </div>
+          </Card>
         )}
       </section>
 
