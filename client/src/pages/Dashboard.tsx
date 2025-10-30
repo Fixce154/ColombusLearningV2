@@ -40,12 +40,13 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
   const [deleteInterestId, setDeleteInterestId] = useState<string | null>(null);
   const [deleteRegistrationId, setDeleteRegistrationId] = useState<string | null>(null);
 
-  const { data: userData } = useQuery<{ user: User; coaches?: CoachInfo[] }>({
-    queryKey: ["/api/auth/me"],
-  });
+  const { data: userData } = useQuery<{ user: User; coach?: Omit<User, "password"> | null; coaches?: Omit<User, "password">[] }>(
+    {
+      queryKey: ["/api/auth/me"],
+    }
+  );
   const currentUser = userData?.user || _currentUser;
-  const coaches = userData?.coaches ?? [];
-  const primaryCoach = coaches[0];
+  const primaryCoach = userData?.coach ?? userData?.coaches?.[0] ?? null;
 
   const { data: interests = [], isLoading: isLoadingInterests } = useQuery<FormationInterest[]>({
     queryKey: ["/api/interests"],
@@ -200,11 +201,6 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
                     <p className="text-base font-semibold text-[#00313F]">
                       {primaryCoach ? primaryCoach.name : "En attente d'assignation"}
                     </p>
-                    {coaches.length > 1 ? (
-                      <p className="text-xs text-[#00313F]/60">
-                        + {coaches.length - 1} coach{coaches.length - 1 > 1 ? "s" : ""} supplémentaire{coaches.length - 1 > 1 ? "s" : ""}
-                      </p>
-                    ) : null}
                   </div>
                 </div>
               </div>
