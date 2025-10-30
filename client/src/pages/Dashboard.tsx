@@ -12,27 +12,39 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Calendar, XCircle, Loader2, Heart, AlertCircle, CheckCircle, Trash2 } from "lucide-react";
+import {
+  Calendar,
+  XCircle,
+  Loader2,
+  Heart,
+  AlertCircle,
+  CheckCircle,
+  Trash2,
+  UserCircle,
+} from "lucide-react";
 import { Link } from "wouter";
 import { useMemo, useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useRouteNotifications, useMarkNotificationsRead } from "@/hooks/use-notifications";
 import type { User, Registration, Formation, Session, FormationInterest } from "@shared/schema";
+import type { AuthMeResponse, SanitizedUser } from "@/types/api";
 
 interface DashboardProps {
   currentUser: User;
+  initialCoach?: SanitizedUser | null;
 }
 
-export default function Dashboard({ currentUser: _currentUser }: DashboardProps) {
+export default function Dashboard({ currentUser: _currentUser, initialCoach = null }: DashboardProps) {
   const { toast } = useToast();
   const [deleteInterestId, setDeleteInterestId] = useState<string | null>(null);
   const [deleteRegistrationId, setDeleteRegistrationId] = useState<string | null>(null);
 
-  const { data: userData } = useQuery<{ user: User }>({
+  const { data: userData } = useQuery<AuthMeResponse>({
     queryKey: ["/api/auth/me"],
   });
   const currentUser = userData?.user || _currentUser;
+  const primaryCoach = userData?.coach ?? userData?.coaches?.[0] ?? initialCoach;
 
   const { data: interests = [], isLoading: isLoadingInterests } = useQuery<FormationInterest[]>({
     queryKey: ["/api/interests"],
@@ -174,6 +186,23 @@ export default function Dashboard({ currentUser: _currentUser }: DashboardProps)
             <p className="text-base leading-relaxed text-muted-foreground">
               L'outil "Made in Colombus" pour gérer votre parcours de formation
             </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="rounded-2xl border border-white/40 bg-white/80 px-5 py-4 text-[#00313F] shadow-sm backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <UserCircle className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#00313F]/70">
+                      Coach référent
+                    </p>
+                    <p className="text-base font-semibold text-[#00313F]">
+                      {primaryCoach ? primaryCoach.name : "En attente d'assignation"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           {unreadDashboardNotifications.length > 0 ? (
             <div className="w-full max-w-md rounded-2xl border border-primary/10 bg-white/80 p-5 text-[#00313F] shadow-sm backdrop-blur-sm">

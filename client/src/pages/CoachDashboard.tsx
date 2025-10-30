@@ -190,6 +190,58 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
         </div>
       </section>
 
+      <section className="space-y-4">
+        <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-3">
+              <Users className="h-5 w-5 text-primary" />
+              <div>
+                <h2 className="text-xl font-semibold text-primary">Mes coachés</h2>
+                <p className="text-sm text-muted-foreground">
+                  Retrouvez la liste des collaborateurs que vous accompagnez au quotidien.
+                </p>
+              </div>
+            </div>
+            <Badge variant="secondary" className="w-fit">
+              {coachees.length} coaché{coachees.length > 1 ? "s" : ""}
+            </Badge>
+          </div>
+          <div className="mt-4 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Coaché</TableHead>
+                  <TableHead>Business Unit</TableHead>
+                  <TableHead>Séniorité</TableHead>
+                  <TableHead>Rôle</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {coachees.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
+                      Aucun coaché ne vous est encore assigné.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  coachees.map((coachee) => (
+                    <TableRow key={coachee.id}>
+                      <TableCell>
+                        <div className="font-medium">{coachee.name}</div>
+                        <div className="text-xs text-muted-foreground">{coachee.email}</div>
+                      </TableCell>
+                      <TableCell>{coachee.businessUnit || "-"}</TableCell>
+                      <TableCell>{coachee.seniority || "-"}</TableCell>
+                      <TableCell>{coachee.jobRole || "-"}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      </section>
+
       <section className="grid gap-6 md:grid-cols-3">
         <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
           <div className="space-y-1">

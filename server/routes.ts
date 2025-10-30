@@ -605,8 +605,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const assignments = await storage.listCoachAssignmentsForCoachee(userId);
+      const coachIds = Array.from(new Set(assignments.map((assignment) => assignment.coachId)));
+      const coaches = coachIds.length ? await storage.listUsersByIds(coachIds) : [];
+      const sanitizedCoaches = coaches.map(({ password: _password, ...coach }) => coach);
+      const primaryCoach = sanitizedCoaches.length > 0 ? sanitizedCoaches[0] : null;
+
       const { password: _, ...userWithoutPassword } = user;
-      res.json({ user: userWithoutPassword });
+      res.json({ user: userWithoutPassword, coach: primaryCoach, coaches: sanitizedCoaches });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1582,6 +1588,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (coachee.archived) {
         return res.status(400).json({ message: "Impossible d'assigner un coach à un consultant archivé" });
+      }
+
+      const existingAssignments = await storage.listCoachAssignmentsForCoachee(data.coacheeId);
+      if (existingAssignments.length > 0) {
+        const currentAssignment = existingAssignments[0];
+        if (currentAssignment.coachId === data.coachId) {
+          return res.json(currentAssignment);
+        }
+        await storage.deleteCoachAssignmentsForCoachee(data.coacheeId);
       }
 
       const assignment = await storage.createCoachAssignment({

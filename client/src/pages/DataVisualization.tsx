@@ -61,6 +61,7 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import type { User } from "@shared/schema";
+import type { AuthMeResponse } from "@/types/api";
 
 interface StatusCounts {
   pending: number;
@@ -142,10 +143,6 @@ interface AnalyticsResponse {
   timeline: TimelineEntry[];
 }
 
-interface CurrentUserResponse {
-  user: User;
-}
-
 const statusLabels: Record<TimelineStatus, string> = {
   pending: "En attente",
   validated: "Validée",
@@ -207,7 +204,7 @@ export default function DataVisualization() {
   const [statusFilter, setStatusFilter] = useState<TimelineStatus | "all">("all");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: currentUser } = useQuery<CurrentUserResponse | null>({
+  const { data: currentUser } = useQuery<AuthMeResponse | null>({
     queryKey: ["/api/auth/me"],
   });
 
@@ -226,7 +223,7 @@ export default function DataVisualization() {
     },
   });
 
-  const isRh = currentUser?.user?.roles.includes("rh");
+  const isRh = currentUser?.user.roles.includes("rh");
 
   const consultantOptions = useMemo(() => {
     if (!analytics) return [];

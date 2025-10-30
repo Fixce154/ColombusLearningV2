@@ -275,6 +275,7 @@ export interface IStorage {
   createCoachAssignment(assignment: InsertCoachAssignment): Promise<CoachAssignment>;
   deleteCoachAssignment(id: string): Promise<boolean>;
   deleteCoachAssignmentsForCoach(coachId: string): Promise<number>;
+  deleteCoachAssignmentsForCoachee(coacheeId: string): Promise<number>;
 
   // Settings
   getSetting<T>(key: string): Promise<T | null>;
@@ -1068,6 +1069,14 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(coachAssignments)
       .where(eq(coachAssignments.coachId, coachId))
+      .returning({ id: coachAssignments.id });
+    return result.length;
+  }
+
+  async deleteCoachAssignmentsForCoachee(coacheeId: string): Promise<number> {
+    const result = await db
+      .delete(coachAssignments)
+      .where(eq(coachAssignments.coacheeId, coacheeId))
       .returning({ id: coachAssignments.id });
     return result.length;
   }
