@@ -120,7 +120,7 @@ export const sessions = pgTable("sessions", {
 
 export const formationInterests = pgTable("formation_interests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  formationId: varchar("formation_id").notNull(),
+  formationId: varchar("formation_id").references(() => formations.id),
   userId: varchar("user_id").notNull(),
   priority: text("priority").notNull(), // P1, P2, P3
   status: text("status").notNull(), // pending, approved, converted, withdrawn
@@ -128,6 +128,16 @@ export const formationInterests = pgTable("formation_interests", {
   coachStatus: text("coach_status").notNull().default("pending"), // pending, approved, rejected
   coachId: varchar("coach_id"),
   coachValidatedAt: timestamp("coach_validated_at"),
+  customTitle: text("custom_title"),
+  customDescription: text("custom_description"),
+  customLink: text("custom_link"),
+  customPrice: text("custom_price"),
+  customFitnetNumber: text("custom_fitnet_number"),
+  customMissionManager: text("custom_mission_manager"),
+  customPlannedDate: timestamp("custom_planned_date"),
+  completedAt: timestamp("completed_at"),
+  customReviewRating: integer("custom_review_rating"),
+  customReviewComment: text("custom_review_comment"),
 }, (table) => ({
   userFormationUnique: uniqueIndex("user_formation_unique_idx").on(table.userId, table.formationId),
 }));
@@ -245,14 +255,35 @@ export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true 
   startDate: z.union([z.date(), z.string()]).transform((val) => typeof val === 'string' ? new Date(val) : val),
   endDate: z.union([z.date(), z.string()]).transform((val) => typeof val === 'string' ? new Date(val) : val),
 });
-export const insertFormationInterestSchema = createInsertSchema(formationInterests).omit({
-  id: true,
-  expressedAt: true,
-  status: true,
-  coachStatus: true,
-  coachId: true,
-  coachValidatedAt: true,
-});
+export const insertFormationInterestSchema = createInsertSchema(formationInterests)
+  .omit({
+    id: true,
+    expressedAt: true,
+    status: true,
+    coachStatus: true,
+    coachId: true,
+    coachValidatedAt: true,
+  })
+  .extend({
+    customPlannedDate: z
+      .union([z.date(), z.string()])
+      .optional()
+      .transform((val) => {
+        if (typeof val === "string" && val.length > 0) {
+          return new Date(val);
+        }
+        return val ?? undefined;
+      }),
+    completedAt: z
+      .union([z.date(), z.string()])
+      .optional()
+      .transform((val) => {
+        if (typeof val === "string" && val.length > 0) {
+          return new Date(val);
+        }
+        return val ?? undefined;
+      }),
+  });
 export const insertRegistrationSchema = createInsertSchema(registrations).omit({ id: true, registeredAt: true, status: true });
 export const insertFormationMaterialSchema = createInsertSchema(formationMaterials).omit({
   id: true,
