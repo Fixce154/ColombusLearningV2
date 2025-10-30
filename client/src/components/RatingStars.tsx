@@ -29,33 +29,35 @@ export function RatingStars({
 
   if (readOnly || !onChange) {
     const clampedValue = Math.max(0, Math.min(5, value));
-    const fillPercentage = (clampedValue / 5) * 100;
 
     return (
-      <div className={clsx("relative inline-flex", className)} aria-hidden>
-        <div className="flex gap-0.5">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <Star
-              key={`empty-${index}`}
-              className={clsx(starSize, "text-muted-foreground/25")}
-              strokeWidth={1.3}
-            />
-          ))}
-        </div>
-        <div
-          className="absolute inset-0 overflow-hidden"
-          style={{ width: `${fillPercentage}%` }}
-        >
-          <div className="flex gap-0.5">
-            {Array.from({ length: 5 }).map((_, index) => (
+      <div className={clsx("flex items-center gap-0.5", className)} aria-hidden>
+        {Array.from({ length: 5 }).map((_, index) => {
+          const fillLevel = Math.min(Math.max(clampedValue - index, 0), 1);
+
+          return (
+            <span key={`static-${index}`} className="relative inline-flex">
               <Star
-                key={`filled-${index}`}
-                className={clsx(starSize, "text-amber-400 fill-amber-400 drop-shadow-sm")}
+                className={clsx(starSize, "text-muted-foreground/25")}
                 strokeWidth={1.3}
               />
-            ))}
-          </div>
-        </div>
+              {fillLevel > 0 && (
+                <span
+                  className="absolute inset-y-0 left-0 overflow-hidden"
+                  style={{ width: `${fillLevel * 100}%` }}
+                >
+                  <Star
+                    className={clsx(
+                      starSize,
+                      "text-amber-400 fill-amber-400 drop-shadow-sm"
+                    )}
+                    strokeWidth={1.3}
+                  />
+                </span>
+              )}
+            </span>
+          );
+        })}
       </div>
     );
   }
