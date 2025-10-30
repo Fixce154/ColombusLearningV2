@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import DashboardStats from "@/components/DashboardStats";
 import TrainingListItem from "@/components/TrainingListItem";
+import DashboardInformationCard from "@/components/DashboardInformationCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,15 @@ import { useMemo, useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useRouteNotifications, useMarkNotificationsRead } from "@/hooks/use-notifications";
-import type { User, Registration, Formation, Session, FormationInterest } from "@shared/schema";
+import type {
+  User,
+  Registration,
+  Formation,
+  Session,
+  FormationInterest,
+  DashboardInformationSettings,
+} from "@shared/schema";
+import { DEFAULT_DASHBOARD_INFORMATION } from "@shared/schema";
 import type { AuthMeResponse, SanitizedUser } from "@/types/api";
 
 type CoachInfo = Omit<User, "password">;
@@ -67,6 +76,10 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
       if (!res.ok) throw new Error("Failed to fetch sessions");
       return res.json();
     },
+  });
+
+  const { data: dashboardInformationSettings } = useQuery<DashboardInformationSettings>({
+    queryKey: ["/api/settings/dashboard-information"],
   });
 
   const dashboardNotificationsQuery = useRouteNotifications("/");
@@ -169,12 +182,18 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
   };
 
   const firstName = currentUser.name.split(" ")[0] || currentUser.name;
+  const dashboardInformation =
+    dashboardInformationSettings ?? DEFAULT_DASHBOARD_INFORMATION;
+  const showDashboardInformation =
+    dashboardInformation.enabled &&
+    dashboardInformation.title.trim().length > 0 &&
+    dashboardInformation.body.trim().length > 0;
 
   return (
     <div className="space-y-12">
       <section className="surface-elevated relative overflow-hidden rounded-[2rem] px-12 py-14">
         <div className="pointer-events-none absolute inset-y-8 right-0 hidden w-72 rounded-l-[32px] bg-[radial-gradient(circle_at_center,rgba(10,132,255,0.12),transparent_60%)] md:block" />
-        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-center md:justify-between">
+        <div className="relative z-10 flex flex-col gap-12 md:flex-row md:items-start md:justify-between">
           <div className="max-w-2xl space-y-5">
             <div className="flex flex-wrap items-center gap-3">
               <p className="eyebrow text-muted-foreground">Tableau de bord</p>
@@ -206,43 +225,48 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
               </div>
             </div>
           </div>
-          {unreadDashboardNotifications.length > 0 ? (
-            <div className="w-full max-w-md rounded-2xl border border-primary/10 bg-white/80 p-5 text-[#00313F] shadow-sm backdrop-blur-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold">Nouveautés pour vous</p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-3 text-xs text-[#00313F]"
-                  onClick={() => markDashboardNotificationsRead.mutate({ route: "/" })}
-                  disabled={markDashboardNotificationsRead.isPending || dashboardUnread === 0}
-                >
-                  {markDashboardNotificationsRead.isPending ? "Traitement..." : "Marquer comme lues"}
-                </Button>
+          <div className="flex w-full max-w-md flex-col gap-5">
+            {showDashboardInformation ? (
+              <DashboardInformationCard settings={dashboardInformation} />
+            ) : null}
+            {unreadDashboardNotifications.length > 0 ? (
+              <div className="rounded-2xl border border-primary/10 bg-white/80 p-5 text-[#00313F] shadow-sm backdrop-blur-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">Nouveautés pour vous</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-3 text-xs text-[#00313F]"
+                    onClick={() => markDashboardNotificationsRead.mutate({ route: "/" })}
+                    disabled={markDashboardNotificationsRead.isPending || dashboardUnread === 0}
+                  >
+                    {markDashboardNotificationsRead.isPending ? "Traitement..." : "Marquer comme lues"}
+                  </Button>
+                </div>
+                <ul className="mt-4 space-y-2">
+                  {unreadDashboardNotifications.slice(0, 3).map((notification) => (
+                    <li key={notification.id} className="flex items-start gap-3 text-sm">
+                      <span className="mt-1 inline-flex h-2.5 w-2.5 flex-shrink-0 rounded-full bg-primary" />
+                      <div>
+                        <p className="font-medium text-[#00313F]">{notification.title}</p>
+                        {notification.message ? (
+                          <p className="text-sm text-[#00313F]/75">{notification.message}</p>
+                        ) : null}
+                        <p className="text-xs text-[#00313F]/60">
+                          {formatNotificationDate(notification.createdAt)}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {unreadDashboardNotifications.length > 3 ? (
+                  <p className="mt-3 text-xs text-[#00313F]/60">
+                    {unreadDashboardNotifications.length - 3} notification(s) supplémentaires en attente.
+                  </p>
+                ) : null}
               </div>
-              <ul className="mt-4 space-y-2">
-                {unreadDashboardNotifications.slice(0, 3).map((notification) => (
-                  <li key={notification.id} className="flex items-start gap-3 text-sm">
-                    <span className="mt-1 inline-flex h-2.5 w-2.5 flex-shrink-0 rounded-full bg-primary" />
-                    <div>
-                      <p className="font-medium text-[#00313F]">{notification.title}</p>
-                      {notification.message ? (
-                        <p className="text-sm text-[#00313F]/75">{notification.message}</p>
-                      ) : null}
-                      <p className="text-xs text-[#00313F]/60">
-                        {formatNotificationDate(notification.createdAt)}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              {unreadDashboardNotifications.length > 3 ? (
-                <p className="mt-3 text-xs text-[#00313F]/60">
-                  {unreadDashboardNotifications.length - 3} notification(s) supplémentaires en attente.
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
       </section>
 
