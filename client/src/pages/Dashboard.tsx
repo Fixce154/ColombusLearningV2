@@ -30,6 +30,8 @@ import { useRouteNotifications, useMarkNotificationsRead } from "@/hooks/use-not
 import type { User, Registration, Formation, Session, FormationInterest } from "@shared/schema";
 import type { AuthMeResponse, SanitizedUser } from "@/types/api";
 
+type CoachInfo = Omit<User, "password">;
+
 interface DashboardProps {
   currentUser: User;
   initialCoach?: SanitizedUser | null;
