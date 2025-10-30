@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { Loader2, CheckCircle, XCircle, Clock, Users, Calendar } from "lucide-re
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import PriorityBadge from "@/components/PriorityBadge";
+import { cn } from "@/lib/utils";
 import type {
   User,
   FormationInterest,
@@ -42,6 +43,7 @@ interface CoachDashboardProps {
 
 export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
   const { toast } = useToast();
+  const [selectedCoacheeId, setSelectedCoacheeId] = useState<string | null>(null);
 
   const { data: overview, isLoading } = useQuery<CoachOverviewResponse>({
     queryKey: ["/api/coach/overview"],
@@ -113,11 +115,34 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
   const registrations = overview?.registrations ?? [];
   const coachValidationOnly = overview?.settings.coachValidationOnly ?? false;
 
+  const filteredCoachees = useMemo(() => {
+    if (!selectedCoacheeId) {
+      return coachees;
+    }
+    return coachees.filter((coachee) => coachee.id === selectedCoacheeId);
+  }, [coachees, selectedCoacheeId]);
+
   const coacheeMap = useMemo(() => {
     const map = new Map<string, User>();
     coachees.forEach((coachee) => map.set(coachee.id, coachee));
     return map;
   }, [coachees]);
+
+  const selectedCoachee = selectedCoacheeId ? coacheeMap.get(selectedCoacheeId) ?? null : null;
+
+  const filteredInterests = useMemo(() => {
+    if (!selectedCoacheeId) {
+      return interests;
+    }
+    return interests.filter((interest) => interest.userId === selectedCoacheeId);
+  }, [interests, selectedCoacheeId]);
+
+  const filteredRegistrations = useMemo(() => {
+    if (!selectedCoacheeId) {
+      return registrations;
+    }
+    return registrations.filter((registration) => registration.userId === selectedCoacheeId);
+  }, [registrations, selectedCoacheeId]);
 
   const formationMap = useMemo(() => {
     const map = new Map<string, Formation>();
@@ -131,15 +156,15 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
     return map;
   }, [sessions]);
 
-  const pendingCoach = interests.filter(
+  const pendingCoach = filteredInterests.filter(
     (interest) => interest.status === "pending" && interest.coachStatus === "pending"
   );
-  const awaitingRh = interests.filter(
+  const awaitingRh = filteredInterests.filter(
     (interest) => interest.status === "pending" && interest.coachStatus === "approved"
   );
-  const approvedInterests = interests.filter((interest) => interest.status === "approved");
+  const approvedInterests = filteredInterests.filter((interest) => interest.status === "approved");
 
-  const completedRegistrations = registrations.filter(
+  const completedRegistrations = filteredRegistrations.filter(
     (registration) => registration.status === "completed"
   );
 
@@ -185,7 +210,11 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
           <div className="rounded-2xl border border-white/40 bg-white/80 p-5 text-[#00313F] shadow-sm backdrop-blur">
             <p className="text-sm font-semibold">Coach</p>
             <p className="text-2xl font-bold">{currentUser.name}</p>
-            <p className="text-xs text-[#00313F]/70">{coachees.length} coaché(s) suivis</p>
+            <p className="text-xs text-[#00313F]/70">
+              {selectedCoachee
+                ? `${selectedCoachee.name} sélectionné`
+                : `${coachees.length} coaché(s) suivis`}
+            </p>
           </div>
         </div>
       </section>
@@ -203,36 +232,52 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
               </div>
             </div>
             <Badge variant="secondary" className="w-fit">
-              {coachees.length} coaché{coachees.length > 1 ? "s" : ""}
+              {selectedCoachee ? "1 coaché sélectionné" : `${coachees.length} coaché${coachees.length > 1 ? "s" : ""}`}
             </Badge>
           </div>
+          {selectedCoachee && (
+            <div className="mt-3 flex items-center justify-between gap-4 rounded-xl bg-muted/40 p-4 text-sm text-muted-foreground">
+              <span>
+                Affichage des données pour <span className="font-medium text-foreground">{selectedCoachee.name}</span>.
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedCoacheeId(null)}>
+                Réinitialiser
+              </Button>
+            </div>
+          )}
           <div className="mt-4 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Coaché</TableHead>
-                  <TableHead>Business Unit</TableHead>
                   <TableHead>Séniorité</TableHead>
-                  <TableHead>Rôle</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {coachees.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
+                    <TableCell colSpan={2} className="py-6 text-center text-muted-foreground">
                       Aucun coaché ne vous est encore assigné.
                     </TableCell>
                   </TableRow>
                 ) : (
                   coachees.map((coachee) => (
-                    <TableRow key={coachee.id}>
+                    <TableRow
+                      key={coachee.id}
+                      onClick={() =>
+                        setSelectedCoacheeId((current) => (current === coachee.id ? null : coachee.id))
+                      }
+                      className={cn(
+                        "cursor-pointer transition-colors",
+                        selectedCoacheeId === coachee.id && "bg-primary/5 hover:bg-primary/10",
+                        selectedCoacheeId !== coachee.id && "hover:bg-muted/40"
+                      )}
+                    >
                       <TableCell>
                         <div className="font-medium">{coachee.name}</div>
                         <div className="text-xs text-muted-foreground">{coachee.email}</div>
                       </TableCell>
-                      <TableCell>{coachee.businessUnit || "-"}</TableCell>
                       <TableCell>{coachee.seniority || "-"}</TableCell>
-                      <TableCell>{coachee.jobRole || "-"}</TableCell>
                     </TableRow>
                   ))
                 )}
@@ -246,7 +291,7 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
         <Card className="surface-soft flex h-full items-center justify-between gap-6 rounded-2xl border-none p-6 shadow-sm">
           <div className="space-y-1">
             <p className="text-sm text-muted-foreground">Coachés actifs</p>
-            <p className="text-3xl font-semibold text-foreground">{coachees.length}</p>
+            <p className="text-3xl font-semibold text-foreground">{filteredCoachees.length}</p>
           </div>
           <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <Users className="h-6 w-6" />
@@ -471,14 +516,14 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {registrations.length === 0 ? (
+                {filteredRegistrations.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
                       Aucune formation suivie pour l'instant.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  registrations.map((registration) => {
+                  filteredRegistrations.map((registration) => {
                     const coachee = coacheeMap.get(registration.userId);
                     const session = sessionMap.get(registration.sessionId);
                     const formation = formationMap.get(registration.formationId);
