@@ -605,8 +605,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const assignments = await storage.listCoachAssignmentsForCoachee(userId);
+      const coachIds = Array.from(new Set(assignments.map((assignment) => assignment.coachId)));
+      const coaches = coachIds.length ? await storage.listUsersByIds(coachIds) : [];
+      const sanitizedCoaches = coaches.map(({ password: _password, ...coach }) => coach);
+
       const { password: _, ...userWithoutPassword } = user;
-      res.json({ user: userWithoutPassword });
+      res.json({ user: userWithoutPassword, coaches: sanitizedCoaches });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
