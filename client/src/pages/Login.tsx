@@ -188,7 +188,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <p className="eyebrow text-muted-foreground">Portail sécurisé</p>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">Colombus Learning</h1>
           <p className="text-sm text-muted-foreground">
-            Accédez à votre espace de formation personnalisée et gérez vos parcours en toute simplicité.
+            Accédez à votre espace de formation et gérez vos parcours en toute simplicité.
           </p>
         </div>
 
@@ -215,7 +215,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                         <Input
                           {...field}
                           type="email"
-                          placeholder="votre.nom@colombus.fr"
+                          placeholder="votre.nom@colombus-consulting.fr"
                           data-testid="input-email"
                           disabled={isLoading}
                         />
@@ -338,7 +338,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                         <Input
                           {...field}
                           type="email"
-                          placeholder="jean.dupont@colombus.fr"
+                          placeholder="jean.dupont@colombus-consulting.fr"
                           data-testid="input-register-email"
                           disabled={isLoading}
                         />

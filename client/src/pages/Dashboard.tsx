@@ -215,7 +215,7 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs font-semibold uppercase tracking-wide text-[#00313F]/70">
-                      Coach référent
+                      Mon coach
                     </p>
                     <p className="text-base font-semibold text-[#00313F]">
                       {primaryCoach ? primaryCoach.name : "En attente d'assignation"}
