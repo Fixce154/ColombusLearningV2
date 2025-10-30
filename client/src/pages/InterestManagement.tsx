@@ -66,9 +66,7 @@ import type {
   Formation,
   User,
   CoachAssignment,
-  DashboardInformationSettings,
 } from "@shared/schema";
-import { DEFAULT_DASHBOARD_INFORMATION } from "@shared/schema";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PriorityBadge from "@/components/PriorityBadge";
