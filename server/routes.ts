@@ -2838,15 +2838,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hasAssignedCoach = assignments.length > 0;
       }
 
-      if (updates.status === "approved" && !coachValidationOnly && !rhValidationOnly && hasAssignedCoach) {
-        if (interest.coachStatus !== "approved") {
-          return res.status(400).json({
-            message: "L'intention doit être validée par le coach avant la validation RH",
-          });
-        }
-      }
-
-      if (updates.status === "approved" && interest.coachStatus !== "approved") {
+      if (
+        updates.status === "approved" &&
+        interest.coachStatus !== "approved" &&
+        (!hasAssignedCoach || coachValidationOnly || rhValidationOnly)
+      ) {
         updates.coachStatus = "approved";
       }
 

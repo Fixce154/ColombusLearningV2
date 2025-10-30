@@ -37,10 +37,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Heart,
   CheckCircle,
   XCircle,
   Clock,
+  Heart,
   Loader2,
   TrendingUp,
   RefreshCw,
@@ -48,6 +48,7 @@ import {
   Settings,
   UserX,
   Megaphone,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Dialog,
@@ -517,6 +518,10 @@ export default function InterestManagement() {
     (interest) => interest.coachStatus !== "approved" && hasAssignedCoach(interest)
   );
   const pendingRhValidation = pendingInterests.filter((interest) => {
+    if (coachValidationOnly) {
+      return false;
+    }
+
     if (canSkipCoachApproval) {
       return true;
     }
@@ -527,10 +532,23 @@ export default function InterestManagement() {
 
     return interest.coachStatus === "approved";
   });
-  const approvablePendingInterests = pendingInterests.filter(
-    (interest) =>
-      canSkipCoachApproval || interest.coachStatus === "approved" || !hasAssignedCoach(interest)
-  );
+  const pendingRhWithoutCoachValidation = pendingInterests.filter((interest) => {
+    if (coachValidationOnly || canSkipCoachApproval) {
+      return false;
+    }
+
+    if (!hasAssignedCoach(interest)) {
+      return false;
+    }
+
+    return interest.coachStatus !== "approved";
+  });
+  const approvablePendingInterests = coachValidationOnly
+    ? []
+    : pendingInterests.filter(
+        (interest) =>
+          canSkipCoachApproval || interest.coachStatus === "approved" || !hasAssignedCoach(interest)
+      );
 
   if (isLoadingInterests) {
     return (
@@ -582,10 +600,20 @@ export default function InterestManagement() {
                 const formation = interest.formationId ? getFormation(interest.formationId) : undefined;
                 const user = getUser(interest.userId);
                 const coachAssigned = hasAssignedCoach(interest);
-                const canApprove =
-                  canSkipCoachApproval || interest.coachStatus === "approved" || !coachAssigned;
-                const approveDisabledReason =
-                  !canApprove && coachAssigned ? "En attente de validation coach" : undefined;
+                const coachValidationBypassed =
+                  coachAssigned &&
+                  interest.coachStatus !== "approved" &&
+                  (interest.status === "approved" || interest.status === "converted");
+                const coachValidationPending = coachAssigned && interest.coachStatus !== "approved";
+                const canApprove = !coachValidationOnly;
+                const approveDisabledReason = coachValidationOnly
+                  ? "La validation du coach suffit"
+                  : undefined;
+                const approveTooltip = approveDisabledReason
+                  ? approveDisabledReason
+                  : coachValidationPending
+                    ? "Le coach n'a pas encore validé cette intention. Validez-la uniquement si nécessaire."
+                    : undefined;
                 const canCancel = interest.status === "approved" || interest.status === "converted";
                 const isOffCatalog = !interest.formationId;
                 const formationTitle = isOffCatalog
@@ -691,13 +719,19 @@ export default function InterestManagement() {
                           Validée
                         </Badge>
                       )}
+                      {coachValidationBypassed && (
+                        <Badge variant="secondary" className="bg-orange-500/10 text-orange-700 border-orange-500/20">
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                          Validée sans coach
+                        </Badge>
+                      )}
                       {coachAssigned && interest.coachStatus === "rejected" && (
                         <Badge variant="destructive">
                           <XCircle className="w-3 h-3 mr-1" />
                           Refusée
                         </Badge>
                       )}
-                      {coachAssigned && interest.coachStatus === "pending" && (
+                      {coachAssigned && interest.coachStatus === "pending" && !coachValidationBypassed && (
                         <Badge variant="outline" className="text-muted-foreground border-dashed">
                           <Clock className="w-3 h-3 mr-1" />
                           En attente
@@ -715,7 +749,7 @@ export default function InterestManagement() {
                                 onClick={() => handleAction(interest, "approve")}
                                 data-testid={`button-approve-interest-${interest.id}`}
                                 disabled={!canApprove || updateStatusMutation.isPending}
-                                title={!canApprove ? approveDisabledReason : undefined}
+                                title={approveTooltip}
                               >
                                 <CheckCircle className="w-4 h-4 mr-1" />
                                 Approuver
@@ -1174,11 +1208,21 @@ export default function InterestManagement() {
                   </Badge>
                 )}
                 {!coachValidationOnly && (
-                  <Badge variant="secondary" className="bg-blue-500/10 text-blue-700 border-blue-500/20">
-                    {canSkipCoachApproval
-                      ? `Validations RH possibles: ${pendingRhValidation.length}`
-                      : `En attente RH: ${pendingRhValidation.length}`}
-                  </Badge>
+                  <>
+                    <Badge variant="secondary" className="bg-blue-500/10 text-blue-700 border-blue-500/20">
+                      {canSkipCoachApproval
+                        ? `Validations RH possibles: ${pendingRhValidation.length}`
+                        : `Prêtes pour les RH: ${pendingRhValidation.length}`}
+                    </Badge>
+                    {pendingRhWithoutCoachValidation.length > 0 && (
+                      <Badge
+                        variant="secondary"
+                        className="border border-orange-200 bg-orange-50 text-orange-700"
+                      >
+                        Sans validation coach: {pendingRhWithoutCoachValidation.length}
+                      </Badge>
+                    )}
+                  </>
                 )}
               </div>
               <InterestTable data={pendingInterests} showActions={true} />
