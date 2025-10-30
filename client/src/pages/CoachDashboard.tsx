@@ -353,7 +353,16 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
                 ) : (
                   pendingCoach.map((interest) => {
                     const coachee = coacheeMap.get(interest.userId);
-                    const formation = formationMap.get(interest.formationId);
+                    const formation = interest.formationId
+                      ? formationMap.get(interest.formationId)
+                      : undefined;
+                    const isOffCatalog = !interest.formationId;
+                    const formationTitle = isOffCatalog
+                      ? interest.customTitle ?? "Formation hors catalogue"
+                      : formation?.title ?? "Formation inconnue";
+                    const formationDescription = isOffCatalog
+                      ? interest.customDescription ?? ""
+                      : formation?.description ?? "";
                     return (
                       <TableRow key={interest.id}>
                         <TableCell>
@@ -361,8 +370,8 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
                           <div className="text-xs text-muted-foreground">{coachee?.businessUnit || ""}</div>
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium">{formation?.title ?? "Formation inconnue"}</div>
-                          <div className="text-xs text-muted-foreground line-clamp-1">{formation?.description}</div>
+                          <div className="font-medium">{formationTitle}</div>
+                          <div className="text-xs text-muted-foreground line-clamp-1">{formationDescription}</div>
                         </TableCell>
                         <TableCell>
                           <PriorityBadge priority={interest.priority as "P1" | "P2" | "P3"} />
@@ -431,11 +440,17 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
                   ) : (
                     awaitingRh.map((interest) => {
                       const coachee = coacheeMap.get(interest.userId);
-                      const formation = formationMap.get(interest.formationId);
+                      const formation = interest.formationId
+                        ? formationMap.get(interest.formationId)
+                        : undefined;
+                      const isOffCatalog = !interest.formationId;
+                      const formationTitle = isOffCatalog
+                        ? interest.customTitle ?? "Formation hors catalogue"
+                        : formation?.title ?? "Formation inconnue";
                       return (
                         <TableRow key={interest.id}>
                           <TableCell>{coachee?.name ?? "Consultant inconnu"}</TableCell>
-                          <TableCell>{formation?.title ?? "Formation inconnue"}</TableCell>
+                          <TableCell>{formationTitle}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{formatDate(interest.expressedAt)}</TableCell>
                         </TableRow>
                       );
@@ -478,11 +493,17 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
                 ) : (
                   approvedInterests.map((interest) => {
                     const coachee = coacheeMap.get(interest.userId);
-                    const formation = formationMap.get(interest.formationId);
+                    const formation = interest.formationId
+                      ? formationMap.get(interest.formationId)
+                      : undefined;
+                    const isOffCatalog = !interest.formationId;
+                    const formationTitle = isOffCatalog
+                      ? interest.customTitle ?? "Formation hors catalogue"
+                      : formation?.title ?? "Formation inconnue";
                     return (
                       <TableRow key={interest.id}>
                         <TableCell>{coachee?.name ?? "Consultant inconnu"}</TableCell>
-                        <TableCell>{formation?.title ?? "Formation inconnue"}</TableCell>
+                        <TableCell>{formationTitle}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{formatDate(interest.coachValidatedAt)}</TableCell>
                       </TableRow>
                     );

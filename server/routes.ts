@@ -78,6 +78,48 @@ const formationReviewInputSchema = z.object({
     .optional(),
 });
 
+const offCatalogInterestSchema = z
+  .object({
+    priority: z.enum(["P1", "P2", "P3"]),
+    customTitle: z
+      .string()
+      .trim()
+      .min(5, "Merci de préciser le nom de la formation souhaitée")
+      .max(200, "Le titre ne peut pas dépasser 200 caractères"),
+    customDescription: z
+      .string()
+      .trim()
+      .min(10, "Merci de détailler les objectifs de la formation"),
+    customLink: z
+      .string()
+      .trim()
+      .max(500, "Le lien fourni est trop long")
+      .optional()
+      .transform((value) => (value && value.length > 0 ? value : undefined)),
+    customPrice: z
+      .string()
+      .trim()
+      .max(100, "Le prix indiqué est trop long")
+      .optional()
+      .transform((value) => (value && value.length > 0 ? value : undefined)),
+    customFitnetNumber: z
+      .string()
+      .trim()
+      .max(100, "Le numéro d'affaire Fitnet est trop long")
+      .optional()
+      .transform((value) => (value && value.length > 0 ? value : undefined)),
+    customMissionManager: z
+      .string()
+      .trim()
+      .max(150, "Le nom du responsable de mission est trop long")
+      .optional()
+      .transform((value) => (value && value.length > 0 ? value : undefined)),
+  })
+  .transform((data) => ({
+    ...data,
+    customDescription: data.customDescription,
+  }));
+
 const reviewVisibilitySchema = z.object({
   visible: z.boolean(),
 });
@@ -2615,54 +2657,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as AuthRequest).userId!;
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Validate request body
-      const validationSchema = insertFormationInterestSchema.omit({ userId: true });
-      const data = validationSchema.parse(req.body);
+      const hasFormationId =
+        typeof req.body.formationId === "string" && req.body.formationId.trim().length > 0;
 
-      // Check if formation exists
-      const formation = await storage.getFormation(data.formationId);
-      if (!formation) {
-        return res.status(404).json({ message: "Formation not found" });
-      }
+      let createdInterest: FormationInterest;
+      let interestTitle: string;
 
-      // Check if already expressed interest for this formation
-      const existing = await storage.listFormationInterests({ userId, formationId: data.formationId });
-      const activeInterest = existing.find(i => i.status === "pending" || i.status === "approved");
-      if (activeInterest) {
-        return res.status(400).json({ message: "Vous avez déjà manifesté votre intérêt pour cette formation" });
-      }
+      if (hasFormationId) {
+        // Validate request body
+        const validationSchema = insertFormationInterestSchema.omit({ userId: true });
+        const data = validationSchema.parse(req.body);
 
-      // Check P1/P2 quotas - consumed immediately at expression of interest
-      if (data.priority === "P1") {
-        if ((user.p1Used || 0) >= 1) {
-          return res.status(400).json({ message: "Vous avez déjà utilisé votre priorité P1 cette année" });
+        // Check if formation exists
+        const formation = await storage.getFormation(data.formationId!);
+        if (!formation) {
+          return res.status(404).json({ message: "Formation not found" });
         }
-        await storage.updateUser(userId, { p1Used: (user.p1Used || 0) + 1 });
-      } else if (data.priority === "P2") {
-        if ((user.p2Used || 0) >= 1) {
-          return res.status(400).json({ message: "Vous avez déjà utilisé votre priorité P2 cette année" });
-        }
-        await storage.updateUser(userId, { p2Used: (user.p2Used || 0) + 1 });
-      }
 
-      // Create interest with status="pending"
-      const interest = await storage.createFormationInterest({
-        ...data,
-        userId,
-        status: "pending",
-      });
+        // Check if already expressed interest for this formation
+        const existing = await storage.listFormationInterests({ userId, formationId: data.formationId! });
+        const activeInterest = existing.find((i) => i.status === "pending" || i.status === "approved");
+        if (activeInterest) {
+          return res.status(400).json({ message: "Vous avez déjà manifesté votre intérêt pour cette formation" });
+        }
+
+        // Check P1/P2 quotas - consumed immediately at expression of interest
+        if (data.priority === "P1") {
+          if ((user.p1Used || 0) >= 1) {
+            return res.status(400).json({ message: "Vous avez déjà utilisé votre priorité P1 cette année" });
+          }
+          await storage.updateUser(userId, { p1Used: (user.p1Used || 0) + 1 });
+        } else if (data.priority === "P2") {
+          if ((user.p2Used || 0) >= 1) {
+            return res.status(400).json({ message: "Vous avez déjà utilisé votre priorité P2 cette année" });
+          }
+          await storage.updateUser(userId, { p2Used: (user.p2Used || 0) + 1 });
+        }
+
+        createdInterest = await storage.createFormationInterest({
+          ...data,
+          formationId: data.formationId!,
+          userId,
+          status: "pending",
+        });
+
+        interestTitle = formation.title;
+      } else {
+        const data = offCatalogInterestSchema.parse(req.body);
+
+        if (data.priority === "P1") {
+          if ((user.p1Used || 0) >= 1) {
+            return res.status(400).json({ message: "Vous avez déjà utilisé votre priorité P1 cette année" });
+          }
+          await storage.updateUser(userId, { p1Used: (user.p1Used || 0) + 1 });
+        } else if (data.priority === "P2") {
+          if ((user.p2Used || 0) >= 1) {
+            return res.status(400).json({ message: "Vous avez déjà utilisé votre priorité P2 cette année" });
+          }
+          await storage.updateUser(userId, { p2Used: (user.p2Used || 0) + 1 });
+        }
+
+        createdInterest = await storage.createFormationInterest({
+          userId,
+          priority: data.priority,
+          status: "pending",
+          formationId: null,
+          customTitle: data.customTitle,
+          customDescription: data.customDescription,
+          customLink: data.customLink,
+          customPrice: data.customPrice,
+          customFitnetNumber: data.customFitnetNumber,
+          customMissionManager: data.customMissionManager,
+        });
+
+        interestTitle = data.customTitle;
+      }
 
       try {
         const rhUsers = (await storage.listUsers(false)).filter((candidate) =>
           candidate.roles.includes("rh")
         );
         if (rhUsers.length > 0) {
-          const message = `${user.name} a exprimé une intention pour ${formation.title}.`;
+          const message = `${user.name} a exprimé une intention pour ${interestTitle}.`;
           await Promise.all(
             rhUsers.map((rhUser) =>
               createNotification({
@@ -2683,7 +2764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (coachAssignments.length > 0) {
           const coachIds = coachAssignments.map((assignment) => assignment.coachId);
           const coaches = await storage.listUsersByIds(coachIds);
-          const message = `${user.name} a exprimé une intention pour ${formation.title}.`;
+          const message = `${user.name} a exprimé une intention pour ${interestTitle}.`;
           await Promise.all(
             coaches
               .filter((coachUser) => coachUser.roles.includes("coach"))
@@ -2701,7 +2782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Failed to notify coaches about new interest", coachNotificationError);
       }
 
-      res.status(201).json(interest);
+      res.status(201).json(createdInterest);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid request data", errors: error.errors });
@@ -2724,9 +2805,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Interest not found" });
       }
 
-      // Only RH can approve/reject, users can only withdraw their own
-      if (req.body.status === "approved" || req.body.status === "rejected" || req.body.status === "converted") {
+      const requestedStatus = req.body.status as FormationInterest["status"] | undefined;
+      const isOffCatalogInterest = !interest.formationId;
+      const canSelfConvert =
+        requestedStatus === "converted" && isOffCatalogInterest && interest.userId === userId;
+
+      // Only RH can approve/reject/withdraw, except consultants can self-convert their off-catalog interests
+      if (requestedStatus === "approved" || requestedStatus === "rejected" || requestedStatus === "withdrawn") {
         if (!user.roles.includes("rh")) {
+          return res.status(403).json({ message: "Unauthorized" });
+        }
+      } else if (requestedStatus === "converted") {
+        if (!user.roles.includes("rh") && !canSelfConvert) {
           return res.status(403).json({ message: "Unauthorized" });
         }
       } else if (interest.userId !== userId) {
@@ -2817,22 +2907,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.updateFormationInterest(req.params.id, updates);
 
-      if (updated && req.body.status && req.body.status !== interest.status) {
-        const formation = await storage.getFormation(updated.formationId);
-        const formationTitle = formation?.title ?? "votre formation";
+      if (updated && requestedStatus && requestedStatus !== interest.status) {
+        const formation = updated.formationId ? await storage.getFormation(updated.formationId) : undefined;
+        const formationTitle = updated.formationId
+          ? formation?.title ?? "votre formation"
+          : updated.customTitle ?? "votre formation";
         let title: string | null = null;
         let message: string | undefined;
 
-        if (req.body.status === "approved") {
+        if (requestedStatus === "approved") {
           title = "Intention validée";
           message = `Votre intention pour ${formationTitle} a été validée par les RH.`;
-        } else if (req.body.status === "converted") {
-          title = "Session planifiée";
-          message = `Une nouvelle session est disponible pour ${formationTitle}.`;
-        } else if (req.body.status === "rejected") {
+        } else if (requestedStatus === "converted") {
+          if (updated.formationId) {
+            title = "Session planifiée";
+            message = `Une nouvelle session est disponible pour ${formationTitle}.`;
+          } else {
+            title = "Formation réalisée";
+            message = `Votre formation hors catalogue "${formationTitle}" est marquée comme réalisée.`;
+          }
+        } else if (requestedStatus === "rejected") {
           title = "Intention refusée";
           message = `Votre intention pour ${formationTitle} a été refusée.`;
-        } else if (req.body.status === "withdrawn") {
+        } else if (requestedStatus === "withdrawn") {
           title = "Intention annulée";
           message = `Votre intention pour ${formationTitle} a été annulée par les RH.`;
         }
@@ -2971,9 +3068,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Failed to update interest" });
       }
 
-      const formation = await storage.getFormation(updated.formationId);
+      const formation = updated.formationId ? await storage.getFormation(updated.formationId) : undefined;
       const coachee = await storage.getUser(updated.userId);
-      const formationTitle = formation?.title ?? "votre formation";
+      const formationTitle = updated.formationId
+        ? formation?.title ?? "votre formation"
+        : updated.customTitle ?? "votre formation";
 
       if (coachValidationOnly) {
         await createNotification({
@@ -3068,8 +3167,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Failed to update interest" });
       }
 
-      const formation = await storage.getFormation(updated.formationId);
-      const formationTitle = formation?.title ?? "votre formation";
+      const formation = updated.formationId ? await storage.getFormation(updated.formationId) : undefined;
+      const formationTitle = updated.formationId
+        ? formation?.title ?? "votre formation"
+        : updated.customTitle ?? "votre formation";
 
       await createNotification({
         userId: updated.userId,
@@ -3218,8 +3319,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalTrainingDays: Number(trainingDays.toFixed(2)),
           refusedDetails: consultantRefusedInterests.map((interest) => ({
             interestId: interest.id,
-            formationId: interest.formationId,
-            formationTitle: formationMap.get(interest.formationId)?.title || "Formation inconnue",
+            formationId: interest.formationId ?? interest.id,
+            formationTitle: interest.formationId
+              ? formationMap.get(interest.formationId)?.title || "Formation inconnue"
+              : interest.customTitle || "Formation hors catalogue",
             expressedAt: interest.expressedAt ? interest.expressedAt.toISOString() : null,
           })),
         };
@@ -3296,14 +3399,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter((interest) => interest.status === "rejected")
         .map((interest) => {
           const consultant = userMap.get(interest.userId);
-          const formation = formationMap.get(interest.formationId);
+          const formation = interest.formationId ? formationMap.get(interest.formationId) : undefined;
           return {
             recordType: "interest" as const,
             id: interest.id,
             consultantId: interest.userId,
             consultantName: consultant?.name || "Consultant inconnu",
-            formationId: interest.formationId,
-            formationTitle: formation?.title || "Formation inconnue",
+            formationId: interest.formationId ?? interest.id,
+            formationTitle: interest.formationId
+              ? formation?.title || "Formation inconnue"
+              : interest.customTitle || "Formation hors catalogue",
             sessionId: null,
             sessionStartDate: interest.expressedAt ? interest.expressedAt.toISOString() : null,
             sessionEndDate: null,
@@ -3757,6 +3862,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }>();
 
       for (const interest of interests) {
+        if (!interest.formationId) {
+          continue;
+        }
+
         if (!formationMap.has(interest.formationId)) {
           formationMap.set(interest.formationId, {
             formationId: interest.formationId,

@@ -22,9 +22,12 @@ import {
   CheckCircle,
   Trash2,
   UserCircle,
+  ExternalLink,
+  CalendarCheck,
+  MessageSquareQuote,
 } from "lucide-react";
 import { Link } from "wouter";
-import { useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useRouteNotifications, useMarkNotificationsRead } from "@/hooks/use-notifications";
@@ -38,8 +41,49 @@ import type {
 } from "@shared/schema";
 import { DEFAULT_DASHBOARD_INFORMATION } from "@shared/schema";
 import type { AuthMeResponse, SanitizedUser } from "@/types/api";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import RatingStars from "@/components/RatingStars";
 
 type CoachInfo = Omit<User, "password">;
+
+const formatDateForInput = (value?: string | Date | null) => {
+  if (!value) {
+    return "";
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toISOString().slice(0, 10);
+};
+
+const formatDateForDisplay = (value?: string | Date | null) => {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+};
 
 interface DashboardProps {
   currentUser: User;
@@ -50,6 +94,28 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
   const { toast } = useToast();
   const [deleteInterestId, setDeleteInterestId] = useState<string | null>(null);
   const [deleteRegistrationId, setDeleteRegistrationId] = useState<string | null>(null);
+  const [showOffCatalogDialog, setShowOffCatalogDialog] = useState(false);
+  type OffCatalogFormState = {
+    customTitle: string;
+    customDescription: string;
+    customLink: string;
+    customPrice: string;
+    customFitnetNumber: string;
+    customMissionManager: string;
+    priority: "P1" | "P2" | "P3";
+  };
+
+  const initialOffCatalogState: OffCatalogFormState = {
+    customTitle: "",
+    customDescription: "",
+    customLink: "",
+    customPrice: "",
+    customFitnetNumber: "",
+    customMissionManager: "",
+    priority: "P2",
+  };
+
+  const [offCatalogForm, setOffCatalogForm] = useState<OffCatalogFormState>(initialOffCatalogState);
 
   const { data: userData } = useQuery<AuthMeResponse>({
     queryKey: ["/api/auth/me"],
@@ -103,6 +169,69 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
   const formatNotificationDate = (isoDate: string) =>
     notificationDateFormatter.format(new Date(isoDate));
 
+  const createOffCatalogInterest = useMutation({
+    mutationFn: async () => {
+      const payload: Record<string, any> = {
+        priority: offCatalogForm.priority,
+        customTitle: offCatalogForm.customTitle.trim(),
+        customDescription: offCatalogForm.customDescription.trim(),
+      };
+
+      const optionalFields: Array<keyof typeof offCatalogForm> = [
+        "customLink",
+        "customPrice",
+        "customFitnetNumber",
+        "customMissionManager",
+      ];
+
+      optionalFields.forEach((field) => {
+        const value = offCatalogForm[field].trim();
+        if (value.length > 0) {
+          payload[field] = value;
+        }
+      });
+
+      return apiRequest("/api/interests", "POST", payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/interests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({
+        title: "Demande envoyée",
+        description:
+          "Votre demande de formation hors catalogue a été transmise. Elle suivra le circuit de validation habituel.",
+      });
+      setShowOffCatalogDialog(false);
+      setOffCatalogForm({ ...initialOffCatalogState });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description:
+          error?.message || "Impossible d'enregistrer votre demande pour le moment. Merci de réessayer.",
+      });
+    },
+  });
+
+  const handleOffCatalogSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedTitle = offCatalogForm.customTitle.trim();
+    const trimmedDescription = offCatalogForm.customDescription.trim();
+
+    if (trimmedTitle.length === 0 || trimmedDescription.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Informations manquantes",
+        description: "Merci de préciser le nom et le contenu de la formation souhaitée.",
+      });
+      return;
+    }
+
+    createOffCatalogInterest.mutate();
+  };
+
   const deleteInterestMutation = useMutation({
     mutationFn: async (interestId: string) => {
       await apiRequest(`/api/interests/${interestId}`, "DELETE");
@@ -148,6 +277,367 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
     },
   });
 
+  const OffCatalogInterestCard = ({ interest }: { interest: FormationInterest }) => {
+    const [plannedDateValue, setPlannedDateValue] = useState<string>(
+      formatDateForInput(interest.customPlannedDate)
+    );
+    const [showReviewDialog, setShowReviewDialog] = useState(false);
+    const [reviewRatingValue, setReviewRatingValue] = useState<number>(
+      interest.customReviewRating ?? 0
+    );
+    const [reviewCommentValue, setReviewCommentValue] = useState(
+      interest.customReviewComment ?? ""
+    );
+
+    useEffect(() => {
+      setPlannedDateValue(formatDateForInput(interest.customPlannedDate));
+    }, [interest.customPlannedDate]);
+
+    useEffect(() => {
+      setReviewRatingValue(interest.customReviewRating ?? 0);
+      setReviewCommentValue(interest.customReviewComment ?? "");
+    }, [interest.customReviewRating, interest.customReviewComment]);
+
+    const updatePlannedDateMutation = useMutation({
+      mutationFn: async (date: string) => {
+        return apiRequest(`/api/interests/${interest.id}`, "PATCH", {
+          customPlannedDate: new Date(date).toISOString(),
+        });
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/interests"] });
+        toast({
+          title: "Date enregistrée",
+          description: "La date prévue pour votre formation a été sauvegardée.",
+        });
+      },
+      onError: (error: any) => {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description:
+            error?.message || "Impossible d'enregistrer la date prévue pour le moment.",
+        });
+      },
+    });
+
+    const markCompletedMutation = useMutation({
+      mutationFn: async () => {
+        return apiRequest(`/api/interests/${interest.id}`, "PATCH", {
+          status: "converted",
+          completedAt: new Date().toISOString(),
+        });
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/interests"] });
+        toast({
+          title: "Formation réalisée",
+          description: "Bravo ! Votre formation hors catalogue est désormais clôturée.",
+        });
+      },
+      onError: (error: any) => {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description:
+            error?.message || "Impossible de marquer la formation comme réalisée pour le moment.",
+        });
+      },
+    });
+
+    const saveReviewMutation = useMutation({
+      mutationFn: async () => {
+        const payload: Record<string, any> = {
+          customReviewRating: reviewRatingValue,
+        };
+
+        const trimmedComment = reviewCommentValue.trim();
+        payload.customReviewComment = trimmedComment.length > 0 ? trimmedComment : "";
+
+        return apiRequest(`/api/interests/${interest.id}`, "PATCH", payload);
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/interests"] });
+        toast({
+          title: "Merci pour votre avis",
+          description: "Votre retour sur cette formation hors catalogue a bien été enregistré.",
+        });
+        setShowReviewDialog(false);
+      },
+      onError: (error: any) => {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description:
+            error?.message || "Impossible d'enregistrer votre avis pour le moment.",
+        });
+      },
+    });
+
+    const plannedDateDisplay = formatDateForDisplay(interest.customPlannedDate);
+    const completedAtDisplay = formatDateForDisplay(interest.completedAt);
+
+    const handleSavePlannedDate = () => {
+      if (!plannedDateValue) {
+        toast({
+          variant: "destructive",
+          title: "Date requise",
+          description: "Merci de sélectionner une date avant d'enregistrer.",
+        });
+        return;
+      }
+      updatePlannedDateMutation.mutate(plannedDateValue);
+    };
+
+    const reviewDisabled = reviewRatingValue < 1;
+
+    return (
+      <Card className="surface-soft flex h-full flex-col rounded-2xl p-6">
+        <div className="flex flex-1 flex-col space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-2">
+              <Badge variant="secondary" className="w-fit bg-slate-100 text-slate-700">
+                Hors catalogue
+              </Badge>
+              <h3 className="text-base font-semibold leading-snug tracking-tight text-foreground">
+                {interest.customTitle || "Formation hors catalogue"}
+              </h3>
+            </div>
+            <Badge variant={
+              interest.priority === "P1"
+                ? "destructive"
+                : interest.priority === "P2"
+                ? "default"
+                : "secondary"
+            }>
+              {interest.priority}
+            </Badge>
+          </div>
+
+          {interest.customDescription && (
+            <p className="text-sm leading-relaxed text-muted-foreground line-clamp-4">
+              {interest.customDescription}
+            </p>
+          )}
+
+          <div className="space-y-2 text-sm text-muted-foreground">
+            {interest.customLink && (
+              <a
+                href={interest.customLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 font-medium text-primary hover:underline"
+              >
+                <ExternalLink className="h-4 w-4" /> Consulter la formation proposée
+              </a>
+            )}
+            {interest.customPrice && (
+              <div>
+                <span className="font-medium text-foreground">Budget estimé :</span> {interest.customPrice}
+              </div>
+            )}
+            {interest.customFitnetNumber && (
+              <div>
+                <span className="font-medium text-foreground">Affaire Fitnet :</span> {interest.customFitnetNumber}
+              </div>
+            )}
+            {interest.customMissionManager && (
+              <div>
+                <span className="font-medium text-foreground">Responsable de mission :</span> {interest.customMissionManager}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl bg-muted/40 p-4 text-sm">
+            {interest.status === "pending" && (
+              <div className="flex items-start gap-3 text-amber-700">
+                <AlertCircle className="mt-0.5 h-4 w-4" />
+                <div>
+                  <p className="font-medium">En attente de validation</p>
+                  <p>
+                    Votre demande suit le processus classique de validation coach puis RH. Vous serez notifié dès qu'elle
+                    sera traitée.
+                  </p>
+                </div>
+              </div>
+            )}
+            {interest.status === "approved" && (
+              <div className="flex items-start gap-3 text-primary">
+                <CalendarCheck className="mt-0.5 h-4 w-4" />
+                <div className="space-y-1">
+                  <p className="font-medium">Validation obtenue</p>
+                  <p>
+                    Planifiez la date prévue de la formation et confirmez sa réalisation une fois effectuée.
+                  </p>
+                  {plannedDateDisplay && (
+                    <p className="text-sm text-primary/80">
+                      Date prévue : <strong>{plannedDateDisplay}</strong>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            {interest.status === "converted" && (
+              <div className="flex items-start gap-3 text-emerald-700">
+                <CheckCircle className="mt-0.5 h-4 w-4" />
+                <div className="space-y-1">
+                  <p className="font-medium">Formation réalisée</p>
+                  <p>
+                    Merci d'avoir confirmé la réalisation de cette formation. Partagez votre avis pour aider les équipes
+                    RH et vos collègues.
+                  </p>
+                  {completedAtDisplay && (
+                    <p className="text-sm text-emerald-700/80">
+                      Réalisée le <strong>{completedAtDisplay}</strong>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            {interest.status === "rejected" && (
+              <div className="flex items-start gap-3 text-destructive">
+                <XCircle className="mt-0.5 h-4 w-4" />
+                <div>
+                  <p className="font-medium">Demande refusée</p>
+                  <p>Vous pouvez retirer cette demande ou en formuler une nouvelle si nécessaire.</p>
+                </div>
+              </div>
+            )}
+            {interest.status === "withdrawn" && (
+              <div className="flex items-start gap-3 text-muted-foreground">
+                <XCircle className="mt-0.5 h-4 w-4" />
+                <div>
+                  <p className="font-medium">Demande annulée</p>
+                  <p>Cette demande a été annulée par les RH.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          {interest.status === "approved" && (
+            <div className="flex w-full flex-col gap-2 rounded-xl bg-muted/40 p-3">
+              <Label htmlFor={`planned-date-${interest.id}`} className="text-xs uppercase tracking-wide text-muted-foreground">
+                Date prévue
+              </Label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input
+                  id={`planned-date-${interest.id}`}
+                  type="date"
+                  value={plannedDateValue}
+                  onChange={(event) => setPlannedDateValue(event.target.value)}
+                  className="sm:max-w-[220px]"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSavePlannedDate}
+                  disabled={updatePlannedDateMutation.isPending}
+                >
+                  {updatePlannedDateMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Enregistrer la date
+                </Button>
+              </div>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => markCompletedMutation.mutate()}
+                disabled={markCompletedMutation.isPending}
+              >
+                {markCompletedMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                )}
+                Formation réalisée
+              </Button>
+            </div>
+          )}
+
+          {interest.status === "converted" && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setShowReviewDialog(true)}>
+                <MessageSquareQuote className="mr-2 h-4 w-4" />
+                {interest.customReviewRating ? "Mettre à jour mon avis" : "Partager mon avis"}
+              </Button>
+            </>
+          )}
+
+          {interest.status !== "converted" && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setDeleteInterestId(interest.id)}
+              data-testid={`button-cancel-interest-${interest.id}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
+        {interest.customReviewRating && interest.status === "converted" && (
+          <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-emerald-800">Votre avis</p>
+                {interest.customReviewComment && (
+                  <p className="text-sm text-emerald-800/80">{interest.customReviewComment}</p>
+                )}
+              </div>
+              <RatingStars value={interest.customReviewRating} size="sm" />
+            </div>
+          </div>
+        )}
+
+        <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Partager votre avis</DialogTitle>
+              <DialogDescription>
+                Notez cette formation hors catalogue pour guider vos collègues et les équipes RH.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <Label>Note globale</Label>
+                <RatingStars
+                  value={reviewRatingValue}
+                  onChange={(value) => setReviewRatingValue(value)}
+                  readOnly={false}
+                  size="lg"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`review-comment-${interest.id}`}>Commentaires (optionnel)</Label>
+                <Textarea
+                  id={`review-comment-${interest.id}`}
+                  value={reviewCommentValue}
+                  onChange={(event) => setReviewCommentValue(event.target.value)}
+                  placeholder="Partagez les points forts, axes d'amélioration, modalité, etc."
+                  rows={4}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={() => saveReviewMutation.mutate()}
+                disabled={reviewDisabled || saveReviewMutation.isPending}
+              >
+                {saveReviewMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                {interest.customReviewRating ? "Mettre à jour" : "Envoyer"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </Card>
+    );
+  };
+
   if (isLoadingRegistrations || isLoadingInterests) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -167,6 +657,9 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
 
   const completedTrainings = registrations.filter((r) => r.status === "completed");
   const cancelledTrainings = registrations.filter((r) => r.status === "cancelled");
+
+  const offCatalogInterests = interests.filter((interest) => !interest.formationId);
+  const catalogInterests = interests.filter((interest) => interest.formationId);
 
   const getFormationTitle = (formationId: string) => {
     return formations.find((f) => f.id === formationId)?.title || "Formation inconnue";
@@ -277,7 +770,7 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
         p2Used={currentUser.p2Used || 0}
       />
 
-      {interests.length > 0 && (
+      {catalogInterests.length > 0 && (
         <section className="space-y-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -295,7 +788,7 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
           </div>
 
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {interests.map((interest) => {
+            {catalogInterests.map((interest) => {
               const formation = formations.find((f) => f.id === interest.formationId);
               if (!formation) return null;
 
@@ -497,6 +990,179 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
           </div>
         </section>
       )}
+
+      <section className="space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <p className="eyebrow text-muted-foreground">Demandes hors catalogue</p>
+            <h3 className="text-xl font-semibold text-foreground">Vos formations personnalisées</h3>
+            <p className="max-w-xl text-sm text-muted-foreground">
+              Retrouvez ici l'avancement de vos demandes hors catalogue : validations, dates prévues, avis laissés...
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <Button onClick={() => setShowOffCatalogDialog(true)} className="rounded-xl px-5">
+              Faire une demande
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              {offCatalogInterests.length > 0
+                ? `${offCatalogInterests.length} demande${offCatalogInterests.length > 1 ? "s" : ""} suivie${
+                    offCatalogInterests.length > 1 ? "s" : ""
+                  }`
+                : "Aucune demande en cours"}
+            </p>
+          </div>
+        </div>
+
+        {offCatalogInterests.length > 0 ? (
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {offCatalogInterests.map((interest) => (
+              <OffCatalogInterestCard key={interest.id} interest={interest} />
+            ))}
+          </div>
+        ) : (
+          <Card className="surface-soft rounded-2xl p-10 text-center">
+            <div className="mx-auto flex max-w-md flex-col items-center gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <CalendarCheck className="h-8 w-8" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-lg font-semibold text-foreground">Aucune demande en cours</p>
+                <p className="text-sm text-muted-foreground">
+                  Identifiez une formation hors catalogue et soumettez-la pour validation en un clic.
+                </p>
+              </div>
+              <Button onClick={() => setShowOffCatalogDialog(true)} className="rounded-xl px-6">
+                Proposer une formation
+              </Button>
+            </div>
+          </Card>
+        )}
+      </section>
+
+      <Dialog open={showOffCatalogDialog} onOpenChange={setShowOffCatalogDialog}>
+        <DialogContent className="sm:max-w-2xl">
+          <form onSubmit={handleOffCatalogSubmit} className="space-y-6">
+            <DialogHeader className="space-y-3">
+              <DialogTitle>Proposer une formation hors catalogue</DialogTitle>
+              <DialogDescription>
+                Partagez les informations principales sur la formation identifiée. Les équipes coach et RH seront notifiées
+                pour validation.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="off-catalog-title">Intitulé de la formation</Label>
+                <Input
+                  id="off-catalog-title"
+                  value={offCatalogForm.customTitle}
+                  onChange={(event) =>
+                    setOffCatalogForm((prev) => ({ ...prev, customTitle: event.target.value }))
+                  }
+                  placeholder="Ex : Approche design thinking avancée"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="off-catalog-priority">Priorité souhaitée</Label>
+                <Select
+                  value={offCatalogForm.priority}
+                  onValueChange={(value) =>
+                    setOffCatalogForm((prev) => ({ ...prev, priority: value as "P1" | "P2" | "P3" }))
+                  }
+                >
+                  <SelectTrigger id="off-catalog-priority">
+                    <SelectValue placeholder="Sélectionnez une priorité" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="P1">Priorité P1 (validation garantie)</SelectItem>
+                    <SelectItem value="P2">Priorité P2 (validation prioritaire)</SelectItem>
+                    <SelectItem value="P3">Priorité P3 (souhait à étudier)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="off-catalog-description">Objectifs et contenu</Label>
+                <Textarea
+                  id="off-catalog-description"
+                  value={offCatalogForm.customDescription}
+                  onChange={(event) =>
+                    setOffCatalogForm((prev) => ({ ...prev, customDescription: event.target.value }))
+                  }
+                  placeholder="Expliquez en quelques lignes le contenu de la formation, les compétences visées, l'organisme..."
+                  rows={5}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="off-catalog-link">Lien vers la formation (optionnel)</Label>
+                <Input
+                  id="off-catalog-link"
+                  type="url"
+                  value={offCatalogForm.customLink}
+                  onChange={(event) =>
+                    setOffCatalogForm((prev) => ({ ...prev, customLink: event.target.value }))
+                  }
+                  placeholder="https://..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="off-catalog-price">Budget estimé (optionnel)</Label>
+                <Input
+                  id="off-catalog-price"
+                  value={offCatalogForm.customPrice}
+                  onChange={(event) =>
+                    setOffCatalogForm((prev) => ({ ...prev, customPrice: event.target.value }))
+                  }
+                  placeholder="Ex : 1 490 € HT"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="off-catalog-fitnet">Numéro d'affaire Fitnet (optionnel)</Label>
+                <Input
+                  id="off-catalog-fitnet"
+                  value={offCatalogForm.customFitnetNumber}
+                  onChange={(event) =>
+                    setOffCatalogForm((prev) => ({ ...prev, customFitnetNumber: event.target.value }))
+                  }
+                  placeholder="Saisissez le numéro lié au client"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="off-catalog-manager">Responsable de mission (optionnel)</Label>
+                <Input
+                  id="off-catalog-manager"
+                  value={offCatalogForm.customMissionManager}
+                  onChange={(event) =>
+                    setOffCatalogForm((prev) => ({ ...prev, customMissionManager: event.target.value }))
+                  }
+                  placeholder="Nom et prénom du responsable"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowOffCatalogDialog(false)}
+                disabled={createOffCatalogInterest.isPending}
+              >
+                Annuler
+              </Button>
+              <Button type="submit" disabled={createOffCatalogInterest.isPending}>
+                {createOffCatalogInterest.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Envoi...
+                  </>
+                ) : (
+                  "Envoyer la demande"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={deleteInterestId !== null} onOpenChange={() => setDeleteInterestId(null)}>
         <DialogContent className="surface-soft rounded-2xl border-black/5 bg-white" data-testid="dialog-confirm-delete-interest">
