@@ -217,7 +217,10 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
   const handleOffCatalogSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (offCatalogForm.customTitle.trim().length < 5 || offCatalogForm.customDescription.trim().length < 10) {
+    const trimmedTitle = offCatalogForm.customTitle.trim();
+    const trimmedDescription = offCatalogForm.customDescription.trim();
+
+    if (trimmedTitle.length === 0 || trimmedDescription.length === 0) {
       toast({
         variant: "destructive",
         title: "Informations manquantes",
@@ -1036,6 +1039,58 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
           </div>
         </section>
       )}
+
+      <section className="space-y-6">
+        <Card className="relative overflow-hidden rounded-[2rem] border border-primary/10 bg-gradient-to-br from-white via-white to-primary/5 p-8 shadow-sm">
+          <div
+            className="pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary/10 blur-3xl -z-10"
+            aria-hidden
+          />
+          <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-2xl space-y-3">
+              <p className="eyebrow text-primary/80">Formation hors catalogue</p>
+              <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+                Vous souhaitez vous inscrire à une formation hors catalogue ?
+              </h2>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Décrivez-nous la formation identifiée (contenu, organisme, prix, lien...). Votre demande suivra le workflow
+                classique de validation coach puis RH.
+              </p>
+            </div>
+            <div className="flex flex-col items-start gap-2 md:items-end">
+              <Button onClick={() => setShowOffCatalogDialog(true)} size="lg" className="rounded-xl px-6">
+                Faire une demande
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                {offCatalogInterests.length > 0
+                  ? `${offCatalogInterests.length} demande${offCatalogInterests.length > 1 ? "s" : ""} suivie${
+                      offCatalogInterests.length > 1 ? "s" : ""
+                    }`
+                  : "Aucune demande en cours"}
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        {offCatalogInterests.length > 0 && (
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="eyebrow text-muted-foreground">Demandes hors catalogue</p>
+                <h3 className="text-xl font-semibold text-foreground">Vos formations personnalisées</h3>
+              </div>
+              <p className="max-w-xl text-sm text-muted-foreground">
+                Retrouvez ici l'avancement de vos demandes hors catalogue : validations, dates prévues, avis laissés...
+              </p>
+            </div>
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {offCatalogInterests.map((interest) => (
+                <OffCatalogInterestCard key={interest.id} interest={interest} />
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
 
       <Dialog open={showOffCatalogDialog} onOpenChange={setShowOffCatalogDialog}>
         <DialogContent className="sm:max-w-2xl">
