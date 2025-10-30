@@ -1,4 +1,4 @@
-import { useState, Fragment, useMemo } from "react";
+import { useState, Fragment, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +50,7 @@ import {
   Trash2,
   UserPlus,
   XCircle,
+  UserCircle,
 } from "lucide-react";
 import type {
   User,
@@ -99,6 +100,8 @@ export default function ConsultantManagement() {
   const [editConsultant, setEditConsultant] = useState<User | null>(null);
   const [coachToAssign, setCoachToAssign] = useState<User | null>(null);
   const [selectedCoacheeId, setSelectedCoacheeId] = useState<string | null>(null);
+  const [coacheeForCoachDialog, setCoacheeForCoachDialog] = useState<User | null>(null);
+  const [selectedCoachIdForCoachee, setSelectedCoachIdForCoachee] = useState<string | null>(null);
   const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null);
   const [bulkUploadResult, setBulkUploadResult] = useState<BulkUploadResult | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
@@ -239,12 +242,16 @@ export default function ConsultantManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/coach-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({
         title: "Coaché assigné",
         description: "Le collaborateur a bien été associé au coach.",
       });
       setCoachToAssign(null);
       setSelectedCoacheeId(null);
+      setCoacheeForCoachDialog(null);
+      setSelectedCoachIdForCoachee(null);
     },
     onError: (error: any) => {
       toast({
@@ -261,6 +268,8 @@ export default function ConsultantManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/coach-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({
         title: "Coaché retiré",
         description: "L'association coach/coached a été supprimée.",
@@ -359,15 +368,63 @@ export default function ConsultantManagement() {
     return map;
   }, [coachAssignments]);
 
+  const assignmentsByCoachee = useMemo(() => {
+    const map = new Map<string, CoachAssignment>();
+    (Array.isArray(coachAssignments) ? coachAssignments : []).forEach((assignment) => {
+      const existing = map.get(assignment.coacheeId);
+      if (!existing) {
+        map.set(assignment.coacheeId, assignment);
+        return;
+      }
+
+      const existingDate = existing.createdAt ? new Date(existing.createdAt).getTime() : 0;
+      const currentDate = assignment.createdAt ? new Date(assignment.createdAt).getTime() : 0;
+      if (currentDate > existingDate) {
+        map.set(assignment.coacheeId, assignment);
+      }
+    });
+    return map;
+  }, [coachAssignments]);
+
+  const availableCoaches = useMemo(() => {
+    return (Array.isArray(activeUsers) ? activeUsers : [])
+      .filter((user) => user.roles.includes("coach"))
+      .filter((user) => !user.archived);
+  }, [activeUsers]);
+
   const availableCoachees = useMemo(() => {
     if (!coachToAssign) return [];
-    const assignedIds = new Set(
-      (assignmentsByCoach[coachToAssign.id] || []).map((assignment) => assignment.coacheeId)
-    );
     return (Array.isArray(activeUsers) ? activeUsers : [])
       .filter((user) => user.roles.includes("consultant"))
-      .filter((user) => !user.archived && user.id !== coachToAssign.id && !assignedIds.has(user.id));
-  }, [coachToAssign, assignmentsByCoach, activeUsers]);
+      .filter((user) => {
+        if (user.archived || user.id === coachToAssign.id) {
+          return false;
+        }
+        const assignment = assignmentsByCoachee.get(user.id);
+        return !assignment;
+      });
+  }, [coachToAssign, assignmentsByCoachee, activeUsers]);
+
+  const coachOptionsForSelection = useMemo(() => {
+    if (!coacheeForCoachDialog) return [];
+    return availableCoaches.filter((coach) => coach.id !== coacheeForCoachDialog.id);
+  }, [availableCoaches, coacheeForCoachDialog]);
+
+  useEffect(() => {
+    if (!coacheeForCoachDialog) {
+      return;
+    }
+    if (coachOptionsForSelection.length === 0) {
+      setSelectedCoachIdForCoachee(null);
+      return;
+    }
+    setSelectedCoachIdForCoachee((current) => {
+      if (current && coachOptionsForSelection.some((coach) => coach.id === current)) {
+        return current;
+      }
+      return coachOptionsForSelection[0].id;
+    });
+  }, [coacheeForCoachDialog, coachOptionsForSelection]);
 
   const getAssignedFormationTitles = (instructorId: string) => {
     const formationIds = assignmentsByInstructor[instructorId] || [];
@@ -456,6 +513,14 @@ export default function ConsultantManagement() {
     createCoachAssignmentMutation.mutate({
       coachId: coachToAssign.id,
       coacheeId: selectedCoacheeId,
+    });
+  };
+
+  const handleAssignCoachToCollaborator = () => {
+    if (!coacheeForCoachDialog || !selectedCoachIdForCoachee) return;
+    createCoachAssignmentMutation.mutate({
+      coachId: selectedCoachIdForCoachee,
+      coacheeId: coacheeForCoachDialog.id,
     });
   };
 
@@ -779,18 +844,23 @@ export default function ConsultantManagement() {
                         const stats = getConsultantStats(consultant.id);
                         const isExpanded = expandedConsultant === consultant.id;
                         const coachAssignmentsForUser = assignmentsByCoach[consultant.id] || [];
-                        const assignedCoacheeIds = new Set(
-                          coachAssignmentsForUser.map((assignment) => assignment.coacheeId)
-                        );
                         const availableCoacheesForCoach = (Array.isArray(activeUsers) ? activeUsers : [])
                           .filter((user) => user.roles.includes("consultant"))
-                          .filter(
-                            (user) =>
-                              !user.archived &&
-                              user.id !== consultant.id &&
-                              !assignedCoacheeIds.has(user.id)
-                          );
+                          .filter((user) => {
+                            if (user.archived || user.id === consultant.id) {
+                              return false;
+                            }
+                            const assignment = assignmentsByCoachee.get(user.id);
+                            return !assignment;
+                          });
                         const { firstName, lastName } = splitName(consultant.name);
+                        const currentCoachAssignment = assignmentsByCoachee.get(consultant.id) || null;
+                        const currentCoach = currentCoachAssignment
+                          ? allUsersMap.get(currentCoachAssignment.coachId) || null
+                          : null;
+                        const availableCoachChoices = availableCoaches.filter(
+                          (coach) => coach.id !== consultant.id
+                        );
 
                         return (
                           <Fragment key={consultant.id}>
@@ -933,7 +1003,80 @@ export default function ConsultantManagement() {
                                         <UserCheck className="w-4 h-4" />
                                         Coaching
                                       </h4>
-                                      <div className="flex flex-wrap items-center gap-2">
+
+                                      <div className="space-y-2 rounded-xl border border-border/40 bg-background/60 p-3">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                                          <UserCircle className="h-4 w-4" />
+                                          Coach référent
+                                        </div>
+                                        {currentCoach ? (
+                                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/50 bg-background px-3 py-2">
+                                            <div>
+                                              <p className="text-sm font-semibold text-foreground">{currentCoach.name}</p>
+                                              <p className="text-xs text-muted-foreground">{currentCoach.email}</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={(event) => {
+                                                  event.stopPropagation();
+                                                  setCoacheeForCoachDialog(consultant);
+                                                  const initialCoachId =
+                                                    availableCoachChoices.find((coach) => coach.id === currentCoach.id)?.id ??
+                                                    availableCoachChoices[0]?.id ??
+                                                    null;
+                                                  setSelectedCoachIdForCoachee(initialCoachId);
+                                                }}
+                                                disabled={createCoachAssignmentMutation.isPending}
+                                              >
+                                                Changer de coach
+                                              </Button>
+                                              <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                className="h-8 w-8"
+                                                onClick={(event) => {
+                                                  event.stopPropagation();
+                                                  if (currentCoachAssignment) {
+                                                    removeCoachAssignmentMutation.mutate(currentCoachAssignment.id);
+                                                  }
+                                                }}
+                                                disabled={removeCoachAssignmentMutation.isPending}
+                                              >
+                                                <XCircle className="h-4 w-4" />
+                                                <span className="sr-only">Retirer le coach</span>
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border/60 bg-background px-3 py-2">
+                                            <p className="text-sm text-muted-foreground">
+                                              Aucun coach n'est encore assigné à ce collaborateur.
+                                            </p>
+                                            <Button
+                                              size="sm"
+                                              variant="secondary"
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                setCoacheeForCoachDialog(consultant);
+                                                setSelectedCoachIdForCoachee(availableCoachChoices[0]?.id ?? null);
+                                              }}
+                                              disabled={availableCoachChoices.length === 0 || createCoachAssignmentMutation.isPending}
+                                            >
+                                              <UserPlus className="mr-2 h-4 w-4" />
+                                              Assigner un coach
+                                            </Button>
+                                          </div>
+                                        )}
+                                        {availableCoachChoices.length === 0 && (
+                                          <p className="text-xs text-muted-foreground">
+                                            Aucun coach disponible pour le moment.
+                                          </p>
+                                        )}
+                                      </div>
+
+                                      <div className="flex flex-wrap items-center gap-2 pt-1">
                                         <Badge variant={consultant.roles.includes("coach") ? "default" : "secondary"}>
                                           {consultant.roles.includes("coach") ? "Coach actif" : "Coach inactif"}
                                         </Badge>
@@ -1143,6 +1286,69 @@ export default function ConsultantManagement() {
                   type="button"
                   onClick={handleAssignCoachee}
                   disabled={!selectedCoacheeId || createCoachAssignmentMutation.isPending}
+                >
+                  {createCoachAssignmentMutation.isPending ? "Assignation..." : "Assigner"}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={coacheeForCoachDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCoacheeForCoachDialog(null);
+            setSelectedCoachIdForCoachee(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assigner un coach</DialogTitle>
+            <DialogDescription>
+              Choisissez le coach référent pour {coacheeForCoachDialog?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          {coacheeForCoachDialog ? (
+            <div className="space-y-4">
+              {coachOptionsForSelection.length > 0 ? (
+                <Select
+                  value={selectedCoachIdForCoachee ?? ""}
+                  onValueChange={(value) => setSelectedCoachIdForCoachee(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un coach" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {coachOptionsForSelection.map((coach) => (
+                      <SelectItem key={coach.id} value={coach.id}>
+                        {coach.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Aucun coach disponible pour le moment.
+                </p>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setCoacheeForCoachDialog(null);
+                    setSelectedCoachIdForCoachee(null);
+                  }}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleAssignCoachToCollaborator}
+                  disabled={!selectedCoachIdForCoachee || createCoachAssignmentMutation.isPending}
                 >
                   {createCoachAssignmentMutation.isPending ? "Assignation..." : "Assigner"}
                 </Button>
