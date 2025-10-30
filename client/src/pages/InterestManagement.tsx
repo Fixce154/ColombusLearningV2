@@ -47,7 +47,12 @@ import {
 } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { FormationInterest, Formation, User, CoachAssignment } from "@shared/schema";
+import type {
+  FormationInterest,
+  Formation,
+  User,
+  CoachAssignment,
+} from "@shared/schema";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PriorityBadge from "@/components/PriorityBadge";

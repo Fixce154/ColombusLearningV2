@@ -12,6 +12,7 @@ import ConsultantManagement from "@/pages/ConsultantManagement";
 import InterestManagement from "@/pages/InterestManagement";
 import FormationManagement from "@/pages/FormationManagement";
 import SessionManagement from "@/pages/SessionManagement";
+import CommunicationManagement from "@/pages/CommunicationManagement";
 import InstructorFormations from "@/pages/InstructorFormations";
 import InstructorAvailability from "@/pages/InstructorAvailability";
 import InstructorSessions from "@/pages/InstructorSessions";
@@ -66,6 +67,7 @@ function Router({
       <Route path="/consultants" component={ConsultantManagement} />
       <Route path="/formations" component={FormationManagement} />
       <Route path="/sessions" component={SessionManagement} />
+      <Route path="/communication" component={CommunicationManagement} />
       <Route path="/data-visualisation" component={DataVisualization} />
       <Route path="/instructor-formations" component={InstructorFormations} />
       <Route path="/instructor-formations/:id" component={InstructorFormationContent} />

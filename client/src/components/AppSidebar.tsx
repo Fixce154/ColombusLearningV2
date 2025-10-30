@@ -11,6 +11,7 @@ import {
   Settings,
   UserCheck,
   UserCog,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -145,6 +146,7 @@ export default function AppSidebar({ currentUser }: AppSidebarProps) {
           { title: "Formations", url: "/formations", icon: BookOpen },
           { title: "Sessions", url: "/sessions", icon: Calendar },
           { title: "Intentions", url: "/interests", icon: Heart },
+          { title: "Communication", url: "/communication", icon: Megaphone },
           { title: "Collaborateurs", url: "/consultants", icon: Users },
           { title: "Data visualisation", url: "/data-visualisation", icon: BarChart },
         ],
