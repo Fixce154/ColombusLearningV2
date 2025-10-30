@@ -1416,16 +1416,32 @@ export default function ConsultantManagement() {
                   ) : (
                     <div className="space-y-2">
                       {selectedHistory.interests.map((interest) => {
-                        const formation = getFormation(interest.formationId);
+                        const formation = interest.formationId ? getFormation(interest.formationId) : undefined;
+                        const isOffCatalog = !interest.formationId;
+                        const formationTitle = isOffCatalog
+                          ? interest.customTitle ?? "Formation hors catalogue"
+                          : formation?.title ?? "Formation inconnue";
                         return (
                           <div key={interest.id} className="border rounded-lg p-3 space-y-2">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
-                                <div className="font-medium">{formation?.title || "Formation inconnue"}</div>
+                                <div className="flex items-center gap-2">
+                                  <div className="font-medium">{formationTitle}</div>
+                                  {isOffCatalog ? (
+                                    <Badge variant="outline" className="border-dashed text-xs">
+                                      Hors catalogue
+                                    </Badge>
+                                  ) : null}
+                                </div>
                                 <div className="text-xs text-muted-foreground">
                                   Exprimée le {interest.expressedAt ? format(new Date(interest.expressedAt), "dd MMM yyyy", { locale: fr }) : "-"}
                                 </div>
-                              </div>
+                                {isOffCatalog && interest.customDescription && (
+                                  <div className="text-xs text-muted-foreground line-clamp-2">
+                                    {interest.customDescription}
+                                  </div>
+                                )}
+                            </div>
                               <div className="flex items-center gap-2">
                                 <PriorityBadge priority={interest.priority as "P1" | "P2" | "P3"} />
                                 <Badge variant={
