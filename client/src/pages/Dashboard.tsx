@@ -28,25 +28,25 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useRouteNotifications, useMarkNotificationsRead } from "@/hooks/use-notifications";
 import type { User, Registration, Formation, Session, FormationInterest } from "@shared/schema";
+import type { AuthMeResponse, SanitizedUser } from "@/types/api";
 
 type CoachInfo = Omit<User, "password">;
 
 interface DashboardProps {
   currentUser: User;
+  initialCoach?: SanitizedUser | null;
 }
 
-export default function Dashboard({ currentUser: _currentUser }: DashboardProps) {
+export default function Dashboard({ currentUser: _currentUser, initialCoach = null }: DashboardProps) {
   const { toast } = useToast();
   const [deleteInterestId, setDeleteInterestId] = useState<string | null>(null);
   const [deleteRegistrationId, setDeleteRegistrationId] = useState<string | null>(null);
 
-  const { data: userData } = useQuery<{ user: User; coach?: Omit<User, "password"> | null; coaches?: Omit<User, "password">[] }>(
-    {
-      queryKey: ["/api/auth/me"],
-    }
-  );
+  const { data: userData } = useQuery<AuthMeResponse>({
+    queryKey: ["/api/auth/me"],
+  });
   const currentUser = userData?.user || _currentUser;
-  const primaryCoach = userData?.coach ?? userData?.coaches?.[0] ?? null;
+  const primaryCoach = userData?.coach ?? userData?.coaches?.[0] ?? initialCoach;
 
   const { data: interests = [], isLoading: isLoadingInterests } = useQuery<FormationInterest[]>({
     queryKey: ["/api/interests"],

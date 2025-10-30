@@ -26,8 +26,15 @@ import type { User } from "@shared/schema";
 import { Loader2, LogOut } from "lucide-react";
 import { useEffect } from "react";
 import { formatRoles } from "@shared/roles";
+import type { AuthMeResponse } from "@/types/api";
 
-function Router({ currentUser }: { currentUser: User }) {
+function Router({
+  currentUser,
+  primaryCoach,
+}: {
+  currentUser: User;
+  primaryCoach: AuthMeResponse["coach"];
+}) {
   const [location] = useLocation();
 
   // Rafraîchir les données quand on change de page
@@ -43,13 +50,17 @@ function Router({ currentUser }: { currentUser: User }) {
     queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
   }, [location]);
 
+  const renderDashboard = () => (
+    <Dashboard currentUser={currentUser} initialCoach={primaryCoach ?? null} />
+  );
+
   return (
     <Switch>
-      <Route path="/" component={() => <Dashboard currentUser={currentUser} />} />
-      <Route path="/dashboard" component={() => <Dashboard currentUser={currentUser} />} />
+      <Route path="/" component={renderDashboard} />
+      <Route path="/dashboard" component={renderDashboard} />
       <Route path="/catalog" component={Catalog} />
       <Route path="/training/:id" component={() => <TrainingDetail currentUser={currentUser} />} />
-      <Route path="/my-trainings" component={() => <Dashboard currentUser={currentUser} />} />
+      <Route path="/my-trainings" component={renderDashboard} />
       <Route path="/account" component={() => <AccountSettings currentUser={currentUser} />} />
       <Route path="/interests" component={InterestManagement} />
       <Route path="/consultants" component={ConsultantManagement} />
@@ -68,7 +79,15 @@ function Router({ currentUser }: { currentUser: User }) {
   );
 }
 
-function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void }) {
+function AuthenticatedApp({
+  user,
+  onLogout,
+  primaryCoach,
+}: {
+  user: User;
+  onLogout: () => void;
+  primaryCoach: AuthMeResponse["coach"];
+}) {
   const style = {
     "--sidebar-width": "7rem",
     "--sidebar-width-icon": "7rem",
@@ -105,7 +124,7 @@ function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void
           </header>
           <main className="flex-1 overflow-auto px-8 pb-12">
             <div className="mx-auto max-w-6xl space-y-12 pt-6">
-              <Router currentUser={user} />
+              <Router currentUser={user} primaryCoach={primaryCoach} />
             </div>
           </main>
         </div>
@@ -115,7 +134,7 @@ function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void
 }
 
 function AppContent() {
-  const { data: userData, isLoading, refetch } = useQuery<{ user: User } | null>({
+  const { data: userData, isLoading, refetch } = useQuery<AuthMeResponse | null>({
     queryKey: ["/api/auth/me"],
     retry: false,
     queryFn: async () => {
@@ -127,7 +146,7 @@ function AppContent() {
         if (!res.ok) {
           throw new Error(`${res.status}: ${res.statusText}`);
         }
-        return await res.json();
+        return (await res.json()) as AuthMeResponse;
       } catch (error) {
         console.error("Auth check failed:", error);
         return null;
@@ -164,7 +183,13 @@ function AppContent() {
     return <Login onLoginSuccess={handleLogin} />;
   }
 
-  return <AuthenticatedApp user={userData.user} onLogout={handleLogout} />;
+  return (
+    <AuthenticatedApp
+      user={userData.user}
+      onLogout={handleLogout}
+      primaryCoach={userData.coach ?? null}
+    />
+  );
 }
 
 function App() {

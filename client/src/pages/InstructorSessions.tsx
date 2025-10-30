@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import type { Session, Formation, User } from "@shared/schema";
+import type { AuthMeResponse } from "@/types/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,7 +61,7 @@ export default function InstructorSessions() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
-  const { data: currentUser } = useQuery<{ user: User }>({
+  const { data: currentUser } = useQuery<AuthMeResponse>({
     queryKey: ["/api/auth/me"],
   });
 

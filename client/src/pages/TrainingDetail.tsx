@@ -53,6 +53,7 @@ import {
   type Registration,
   type FormationInterest,
 } from "@shared/schema";
+import type { AuthMeResponse } from "@/types/api";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -209,7 +210,7 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
   };
 
   // Fetch current user (to get updated quotas)
-  const { data: userData } = useQuery<{ user: User }>({
+  const { data: userData } = useQuery<AuthMeResponse>({
     queryKey: ["/api/auth/me"],
   });
   const currentUser = userData?.user || _currentUser;
