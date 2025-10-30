@@ -34,6 +34,7 @@ Preferred communication style: Simple, everyday language.
 - **Current**: Mock user switching, session-based with multi-role support (`roles: text[]`), UI layer role-based access control with dynamic sidebar sections.
 - **Role System**: Users can have multiple simultaneous roles (consultant, RH, formateur, manager). All role checks use `user.roles.includes()` pattern.
 - **Self-Service Upgrade/Downgrade**: Consultants can activate/deactivate instructor role via dedicated buttons, with session assignment validation for resignation.
+- **Production Configuration**: Session middleware configured with `proxy: true` to trust Replit reverse proxy for proper HTTPS cookie handling in production deployments.
 
 ### Key Business Logic
 - **Priority System**: Annual quota of 1 P1 and 1 P2 per consultant. P1 registrations guarantee validation; P2 and P3 follow. Quota usage tracked in user profiles. Quota refunds automatically on intention rejection or deletion.

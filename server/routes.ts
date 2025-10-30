@@ -429,6 +429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       secret: process.env.SESSION_SECRET || "colombus-lms-secret-key",
       resave: false,
       saveUninitialized: false,
+      proxy: true, // Trust reverse proxy (required for Replit deployments)
       cookie: {
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         httpOnly: true,
