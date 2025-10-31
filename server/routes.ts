@@ -25,6 +25,7 @@ import {
   DEFAULT_DASHBOARD_INFORMATION,
   dashboardInformationSettingsSchema,
   SENIORITY_LEVELS,
+  resolveSeniorityLevel,
 } from "@shared/schema";
 import { INSTRUCTOR_ROLES, InstructorRole, USER_ROLES, isInstructor } from "@shared/roles";
 import { z } from "zod";
@@ -3004,6 +3005,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : [];
 
       const registrations = await storage.listRegistrationsForUsers(coacheeIds);
+
+      const coachSeniority = resolveSeniorityLevel(coach.seniority);
+      let collaborators: Array<Omit<User, "password">> = [];
+      let collaboratorInterests: FormationInterest[] = [];
+      let collaboratorRegistrations: Registration[] = [];
+
+      if (coachSeniority) {
+        const coachSeniorityIndex = SENIORITY_LEVELS.indexOf(coachSeniority);
+        const activeUsers = await storage.listUsers(false);
+
+        const hierarchyCandidates = activeUsers.filter((candidate) => {
+          if (candidate.id === coachId) {
+            return false;
+          }
+
+          const candidateSeniority = resolveSeniorityLevel(candidate.seniority);
+          if (!candidateSeniority) {
+            return false;
+          }
+
+          const candidateIndex = SENIORITY_LEVELS.indexOf(candidateSeniority);
+          return candidateIndex >= 0 && candidateIndex < coachSeniorityIndex;
+        });
+
+        const collaboratorIds = hierarchyCandidates.map((candidate) => candidate.id);
+        collaborators = hierarchyCandidates.map(({ password, ...rest }) => rest);
+
+        collaboratorInterests = collaboratorIds.length
+          ? (
+              await Promise.all(
+                collaboratorIds.map((collaboratorId) =>
+                  storage.listFormationInterests({ userId: collaboratorId })
+                )
+              )
+            ).flat()
+          : [];
+
+        collaboratorRegistrations = collaboratorIds.length
+          ? await storage.listRegistrationsForUsers(collaboratorIds)
+          : [];
+      }
+
       const coachValidationOnly = Boolean(
         await storage.getSetting<boolean>(COACH_VALIDATION_SETTING_KEY)
       );
@@ -3013,6 +3056,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         coachees: coacheesWithoutPasswords,
         interests,
         registrations,
+        collaborators,
+        collaboratorInterests,
+        collaboratorRegistrations,
         settings: { coachValidationOnly },
       });
     } catch (error: any) {
