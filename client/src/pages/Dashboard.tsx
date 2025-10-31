@@ -483,10 +483,17 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
                 <div className="space-y-1">
                   <p className="font-medium">Formation réalisée</p>
                   <p>
-                    Merci d'avoir confirmé la réalisation de cette formation. Partagez votre avis pour aider les équipes
-                    RH et vos collègues.
+                    {interest.customReviewRating
+                      ? completedAtDisplay
+                        ? (
+                            <>
+                              Formation réalisée le <strong>{completedAtDisplay}</strong>
+                            </>
+                          )
+                        : "Formation réalisée"
+                      : "Merci d'avoir confirmé la réalisation de cette formation. Partagez votre avis pour aider les équipes RH et vos collègues."}
                   </p>
-                  {completedAtDisplay && (
+                  {!interest.customReviewRating && completedAtDisplay && (
                     <p className="text-sm text-emerald-700/80">
                       Réalisée le <strong>{completedAtDisplay}</strong>
                     </p>
@@ -1032,9 +1039,6 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
                   Identifiez une formation hors catalogue et soumettez-la pour validation en un clic.
                 </p>
               </div>
-              <Button onClick={() => setShowOffCatalogDialog(true)} className="rounded-xl px-6">
-                Proposer une formation
-              </Button>
             </div>
           </Card>
         )}
