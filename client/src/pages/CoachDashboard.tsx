@@ -60,6 +60,7 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
   const { toast } = useToast();
   const [selectedCoacheeId, setSelectedCoacheeId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"coachees" | "collaborators">("coachees");
+  const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<string | null>(null);
 
   const { data: overview, isLoading } = useQuery<CoachOverviewResponse>({
     queryKey: ["/api/coach/overview"],
@@ -159,6 +160,9 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
   }, [collaborators]);
 
   const selectedCoachee = selectedCoacheeId ? coacheeMap.get(selectedCoacheeId) ?? null : null;
+  const selectedCollaborator = selectedCollaboratorId
+    ? collaboratorMap.get(selectedCollaboratorId) ?? null
+    : null;
 
   const filteredInterests = useMemo(() => {
     if (!selectedCoacheeId) {
@@ -211,6 +215,39 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
     });
     return map;
   }, [collaboratorRegistrations]);
+
+  const selectedCollaboratorInterests = useMemo(() => {
+    if (!selectedCollaboratorId) {
+      return [];
+    }
+    return collaboratorInterests.filter((interest) => interest.userId === selectedCollaboratorId);
+  }, [collaboratorInterests, selectedCollaboratorId]);
+
+  const selectedCollaboratorRegistrations = useMemo(() => {
+    if (!selectedCollaboratorId) {
+      return [];
+    }
+    return collaboratorRegistrations.filter((registration) => registration.userId === selectedCollaboratorId);
+  }, [collaboratorRegistrations, selectedCollaboratorId]);
+
+  const selectedCollaboratorMeta = useMemo(() => {
+    if (!selectedCollaborator) {
+      return "";
+    }
+    return [selectedCollaborator.email, selectedCollaborator.businessUnit]
+      .filter(Boolean)
+      .join(" • ");
+  }, [selectedCollaborator]);
+
+  const selectedCollaboratorActiveCount = useMemo(() => {
+    return selectedCollaboratorInterests.filter(
+      (interest) => interest.status !== "rejected" && interest.status !== "withdrawn"
+    ).length;
+  }, [selectedCollaboratorInterests]);
+
+  const selectedCollaboratorCompletedCount = useMemo(() => {
+    return selectedCollaboratorRegistrations.filter((registration) => registration.status === "completed").length;
+  }, [selectedCollaboratorRegistrations]);
 
   const collaboratorSummaries = useMemo(() => {
     const getTimestamp = (registration: Registration) => {
@@ -361,7 +398,11 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
             <p className="text-2xl font-bold">{currentUser.name}</p>
             <p className="text-xs text-[#00313F]/70">
               {activeTab === "collaborators"
-                ? `${collaborators.length} collaborateur${collaborators.length > 1 ? "s" : ""} éligible${collaborators.length > 1 ? "s" : ""}`
+                ? selectedCollaborator
+                  ? `${selectedCollaborator.name} sélectionné`
+                  : `${collaborators.length} collaborateur${collaborators.length > 1 ? "s" : ""} éligible${
+                      collaborators.length > 1 ? "s" : ""
+                    }`
                 : selectedCoachee
                 ? `${selectedCoachee.name} sélectionné`
                 : `${coachees.length} coaché${coachees.length > 1 ? "s" : ""} suivis`}
@@ -375,7 +416,9 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
         onValueChange={(value) => {
           const nextValue = value as "coachees" | "collaborators";
           setActiveTab(nextValue);
-          if (nextValue !== "coachees") {
+          if (nextValue === "coachees") {
+            setSelectedCollaboratorId(null);
+          } else {
             setSelectedCoacheeId(null);
           }
         }}
@@ -837,7 +880,19 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
                             : "Aucune activité récente";
 
                           return (
-                            <TableRow key={collaborator.id}>
+                            <TableRow
+                              key={collaborator.id}
+                              onClick={() =>
+                                setSelectedCollaboratorId((current) =>
+                                  current === collaborator.id ? null : collaborator.id
+                                )
+                              }
+                              className={cn(
+                                "cursor-pointer transition-colors",
+                                selectedCollaboratorId === collaborator.id && "bg-primary/5 hover:bg-primary/10",
+                                selectedCollaboratorId !== collaborator.id && "hover:bg-muted/40"
+                              )}
+                            >
                               <TableCell>
                                 <div className="font-medium">{collaborator.name}</div>
                                 <div className="text-xs text-muted-foreground">
@@ -875,6 +930,176 @@ export default function CoachDashboard({ currentUser }: CoachDashboardProps) {
               </div>
             </Card>
           </section>
+
+          {selectedCollaborator && (
+            <section className="space-y-6">
+              <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div className="space-y-2">
+                    <h2 className="text-xl font-semibold text-primary">
+                      Suivi de {selectedCollaborator.name}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Consultez les intentions et l'historique de formation de ce collaborateur.
+                    </p>
+                    {selectedCollaboratorMeta && (
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span>{selectedCollaboratorMeta}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-start gap-3 md:items-end">
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCollaborator.seniority && (
+                        <Badge variant="outline" className="border-dashed text-xs uppercase tracking-wide">
+                          Séniorité : {selectedCollaborator.seniority}
+                        </Badge>
+                      )}
+                      <Badge variant="secondary" className="text-xs">
+                        {selectedCollaboratorActiveCount} intention(s) active(s)
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {selectedCollaboratorCompletedCount} formation(s) terminée(s)
+                      </Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedCollaboratorId(null)}
+                      className="text-xs"
+                    >
+                      Réinitialiser la sélection
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <Target className="h-5 w-5 text-primary" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-primary">Intentions du collaborateur</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Visibilité sur les intentions exprimées, leur priorité et leur statut.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Intention</TableHead>
+                        <TableHead>Priorité</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead>Validation coach</TableHead>
+                        <TableHead>Dernière mise à jour</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedCollaboratorInterests.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
+                            Aucune intention enregistrée pour ce collaborateur.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        selectedCollaboratorInterests.map((interest) => {
+                          const formation = interest.formationId
+                            ? formationMap.get(interest.formationId)
+                            : undefined;
+                          const isOffCatalog = !interest.formationId;
+                          const formationTitle = isOffCatalog
+                            ? interest.customTitle ?? "Formation hors catalogue"
+                            : formation?.title ?? "Formation inconnue";
+                          const lastUpdate = interest.coachValidatedAt ?? interest.expressedAt;
+
+                          return (
+                            <TableRow key={interest.id}>
+                              <TableCell>
+                                <div className="font-medium">{formationTitle}</div>
+                                {isOffCatalog && interest.customDescription && (
+                                  <div className="text-xs text-muted-foreground">{interest.customDescription}</div>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <PriorityBadge priority={interest.priority as "P1" | "P2" | "P3"} />
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={interest.status === "approved" ? "secondary" : "outline"} className="capitalize">
+                                  {interest.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={interest.coachStatus === "approved" ? "secondary" : "outline"}
+                                  className="capitalize"
+                                >
+                                  {interest.coachStatus}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{formatDate(lastUpdate)}</TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
+
+              <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-primary">Historique des formations</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Détail des inscriptions et de leur statut pour ce collaborateur.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Formation</TableHead>
+                        <TableHead>Session</TableHead>
+                        <TableHead>Statut</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedCollaboratorRegistrations.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={3} className="py-6 text-center text-muted-foreground">
+                            Aucun historique de formation pour ce collaborateur.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        selectedCollaboratorRegistrations.map((registration) => {
+                          const session = sessionMap.get(registration.sessionId);
+                          const formation = formationMap.get(registration.formationId);
+                          return (
+                            <TableRow key={registration.id}>
+                              <TableCell>{formation?.title ?? "Formation inconnue"}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {session
+                                  ? `${formatDate(session.startDate)} • ${session.location || "Lieu à venir"}`
+                                  : formatDate(registration.registeredAt)}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={registration.status === "completed" ? "secondary" : "outline"}>
+                                  {registration.status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
+            </section>
+          )}
 
           <section className="space-y-4">
             <Card className="rounded-[1.75rem] border border-border/50 p-6 shadow-sm">
