@@ -1,21 +1,9 @@
-import {
-  useMemo,
-  useState,
-  useEffect,
-  type ChangeEvent,
-  type FormEvent,
-} from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import DashboardInformationCard from "@/components/DashboardInformationCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import RatingStars from "@/components/RatingStars";
 import {
@@ -63,78 +51,18 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import type {
-  FormationInterest,
-  Formation,
-  User,
-  CoachAssignment,
-  DashboardInformationSettings,
-} from "@shared/schema";
-import { DEFAULT_DASHBOARD_INFORMATION } from "@shared/schema";
+import type { FormationInterest, Formation, User, CoachAssignment } from "@shared/schema";
 import type { AdminInterestsResponse } from "@/types/admin";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PriorityBadge from "@/components/PriorityBadge";
 import { useRouteNotifications, useMarkNotificationsRead } from "@/hooks/use-notifications";
 
-const INFORMATION_LAYOUT_OPTIONS: {
-  value: DashboardInformationSettings["layout"];
-  title: string;
-  description: string;
-}[] = [
-  {
-    value: "text-only",
-    title: "Texte seul",
-    description: "Affiche uniquement un titre et un message détaillé.",
-  },
-  {
-    value: "image-right",
-    title: "Image à droite",
-    description: "Affiche une image compacte à droite du texte.",
-  },
-  {
-    value: "image-left",
-    title: "Image à gauche",
-    description: "Affiche une image compacte à gauche du texte.",
-  },
-  {
-    value: "image-top",
-    title: "Image en haut",
-    description: "Affiche une image large au-dessus du texte.",
-  },
-];
-
-const INFORMATION_TONE_OPTIONS: {
-  value: DashboardInformationSettings["tone"];
-  title: string;
-  description: string;
-}[] = [
-  {
-    value: "neutral",
-    title: "Neutre",
-    description: "Fond clair et discret adapté aux messages généraux.",
-  },
-  {
-    value: "accent",
-    title: "Accent coloré",
-    description: "Fond bleu clair pour mettre en avant l'information.",
-  },
-  {
-    value: "highlight",
-    title: "Contrasté",
-    description: "Fond sombre pour les annonces importantes.",
-  },
-];
-
 export default function InterestManagement() {
   const [selectedInterest, setSelectedInterest] = useState<FormationInterest | null>(null);
   const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
   const [cancelInterestTarget, setCancelInterestTarget] = useState<FormationInterest | null>(null);
   const [isValidationDialogOpen, setIsValidationDialogOpen] = useState(false);
-  const [isInformationDialogOpen, setIsInformationDialogOpen] = useState(false);
-  const [informationForm, setInformationForm] = useState<DashboardInformationSettings>(
-    DEFAULT_DASHBOARD_INFORMATION
-  );
   const { toast } = useToast();
 
   // Fetch all interests (RH access)
@@ -160,10 +88,6 @@ export default function InterestManagement() {
       if (!res.ok) throw new Error("Failed to fetch validation settings");
       return res.json();
     },
-  });
-
-  const { data: dashboardInformationSettings } = useQuery<DashboardInformationSettings>({
-    queryKey: ["/api/settings/dashboard-information"],
   });
 
   const { data: coachAssignments = [] } = useQuery<CoachAssignment[]>({
@@ -224,18 +148,6 @@ export default function InterestManagement() {
   const formatNotificationDate = (isoDate: string) =>
     notificationDateFormatter.format(new Date(isoDate));
 
-  useEffect(() => {
-    if (!isInformationDialogOpen) {
-      return;
-    }
-
-    if (dashboardInformationSettings) {
-      setInformationForm(dashboardInformationSettings);
-    } else {
-      setInformationForm(DEFAULT_DASHBOARD_INFORMATION);
-    }
-  }, [isInformationDialogOpen, dashboardInformationSettings]);
-
   // Update interest status mutation
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status, action }: { id: string; status: string; action: "approve" | "reject" }) => {
@@ -284,82 +196,6 @@ export default function InterestManagement() {
       });
     },
   });
-
-  const updateDashboardInformationMutation = useMutation({
-    mutationFn: async (payload: DashboardInformationSettings) => {
-      return apiRequest("/api/admin/settings/dashboard-information", "PATCH", payload);
-    },
-    onSuccess: (data: DashboardInformationSettings) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/dashboard-information"] });
-      toast({
-        title: "Section information mise à jour",
-        description: data.enabled
-          ? "L'annonce est désormais visible sur le tableau de bord."
-          : "La section information est désactivée.",
-      });
-      setInformationForm(data);
-      setIsInformationDialogOpen(false);
-    },
-    onError: (error: any) => {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description:
-          error?.message || "Impossible d'enregistrer la section information.",
-      });
-    },
-  });
-
-  const handleInformationInputChange = (
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = event.target;
-    setInformationForm((prev: DashboardInformationSettings) => ({
-      ...prev,
-      [name as keyof DashboardInformationSettings]: value,
-    }));
-  };
-
-  const handleInformationEnabledChange = (checked: boolean) => {
-    setInformationForm((prev: DashboardInformationSettings) => ({
-      ...prev,
-      enabled: Boolean(checked),
-    }));
-  };
-
-  const handleInformationLayoutChange = (value: string) => {
-    setInformationForm((prev: DashboardInformationSettings) => ({
-      ...prev,
-      layout: value as DashboardInformationSettings["layout"],
-    }));
-  };
-
-  const handleInformationToneChange = (value: string) => {
-    setInformationForm((prev: DashboardInformationSettings) => ({
-      ...prev,
-      tone: value as DashboardInformationSettings["tone"],
-    }));
-  };
-
-  const handleInformationSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const payload: DashboardInformationSettings = {
-      ...informationForm,
-      title: informationForm.title.trim(),
-      body: informationForm.body.trim(),
-      imageUrl: informationForm.imageUrl.trim(),
-    };
-    updateDashboardInformationMutation.mutate(payload);
-  };
-
-  const previewInformationSettings: DashboardInformationSettings = {
-    ...informationForm,
-    enabled:
-      informationForm.enabled &&
-      informationForm.title.trim().length > 0 &&
-      informationForm.body.trim().length > 0,
-    imageUrl: informationForm.imageUrl.trim(),
-  };
 
   const updateCoachValidationMutation = useMutation({
     mutationFn: async (value: boolean) => {
@@ -906,166 +742,6 @@ export default function InterestManagement() {
                       <Button variant="outline">Fermer</Button>
                     </DialogClose>
                   </DialogFooter>
-                </DialogContent>
-              </Dialog>
-              <Dialog open={isInformationDialogOpen} onOpenChange={setIsInformationDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-12 w-12 rounded-xl"
-                    aria-label="Configurer la section information"
-                    data-testid="button-open-information-settings"
-                  >
-                    <Megaphone className="h-5 w-5" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-3xl">
-                  <form onSubmit={handleInformationSubmit} className="space-y-6">
-                    <DialogHeader>
-                      <DialogTitle>Section information du tableau de bord</DialogTitle>
-                      <DialogDescription>
-                        Personnalisez le message mis en avant pour l'ensemble des collaborateurs.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/60 p-4">
-                        <div className="space-y-1 text-sm">
-                          <p className="font-medium text-foreground">Afficher la section</p>
-                          <p className="text-muted-foreground">
-                            Activez cette carte pour partager une annonce ou une information prioritaire dans le tableau de bord.
-                          </p>
-                        </div>
-                        <Switch
-                          checked={informationForm.enabled}
-                          onCheckedChange={(checked) => handleInformationEnabledChange(Boolean(checked))}
-                          aria-label="Activer la section information"
-                        />
-                      </div>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="information-title">Titre</Label>
-                          <Input
-                            id="information-title"
-                            name="title"
-                            value={informationForm.title}
-                            onChange={handleInformationInputChange}
-                            placeholder="Nouvelle formation Colombus"
-                            autoComplete="off"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="information-image">Image (optionnel)</Label>
-                          <Input
-                            id="information-image"
-                            name="imageUrl"
-                            value={informationForm.imageUrl}
-                            onChange={handleInformationInputChange}
-                            placeholder="https://... ou /assets/visuel.jpg"
-                            autoComplete="off"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Laissez vide pour une carte sans illustration.
-                          </p>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="information-body">Texte</Label>
-                        <Textarea
-                          id="information-body"
-                          name="body"
-                          value={informationForm.body}
-                          onChange={handleInformationInputChange}
-                          rows={5}
-                          placeholder="Décrivez l'information à partager..."
-                        />
-                      </div>
-                      <div className="space-y-3">
-                        <Label>Disposition</Label>
-                        <RadioGroup
-                          value={informationForm.layout}
-                          onValueChange={handleInformationLayoutChange}
-                          className="grid gap-3 md:grid-cols-2"
-                        >
-                          {INFORMATION_LAYOUT_OPTIONS.map((option) => (
-                            <label
-                              key={option.value}
-                              htmlFor={`information-layout-${option.value}`}
-                              className={cn(
-                                "flex cursor-pointer flex-col gap-2 rounded-2xl border border-border/60 p-4 transition",
-                                informationForm.layout === option.value
-                                  ? "border-primary/60 bg-primary/5"
-                                  : "hover:border-primary/40"
-                              )}
-                            >
-                              <div className="flex items-center gap-2">
-                                <RadioGroupItem
-                                  id={`information-layout-${option.value}`}
-                                  value={option.value}
-                                  className="mt-0.5"
-                                />
-                                <span className="text-sm font-medium text-foreground">{option.title}</span>
-                              </div>
-                              <p className="text-xs text-muted-foreground">{option.description}</p>
-                            </label>
-                          ))}
-                        </RadioGroup>
-                      </div>
-                      <div className="space-y-3">
-                        <Label>Style visuel</Label>
-                        <RadioGroup
-                          value={informationForm.tone}
-                          onValueChange={handleInformationToneChange}
-                          className="grid gap-3 md:grid-cols-3"
-                        >
-                          {INFORMATION_TONE_OPTIONS.map((option) => (
-                            <label
-                              key={option.value}
-                              htmlFor={`information-tone-${option.value}`}
-                              className={cn(
-                                "flex cursor-pointer flex-col gap-2 rounded-2xl border border-border/60 p-4 transition",
-                                informationForm.tone === option.value
-                                  ? "border-primary/60 bg-primary/5"
-                                  : "hover:border-primary/40"
-                              )}
-                            >
-                              <div className="flex items-center gap-2">
-                                <RadioGroupItem
-                                  id={`information-tone-${option.value}`}
-                                  value={option.value}
-                                  className="mt-0.5"
-                                />
-                                <span className="text-sm font-medium text-foreground">{option.title}</span>
-                              </div>
-                              <p className="text-xs text-muted-foreground">{option.description}</p>
-                            </label>
-                          ))}
-                        </RadioGroup>
-                      </div>
-                      <div className="space-y-3">
-                        <Label>Aperçu</Label>
-                        <DashboardInformationCard
-                          settings={previewInformationSettings}
-                          showWhenDisabled
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter className="gap-2">
-                      <DialogClose asChild>
-                        <Button type="button" variant="outline">
-                          Annuler
-                        </Button>
-                      </DialogClose>
-                      <Button
-                        type="submit"
-                        disabled={updateDashboardInformationMutation.isPending}
-                      >
-                        {updateDashboardInformationMutation.isPending
-                          ? "Enregistrement..."
-                          : "Enregistrer"}
-                      </Button>
-                    </DialogFooter>
-                  </form>
                 </DialogContent>
               </Dialog>
             </div>
