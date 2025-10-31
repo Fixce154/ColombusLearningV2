@@ -35,7 +35,7 @@ export const LEGACY_SENIORITY_MAPPING: Record<string, (typeof SENIORITY_LEVELS)[
   alternant: "Alternant",
   junior: "Junior",
   confirme: "Senior",
-  confirmé: "Senior",
+  confirmee: "Senior",
   senior: "Supervising Senior",
   expert: "Directeur",
   "super manager": "Senior Manager",
@@ -52,7 +52,33 @@ export const resolveSeniorityLevel = (
     return value as (typeof SENIORITY_LEVELS)[number];
   }
 
-  const normalized = value.trim().toLowerCase();
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  const normalizedLevels = SENIORITY_LEVELS.map((level) => ({
+    level,
+    normalized: level
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, ""),
+  }));
+
+  const matchedLevel = normalizedLevels.find(
+    ({ normalized: level }) => level === normalized
+  );
+  if (matchedLevel) {
+    return matchedLevel.level;
+  }
+
+  const partialMatch = normalizedLevels.find(({ normalized: level }) =>
+    normalized.includes(level)
+  );
+  if (partialMatch) {
+    return partialMatch.level;
+  }
 
   return LEGACY_SENIORITY_MAPPING[normalized];
 };
