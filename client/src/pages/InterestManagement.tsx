@@ -732,7 +732,7 @@ export default function InterestManagement() {
                         <span className="block text-muted-foreground">
                           {rhValidationOnly
                             ? "Une intention validée par les RH est finalisée sans validation manager."
-                            : "Une validation manager reste nécessaire après l'approbation RH."}
+                            : "Une validation manager n'est pas nécessaire après l'approbation RH."}
                         </span>
                       </label>
                     </div>
