@@ -26,6 +26,7 @@ import {
   dashboardInformationSettingsSchema,
   SENIORITY_LEVELS,
   resolveSeniorityLevel,
+  type SeniorityLevel,
 } from "@shared/schema";
 import { INSTRUCTOR_ROLES, InstructorRole, USER_ROLES, isInstructor } from "@shared/roles";
 import { z } from "zod";
@@ -192,6 +193,12 @@ const columnLettersToIndex = (letters: string): number => {
     index = index * 26 + (letters.charCodeAt(i) - 64);
   }
   return index - 1;
+};
+
+const resolveUserSeniorityLevel = (user: User): SeniorityLevel | undefined => {
+  return (
+    resolveSeniorityLevel(user.seniority) ?? resolveSeniorityLevel(user.grade)
+  );
 };
 
 const extractZipEntries = (buffer: Buffer): Map<string, Buffer> => {
@@ -3006,7 +3013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const registrations = await storage.listRegistrationsForUsers(coacheeIds);
 
-      const coachSeniority = resolveSeniorityLevel(coach.seniority);
+      const coachSeniority = resolveUserSeniorityLevel(coach);
       let collaborators: Array<Omit<User, "password">> = [];
       let collaboratorInterests: FormationInterest[] = [];
       let collaboratorRegistrations: Registration[] = [];
@@ -3020,7 +3027,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return false;
           }
 
-          const candidateSeniority = resolveSeniorityLevel(candidate.seniority);
+          const candidateSeniority = resolveUserSeniorityLevel(candidate);
           if (!candidateSeniority) {
             return false;
           }
