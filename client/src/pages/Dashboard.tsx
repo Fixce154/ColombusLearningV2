@@ -40,7 +40,7 @@ import type {
   DashboardInformationSettings,
 } from "@shared/schema";
 import { DEFAULT_DASHBOARD_INFORMATION } from "@shared/schema";
-import { isInstructor } from "@shared/roles";
+import { hasRole } from "@shared/roles";
 import type { AuthMeResponse, SanitizedUser } from "@/types/api";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -683,11 +683,13 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
   };
 
   const firstName = currentUser.name.split(" ")[0] || currentUser.name;
-  const isCurrentUserInstructor = isInstructor(currentUser.roles);
+  const isExternalInstructorOnly =
+    hasRole(currentUser.roles, "formateur_externe") &&
+    !hasRole(currentUser.roles, "consultant");
   const dashboardInformation =
     dashboardInformationSettings ?? DEFAULT_DASHBOARD_INFORMATION;
   const showDashboardInformation =
-    !isCurrentUserInstructor &&
+    !isExternalInstructorOnly &&
     dashboardInformation.enabled &&
     dashboardInformation.title.trim().length > 0 &&
     dashboardInformation.body.trim().length > 0;
@@ -710,7 +712,7 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
             <p className="text-base leading-relaxed text-muted-foreground">
               L'outil "Made in Colombus" pour gérer votre parcours de formation
             </p>
-            {isCurrentUserInstructor ? null : (
+            {isExternalInstructorOnly ? null : (
               <div className="flex flex-wrap items-center gap-3">
                 <div className="rounded-2xl border border-white/40 bg-white/80 px-5 py-4 text-[#00313F] shadow-sm backdrop-blur-sm">
                   <div className="flex items-center gap-3">
