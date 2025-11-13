@@ -197,43 +197,28 @@ export default function InterestManagement() {
     },
   });
 
-  const updateCoachValidationMutation = useMutation({
-    mutationFn: async (value: boolean) => {
-      return apiRequest("/api/admin/settings/coach-validation", "PATCH", {
-        coachValidationOnly: value,
-      });
+  const updateValidationSettingsMutation = useMutation({
+    mutationFn: async (payload: { coachValidationOnly?: boolean; rhValidationOnly?: boolean }) => {
+      return apiRequest("/api/admin/settings/coach-validation", "PATCH", payload);
     },
-    onSuccess: (_, value) => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/coach-validation"] });
-      toast({
-        title: "Préférence mise à jour",
-        description: value
-          ? "Les validations coach suffisent désormais."
-          : "La validation RH reste requise après le coach.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: error.message || "Impossible de mettre à jour la préférence",
-      });
-    },
-  });
 
-  const updateRhValidationMutation = useMutation({
-    mutationFn: async (value: boolean) => {
-      return apiRequest("/api/admin/settings/coach-validation", "PATCH", {
-        rhValidationOnly: value,
-      });
-    },
-    onSuccess: (_, value) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/coach-validation"] });
+      let description = "Les préférences de validation ont été mises à jour.";
+
+      if (variables.coachValidationOnly === true) {
+        description = "Les validations coach suffisent désormais.";
+      } else if (variables.rhValidationOnly === true) {
+        description = "Les validations RH finalisent désormais l'intention sans étape manager.";
+      } else if (variables.coachValidationOnly === false) {
+        description = "La validation RH reste requise après le coach.";
+      } else if (variables.rhValidationOnly === false) {
+        description = "La validation manager reste requise après l'étape RH.";
+      }
+
       toast({
         title: "Préférence mise à jour",
-        description: value
-          ? "Les validations RH finalisent désormais l'intention sans étape manager."
-          : "La validation manager reste requise après l'étape RH.",
+        description,
       });
     },
     onError: (error: any) => {
@@ -332,12 +317,28 @@ export default function InterestManagement() {
 
   const handleCoachValidationToggle = (checked: boolean | "indeterminate") => {
     const value = checked === true;
-    updateCoachValidationMutation.mutate(value);
+
+    if (value) {
+      updateValidationSettingsMutation.mutate({
+        coachValidationOnly: true,
+        rhValidationOnly: false,
+      });
+    } else {
+      updateValidationSettingsMutation.mutate({ coachValidationOnly: false });
+    }
   };
 
   const handleRhValidationToggle = (checked: boolean | "indeterminate") => {
     const value = checked === true;
-    updateRhValidationMutation.mutate(value);
+
+    if (value) {
+      updateValidationSettingsMutation.mutate({
+        rhValidationOnly: true,
+        coachValidationOnly: false,
+      });
+    } else {
+      updateValidationSettingsMutation.mutate({ rhValidationOnly: false });
+    }
   };
 
   const getFormation = (id: string) => formations.find(f => f.id === id);
@@ -709,7 +710,7 @@ export default function InterestManagement() {
                         id="coach-validation-toggle"
                         checked={coachValidationOnly}
                         onCheckedChange={handleCoachValidationToggle}
-                        disabled={updateCoachValidationMutation.isPending}
+                        disabled={updateValidationSettingsMutation.isPending}
                       />
                       <label htmlFor="coach-validation-toggle" className="space-y-1 text-sm">
                         <span className="block font-medium text-foreground">La validation du coach suffit</span>
@@ -725,7 +726,7 @@ export default function InterestManagement() {
                         id="rh-validation-toggle"
                         checked={rhValidationOnly}
                         onCheckedChange={handleRhValidationToggle}
-                        disabled={updateRhValidationMutation.isPending}
+                        disabled={updateValidationSettingsMutation.isPending}
                       />
                       <label htmlFor="rh-validation-toggle" className="space-y-1 text-sm">
                         <span className="block font-medium text-foreground">La validation RH suffit</span>
