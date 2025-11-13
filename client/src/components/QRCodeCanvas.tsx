@@ -24,15 +24,17 @@ export default function QRCodeCanvas({ value, size = 220 }: QRCodeCanvasProps) {
     try {
       const matrix = createQrMatrix(value);
       const moduleCount = matrix.length;
-      const pixelsPerModule = Math.floor(size / moduleCount);
-      const quietZone = pixelsPerModule * 2;
-      const canvasSize = moduleCount * pixelsPerModule + quietZone * 2;
+      const quietZoneModules = 4;
+      const totalModules = moduleCount + quietZoneModules * 2;
+      const pixelsPerModule = Math.max(1, Math.floor(size / totalModules));
+      const quietZone = pixelsPerModule * quietZoneModules;
+      const canvasSize = totalModules * pixelsPerModule;
 
       canvas.width = canvasSize;
       canvas.height = canvasSize;
       context.fillStyle = "white";
       context.fillRect(0, 0, canvasSize, canvasSize);
-      context.fillStyle = "#0f172a";
+      context.fillStyle = "#000000";
 
       for (let r = 0; r < moduleCount; r++) {
         for (let c = 0; c < moduleCount; c++) {
