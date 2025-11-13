@@ -80,13 +80,6 @@ export const resolveSeniorityLevel = (
     return partialMatch.level;
   }
 
-  const matchedLevel = SENIORITY_LEVELS.find(
-    (level) => level.toLowerCase() === normalized
-  );
-  if (matchedLevel) {
-    return matchedLevel;
-  }
-
   return LEGACY_SENIORITY_MAPPING[normalized];
 };
 
