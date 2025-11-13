@@ -813,7 +813,7 @@ export default function ConsultantManagement() {
                   Actifs ({activeUsers.filter(u => u.roles.includes("consultant")).length})
                 </TabsTrigger>
                 <TabsTrigger value="archived" data-testid="tab-archived-collaborators">
-                  Historique ({archivedUsers.filter(u => u.roles.includes("consultant")).length})
+                  Archive ({archivedUsers.filter(u => u.roles.includes("consultant")).length})
                 </TabsTrigger>
               </TabsList>
 
