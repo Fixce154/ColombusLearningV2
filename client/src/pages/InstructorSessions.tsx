@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { Session, Formation, User } from "@shared/schema";
 import type { AuthMeResponse } from "@/types/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -118,8 +118,10 @@ export default function InstructorSessions() {
     [attendees]
   );
 
-  const qrLink = useMemo(() => {
-    if (!tokenData) return "";
+  const { qrLink, qrLinkError } = useMemo(() => {
+    if (!tokenData) {
+      return { qrLink: "", qrLinkError: null as string | null };
+    }
 
     const buildUrl = (origin: string | undefined) => {
       if (!origin) return "";
@@ -133,19 +135,32 @@ export default function InstructorSessions() {
     const browserOrigin = typeof window !== "undefined" ? window.location.origin : "";
     const fromBrowser = buildUrl(browserOrigin);
     if (fromBrowser) {
-      return fromBrowser;
+      return { qrLink: fromBrowser, qrLinkError: null };
     }
 
     const envOrigin = import.meta.env?.VITE_PUBLIC_APP_URL as string | undefined;
     const fromEnv = buildUrl(envOrigin);
     if (fromEnv) {
-      return fromEnv;
+      return { qrLink: fromEnv, qrLinkError: null };
     }
 
-    return `/a/${tokenData.token}`;
+    return {
+      qrLink: "",
+      qrLinkError:
+        "Impossible de déterminer l'URL du QR Code. Assurez-vous que l'application est servie avec une origine accessible ou configurez VITE_PUBLIC_APP_URL.",
+    };
   }, [tokenData]);
 
-  const qrValue = qrLink || tokenData?.token || "";
+  useEffect(() => {
+    if (!tokenData) return;
+    if (qrLinkError) {
+      setTokenError(qrLinkError);
+    } else {
+      setTokenError(null);
+    }
+  }, [tokenData, qrLinkError]);
+
+  const qrValue = qrLink;
 
   const handleCopyLink = async () => {
     if (!qrLink) return;
@@ -336,7 +351,7 @@ export default function InstructorSessions() {
             <div className="space-y-8">
               <div className="grid gap-6 md:grid-cols-[280px,1fr]">
                 <div className="flex flex-col items-center gap-4 rounded-xl border bg-muted/30 p-6">
-                  {tokenData ? (
+                  {tokenData && !tokenError ? (
                     <>
                       <QRCodeCanvas value={qrValue} size={220} />
                       <div className="space-y-3 text-center text-sm">

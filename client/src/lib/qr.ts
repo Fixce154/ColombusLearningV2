@@ -34,7 +34,7 @@ const RS_BLOCK_TABLE: number[] = [
   2, 86, 68, 4, 43, 27, 4, 43, 19, 4, 43, 15,
 ];
 
-const VERSION_CAPACITY_M = [16, 28, 44, 64, 86, 108];
+const VERSION_CAPACITY_M = [14, 26, 42, 62, 84, 106];
 
 const PATTERN_POSITION_TABLE = [
   [],
