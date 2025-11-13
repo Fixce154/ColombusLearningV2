@@ -1221,7 +1221,7 @@ export default function InterestManagement() {
       }}>
         <AlertDialogContent data-testid="dialog-confirm-interest-action">
           <AlertDialogHeader>
-            <AlertDialogTitle className={actionType === "approve" ? "text-accent" : "text-destructive"}>
+            <AlertDialogTitle className={actionType === "approve" ? "text-primary" : "text-destructive"}>
               {actionType === "approve" ? "Approuver l'intention ?" : "Refuser l'intention ?"}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -1241,7 +1241,7 @@ export default function InterestManagement() {
                       <strong>Priorité :</strong> {selectedInterest.priority}
                     </p>
                     {actionType === "approve" && (
-                      <p className="mt-4 text-accent font-medium">
+                      <p className="mt-4 text-primary font-semibold">
                         Le consultant pourra s'inscrire aux sessions disponibles pour cette formation.
                       </p>
                     )}
@@ -1262,7 +1262,7 @@ export default function InterestManagement() {
             <AlertDialogAction
               onClick={confirmAction}
               disabled={updateStatusMutation.isPending}
-              className={actionType === "approve" ? "bg-accent hover:bg-accent/90" : ""}
+              className={actionType === "approve" ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
               data-testid="button-confirm-action"
             >
               {updateStatusMutation.isPending ? (
