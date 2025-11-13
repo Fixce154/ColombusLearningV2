@@ -54,7 +54,7 @@ const createCollaboratorSchema = z
       });
     }
 
-    if (data.accountType === "collaborateur" && !data.seniority) {
+    if (data.accountType === "collaborateur" && data.role === "consultant" && !data.seniority) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["seniority"],
