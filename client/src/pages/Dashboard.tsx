@@ -40,6 +40,7 @@ import type {
   DashboardInformationSettings,
 } from "@shared/schema";
 import { DEFAULT_DASHBOARD_INFORMATION } from "@shared/schema";
+import { hasRole } from "@shared/roles";
 import type { AuthMeResponse, SanitizedUser } from "@/types/api";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -682,9 +683,13 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
   };
 
   const firstName = currentUser.name.split(" ")[0] || currentUser.name;
+  const isExternalInstructorOnly =
+    hasRole(currentUser.roles, "formateur_externe") &&
+    !hasRole(currentUser.roles, "consultant");
   const dashboardInformation =
     dashboardInformationSettings ?? DEFAULT_DASHBOARD_INFORMATION;
   const showDashboardInformation =
+    !isExternalInstructorOnly &&
     dashboardInformation.enabled &&
     dashboardInformation.title.trim().length > 0 &&
     dashboardInformation.body.trim().length > 0;
@@ -707,23 +712,25 @@ export default function Dashboard({ currentUser: _currentUser, initialCoach = nu
             <p className="text-base leading-relaxed text-muted-foreground">
               L'outil "Made in Colombus" pour gérer votre parcours de formation
             </p>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="rounded-2xl border border-white/40 bg-white/80 px-5 py-4 text-[#00313F] shadow-sm backdrop-blur-sm">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <UserCircle className="h-5 w-5" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#00313F]/70">
-                      Mon coach
-                    </p>
-                    <p className="text-base font-semibold text-[#00313F]">
-                      {primaryCoach ? primaryCoach.name : "En attente d'assignation"}
-                    </p>
+            {isExternalInstructorOnly ? null : (
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="rounded-2xl border border-white/40 bg-white/80 px-5 py-4 text-[#00313F] shadow-sm backdrop-blur-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <UserCircle className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#00313F]/70">
+                        Mon coach
+                      </p>
+                      <p className="text-base font-semibold text-[#00313F]">
+                        {primaryCoach ? primaryCoach.name : "En attente d'assignation"}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
           <div className="flex w-full max-w-md flex-col gap-5">
             {showDashboardInformation ? (
