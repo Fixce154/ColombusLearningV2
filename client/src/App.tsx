@@ -158,7 +158,10 @@ function AppContent() {
     },
   });
 
+  const [, setLocation] = useLocation();
+
   const handleLogin = (user: User) => {
+    setLocation("/dashboard", { replace: true });
     refetch();
   };
 
@@ -166,6 +169,7 @@ function AppContent() {
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
       queryClient.clear();
+      setLocation("/dashboard", { replace: true });
       refetch();
     } catch (error) {
       console.error("Logout failed:", error);
