@@ -14,6 +14,12 @@ interface SessionInviteOptions {
   sequence?: number;
 }
 
+interface RegistrationConfirmationOptions {
+  recipients: Recipient[];
+  session: Session;
+  formation: Formation;
+}
+
 const DEFAULT_DAY_START = Number(process.env.SESSION_INVITE_DAY_START ?? "9");
 const DEFAULT_DAY_END = Number(process.env.SESSION_INVITE_DAY_END ?? "18");
 
@@ -23,7 +29,7 @@ interface SessionSegment {
   end: Date;
 }
 
-const formatDateToICS = (date: Date) => {
+export const formatDateToICS = (date: Date) => {
   const pad = (value: number) => value.toString().padStart(2, "0");
   return (
     date.getUTCFullYear().toString() +
@@ -37,7 +43,7 @@ const formatDateToICS = (date: Date) => {
   );
 };
 
-const escapeIcsText = (value: string) =>
+export const escapeIcsText = (value: string) =>
   value
     .replace(/\\/g, "\\\\")
     .replace(/\n/g, "\\n")
@@ -108,7 +114,7 @@ const buildSessionSegments = (session: Session): SessionSegment[] => {
   return segments;
 };
 
-const buildSessionCalendar = (
+export const buildSessionCalendar = (
   session: Session,
   formation: Formation,
   sequence: number,
@@ -278,6 +284,91 @@ export const sendSessionInvitationEmail = async (options: SessionInviteOptions) 
     console.error("[invitation] Failed to send email:", error);
     // Log the payload for debugging
     console.info("[invitation]", JSON.stringify(payload));
+  }
+};
+
+export const sendRegistrationConfirmationEmail = async (options: RegistrationConfirmationOptions) => {
+  if (!options.recipients || options.recipients.length === 0) {
+    return;
+  }
+
+  const segments = buildSessionSegments(options.session);
+  
+  const subject = `[Confirmation d'inscription] ${options.formation.title}`;
+  const greeting =
+    options.recipients.length === 1 && options.recipients[0].name
+      ? `Bonjour ${options.recipients[0].name!.split(" ")[0]},`
+      : "Bonjour,";
+
+  const segmentsDescription = segments
+    .map((segment) => `• ${formatDateRange(segment)}`)
+    .join("\n");
+
+  const textLines = [
+    greeting,
+    "",
+    `Votre demande d'inscription à la session "${options.formation.title}" a bien été enregistrée.`,
+    "",
+    `Dates de la session :\n${segmentsDescription}`,
+  ];
+
+  if (options.session.location) {
+    textLines.push(`Lieu : ${options.session.location}`);
+  }
+
+  textLines.push(
+    "",
+    "Statut : En attente de validation RH",
+    "",
+    "Vous recevrez un second email avec l'invitation calendrier dès que votre inscription sera validée par les RH.",
+    "",
+    "À très vite sur Colombus Learning !",
+  );
+
+  const htmlLines = [
+    `<p>${greeting}</p>`,
+    `<p>Votre demande d'inscription à la session <strong>${options.formation.title}</strong> a bien été enregistrée.</p>`,
+    `<p><strong>Dates de la session :</strong><br/>${segments
+      .map((segment) => `<span style="display:block">${formatDateRange(segment)}</span>`)
+      .join("")}</p>`,
+  ];
+
+  if (options.session.location) {
+    htmlLines.push(`<p><strong>Lieu :</strong> ${options.session.location}</p>`);
+  }
+
+  htmlLines.push(
+    `<p><strong>Statut :</strong> <em style="color: #f59e0b;">En attente de validation RH</em></p>`,
+    "<p>Vous recevrez un second email avec l'invitation calendrier dès que votre inscription sera validée par les RH.</p>",
+    "<p>À très vite sur Colombus Learning !</p>",
+  );
+
+  const payload = {
+    to: options.recipients.map((recipient) =>
+      recipient.name ? `${recipient.name} <${recipient.email}>` : recipient.email
+    ),
+    subject,
+    text: textLines.join("\n"),
+    html: htmlLines.join(""),
+  };
+
+  // Send email via Resend (non-blocking)
+  try {
+    const { getUncachableResendClient } = await import("./resend");
+    const { client, fromEmail } = await getUncachableResendClient();
+    
+    await client.emails.send({
+      from: fromEmail,
+      to: payload.to,
+      subject: payload.subject,
+      text: payload.text,
+      html: payload.html,
+    });
+    
+    console.info("[registration-confirmation] Email sent successfully to:", payload.to);
+  } catch (error) {
+    console.error("[registration-confirmation] Failed to send email:", error);
+    console.info("[registration-confirmation] Payload:", JSON.stringify(payload, null, 2));
   }
 };
 

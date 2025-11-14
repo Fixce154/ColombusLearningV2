@@ -5,7 +5,7 @@ import connectPgSimple from "connect-pg-simple";
 import { inflateRawSync } from "zlib";
 import { pool } from "./db";
 import { storage, ensureFormationContentInfrastructure } from "./storage";
-import { sendSessionInvitationEmail } from "./invitations";
+import { sendSessionInvitationEmail, buildSessionSegments, buildSessionCalendar, sendRegistrationConfirmationEmail } from "./invitations";
 import { requireAuth, optionalAuth, type AuthRequest } from "./auth";
 import {
   insertUserSchema,
@@ -2483,6 +2483,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/sessions/:id/calendar.ics", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as AuthRequest).userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(401).json({ message: "Utilisateur introuvable" });
+      }
+
+      const session = await storage.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ message: "Session non trouvée" });
+      }
+
+      const formation = await storage.getFormation(session.formationId);
+      if (!formation) {
+        return res.status(404).json({ message: "Formation non trouvée" });
+      }
+
+      // Check authorization: user must be registered to the session OR be the instructor OR be RH
+      const isRH = user.roles.includes("rh");
+      const isSessionInstructor = session.instructorId === user.id;
+      const registration = await storage.getRegistrationByUserAndSession(user.id, session.id);
+      const isRegistered = registration ? registration.status !== "cancelled" : false;
+
+      if (!isRH && !isSessionInstructor && !isRegistered) {
+        return res.status(403).json({ 
+          message: "Accès refusé. Vous devez être inscrit à cette session pour télécharger le fichier calendrier." 
+        });
+      }
+
+      // Generate .ics file content
+      const segments = buildSessionSegments(session);
+      const sequence = Math.floor(new Date(session.startDate).getTime() / 1000);
+      const calendarContent = buildSessionCalendar(
+        session,
+        formation,
+        sequence,
+        "REQUEST",
+        segments
+      );
+
+      // Return .ics file with appropriate headers
+      res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${formation.title.replace(/[^a-z0-9]/gi, '_')}.ics"`);
+      res.send(calendarContent);
+    } catch (error: any) {
+      console.error("Failed to generate calendar file:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/attendance/sign", requireAuth, async (req, res) => {
     try {
       const userId = (req as AuthRequest).userId!;
@@ -3686,6 +3738,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.status(201).json(registration);
 
+      // Send immediate confirmation email for pending registrations
+      if (registrationStatus === "pending" && formation && targetUser.email) {
+        void (async () => {
+          try {
+            await sendRegistrationConfirmationEmail({
+              recipients: [{ email: targetUser.email, name: targetUser.name }],
+              session,
+              formation,
+            });
+          } catch (confirmError) {
+            console.error("Failed to send registration confirmation email", confirmError);
+          }
+        })();
+      }
+
+      // Send invitation email with .ics for validated registrations
       if (registrationStatus === "validated" && formation && targetUser.email) {
         void (async () => {
           try {

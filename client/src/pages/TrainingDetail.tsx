@@ -185,6 +185,48 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
     return `${dateFormatter.format(start)} • ${timeFormatter.format(start)} → ${dateFormatter.format(end)} • ${timeFormatter.format(end)}`;
   };
 
+  const handleDownloadCalendar = async () => {
+    if (!calendarSession) {
+      return;
+    }
+
+    try {
+      setIsSendingCalendarInvite(true);
+      const response = await fetch(`/api/sessions/${calendarSession.id}/calendar.ics`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Impossible de télécharger le fichier calendrier");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${formation?.title?.replace(/[^a-z0-9]/gi, '_') || 'formation'}.ics`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Fichier téléchargé",
+        description: "Le fichier calendrier a été téléchargé. Ouvrez-le pour l'ajouter à votre agenda.",
+      });
+      closeCalendarPrompt();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erreur de téléchargement",
+        description: error?.message || "Merci de réessayer dans quelques instants.",
+      });
+    } finally {
+      setIsSendingCalendarInvite(false);
+    }
+  };
+
   const handleSendCalendarInvite = async () => {
     if (!calendarRegistration) {
       return;
@@ -1170,7 +1212,7 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
             <AlertDialogTitle>Ajouter à votre agenda</AlertDialogTitle>
             <AlertDialogDescription className="space-y-3 text-base">
               <span>
-                Souhaitez-vous recevoir l'invitation calendrier pour bloquer cette session "{formation?.title ?? "cette formation"}" dans votre agenda ?
+                Comment souhaitez-vous ajouter cette session "{formation?.title ?? "cette formation"}" à votre agenda ?
               </span>
               {calendarSession && (
                 <div className="rounded-lg border bg-muted/40 p-3 text-sm">
@@ -1182,18 +1224,31 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-3">
-            <AlertDialogCancel onClick={closeCalendarPrompt} disabled={isSendingCalendarInvite}>
+          <AlertDialogFooter className="gap-3 flex-col sm:flex-row">
+            <AlertDialogCancel onClick={closeCalendarPrompt} disabled={isSendingCalendarInvite} data-testid="button-calendar-later">
               Plus tard
             </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault();
-                handleSendCalendarInvite();
-              }}
+            <Button
+              onClick={handleDownloadCalendar}
               disabled={isSendingCalendarInvite}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              variant="outline"
               type="button"
+              data-testid="button-download-calendar"
+            >
+              {isSendingCalendarInvite ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Chargement...
+                </>
+              ) : (
+                "Télécharger le fichier .ics"
+              )}
+            </Button>
+            <Button
+              onClick={handleSendCalendarInvite}
+              disabled={isSendingCalendarInvite}
+              type="button"
+              data-testid="button-email-calendar"
             >
               {isSendingCalendarInvite ? (
                 <>
@@ -1201,9 +1256,9 @@ export default function TrainingDetail({ currentUser: _currentUser }: TrainingDe
                   Envoi en cours...
                 </>
               ) : (
-                "Oui, envoyer l'invitation"
+                "Recevoir par email"
               )}
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
