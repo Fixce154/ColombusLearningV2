@@ -265,7 +265,9 @@ export const sendSessionInvitationEmail = async (options: SessionInviteOptions) 
     const { getUncachableResendClient } = await import("./resend");
     const { client, fromEmail } = await getUncachableResendClient();
     
-    await client.emails.send({
+    console.info("[invitation] Attempting to send email from:", fromEmail, "to:", payload.to);
+    
+    const response = await client.emails.send({
       from: fromEmail,
       to: payload.to,
       subject: payload.subject,
@@ -279,11 +281,12 @@ export const sendSessionInvitationEmail = async (options: SessionInviteOptions) 
       ],
     });
     
+    console.info("[invitation] Resend API response:", JSON.stringify(response, null, 2));
     console.info("[invitation] Email sent successfully to:", payload.to);
   } catch (error) {
     console.error("[invitation] Failed to send email:", error);
     // Log the payload for debugging
-    console.info("[invitation]", JSON.stringify(payload));
+    console.info("[invitation] Payload:", JSON.stringify(payload, null, 2));
   }
 };
 
@@ -357,7 +360,9 @@ export const sendRegistrationConfirmationEmail = async (options: RegistrationCon
     const { getUncachableResendClient } = await import("./resend");
     const { client, fromEmail } = await getUncachableResendClient();
     
-    await client.emails.send({
+    console.info("[registration-confirmation] Attempting to send email from:", fromEmail, "to:", payload.to);
+    
+    const response = await client.emails.send({
       from: fromEmail,
       to: payload.to,
       subject: payload.subject,
@@ -365,6 +370,7 @@ export const sendRegistrationConfirmationEmail = async (options: RegistrationCon
       html: payload.html,
     });
     
+    console.info("[registration-confirmation] Resend API response:", JSON.stringify(response, null, 2));
     console.info("[registration-confirmation] Email sent successfully to:", payload.to);
   } catch (error) {
     console.error("[registration-confirmation] Failed to send email:", error);
